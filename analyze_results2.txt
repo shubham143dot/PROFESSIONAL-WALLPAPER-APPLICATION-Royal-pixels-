@@ -1,0 +1,14 @@
+﻿Analyzing royal_pixels...                                       
+
+   info - Use interpolation to compose strings and values - analyzer.dart:5:42 - prefer_interpolation_to_compose_strings
+  error - The class 'GoogleSignIn' doesn't have an unnamed constructor - lib\core\di\service_locator.dart:24:34 - new_with_undefined_constructor_default
+  error - The method 'signIn' isn't defined for the type 'GoogleSignIn' - lib\data\datasources\auth_remote_data_source.dart:25:64 - undefined_method
+   info - Uses 'await' on an instance of 'GoogleSignInAuthentication', which is not a subtype of 'Future' - lib\data\datasources\auth_remote_data_source.dart:30:51 - await_only_futures
+  error - The getter 'accessToken' isn't defined for the type 'GoogleSignInAuthentication' - lib\data\datasources\auth_remote_data_source.dart:32:31 - undefined_getter
+  error - Target of URI doesn't exist: '../../domain/entities/wallpaper_entity.dart' - lib\presentation\pages\detail\wallpaper_detail_page.dart:10:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: '../../domain/usecases/buy_premium_wallpaper_usecase.dart' - lib\presentation\pages\detail\wallpaper_detail_page.dart:11:8 - uri_does_not_exist
+  error - Undefined class 'WallpaperEntity' - lib\presentation\pages\detail\wallpaper_detail_page.dart:15:9 - undefined_class
+  error - The name 'BuyPremiumWallpaperUseCase' isn't a type, so it can't be used as a type argument - lib\presentation\pages\detail\wallpaper_detail_page.dart:35:27 - non_type_as_type_argument
+  error - The method 'BuyPremiumParams' isn't defined for the type '_WallpaperDetailPageState' - lib\presentation\pages\detail\wallpaper_detail_page.dart:36:37 - undefined_method
+warning - Unused import: '../../providers/auth_provider.dart' - lib\presentation\pages\splash\splash_page.dart:4:8 - unused_import
+

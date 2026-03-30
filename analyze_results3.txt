@@ -1,0 +1,5 @@
+﻿Analyzing royal_pixels...                                       
+
+   info - Use interpolation to compose strings and values - analyzer.dart:5:42 - prefer_interpolation_to_compose_strings
+   info - Type could be non-nullable - lib\data\datasources\auth_remote_data_source.dart:25:32 - unnecessary_nullable_for_final_variable_declarations
+

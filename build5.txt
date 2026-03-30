@@ -1,0 +1,23 @@
+Running Gradle task 'assembleDebug'...                          
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':image_gallery_saver_plus:compileDebugKotlin'.
+> Inconsistent JVM-target compatibility detected for tasks 'compileDebugJavaWithJavac' (17) and 'compileDebugKotlin' (11).
+
+  Consider using JVM Toolchain: https://kotl.in/gradle/jvm/toolchain
+  Learn more about JVM-target validation: https://kotl.in/gradle/jvm/target-validation
+
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1m 35s
+Running Gradle task 'assembleDebug'...                             96.3s
+Gradle task assembleDebug failed with exit code 1

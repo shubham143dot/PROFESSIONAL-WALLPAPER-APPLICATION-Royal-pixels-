@@ -1,0 +1,694 @@
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+class AboutPage extends StatefulWidget {
+  const AboutPage({super.key});
+
+  @override
+  State<AboutPage> createState() => _AboutPageState();
+}
+
+class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
+  late final AnimationController _rotateController;
+  late final AnimationController _pulseController;
+  late final AnimationController _fadeController;
+
+  late final Animation<double> _pulseAnim;
+  late final Animation<double> _fadeAnim;
+
+  bool _copyrightExpanded = false;
+  bool _rightsExpanded = false;
+  bool _devExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _rotateController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    )..repeat();
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
+
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.08).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+  }
+
+  @override
+  void dispose() {
+    _rotateController.dispose();
+    _pulseController.dispose();
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0F),
+      body: CustomScrollView(
+        slivers: [
+          _buildSliverAppBar(context),
+          SliverToBoxAdapter(
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildHeroBadge(),
+                    const SizedBox(height: 32),
+                    _buildCopyrightCard(),
+                    const SizedBox(height: 16),
+                    _buildIPRightsCard(),
+                    const SizedBox(height: 16),
+                    _buildDeveloperCard(),
+                    const SizedBox(height: 16),
+                    _buildProhibitedActionsCard(),
+                    const SizedBox(height: 32),
+                    _buildFooter(),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(BuildContext context) {
+    return SliverAppBar(
+      expandedHeight: 260,
+      pinned: true,
+      backgroundColor: const Color(0xFF0A0A0F),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      flexibleSpace: FlexibleSpaceBar(
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Gradient background
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF1A0A2E),
+                    Color(0xFF0A0A0F),
+                    Color(0xFF0D1F0D),
+                  ],
+                ),
+              ),
+            ),
+            // Animated decorative circles
+            Positioned(
+              top: -40,
+              right: -40,
+              child: AnimatedBuilder(
+                animation: _rotateController,
+                builder: (_, __) => Transform.rotate(
+                  angle: _rotateController.value * 2 * math.pi,
+                  child: Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: SweepGradient(
+                        colors: [
+                          Colors.amber.withValues(alpha: 0.15),
+                          Colors.purple.withValues(alpha: 0.1),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -20,
+              left: -30,
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.amber.withValues(alpha: 0.05),
+                  border: Border.all(
+                    color: Colors.amber.withValues(alpha: 0.2),
+                    width: 1,
+                  ),
+                ),
+              ),
+            ),
+            // Center content
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 20),
+                  // Animated logo
+                  ScaleTransition(
+                    scale: _pulseAnim,
+                    child: Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withValues(alpha: 0.5),
+                            blurRadius: 24,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.diamond_rounded,
+                        color: Colors.white,
+                        size: 48,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Royal Pixels',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Version 1.0.0',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 13,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroBadge() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [
+            Colors.amber.withValues(alpha: 0.15),
+            Colors.orange.withValues(alpha: 0.08),
+          ],
+        ),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.verified_rounded, color: Colors.amber, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Official Application',
+                  style: TextStyle(
+                    color: Colors.amber,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  '© 2026 M.shubham. All rights reserved.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCopyrightCard() {
+    return _InfoCard(
+      icon: Icons.copyright_rounded,
+      iconColor: const Color(0xFF64B5F6),
+      title: 'Copyright Notice',
+      subtitle: 'Tap to expand',
+      isExpanded: _copyrightExpanded,
+      onTap: () => setState(() => _copyrightExpanded = !_copyrightExpanded),
+      expandedContent: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 12),
+          _highlightText(
+            '© 2026 M.shubham.',
+            ' All rights reserved.',
+            highlight: const Color(0xFF64B5F6),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'This application and all of its content, code, and design are protected under applicable copyright law. Reproduction or redistribution of this material without explicit written permission from the owner is prohibited.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.65),
+              fontSize: 13.5,
+              height: 1.7,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _copyButton('© 2026 M.shubham. All rights reserved.'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIPRightsCard() {
+    return _InfoCard(
+      icon: Icons.gavel_rounded,
+      iconColor: const Color(0xFFFFB74D),
+      title: 'Intellectual Property Rights',
+      subtitle: 'Tap to expand',
+      isExpanded: _rightsExpanded,
+      onTap: () => setState(() => _rightsExpanded = !_rightsExpanded),
+      expandedContent: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 12),
+          Text(
+            'All wallpapers, designs, and content available in this application are the intellectual property of the developer.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              height: 1.7,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Unauthorized copying, reproduction, distribution, or resale of any content is strictly prohibited.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.65),
+              fontSize: 13.5,
+              height: 1.7,
+            ),
+          ),
+          const SizedBox(height: 14),
+          // IP tags row
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _chipTag(Icons.image_rounded, 'Wallpapers', const Color(0xFFFFB74D)),
+              _chipTag(Icons.design_services_rounded, 'Designs', const Color(0xFF81C784)),
+              _chipTag(Icons.layers_rounded, 'Content', const Color(0xFF64B5F6)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeveloperCard() {
+    return _InfoCard(
+      icon: Icons.person_rounded,
+      iconColor: const Color(0xFF81C784),
+      title: 'Developer',
+      subtitle: 'M.shubham',
+      isExpanded: _devExpanded,
+      onTap: () => setState(() => _devExpanded = !_devExpanded),
+      expandedContent: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 12),
+          _devInfoRow(Icons.code_rounded, 'Developer', 'M.shubham'),
+          const SizedBox(height: 8),
+          _devInfoRow(Icons.apps_rounded, 'App Name', 'Royal Pixels'),
+          const SizedBox(height: 8),
+          _devInfoRow(Icons.calendar_today_rounded, 'Year', '2026'),
+          const SizedBox(height: 8),
+          _devInfoRow(Icons.security_rounded, 'License', 'Proprietary'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProhibitedActionsCard() {
+    final actions = [
+      (Icons.content_copy_rounded, 'Unauthorized Copying'),
+      (Icons.loop_rounded, 'Reproduction'),
+      (Icons.share_rounded, 'Unauthorized Distribution'),
+      (Icons.sell_rounded, 'Resale of Content'),
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A0A0A),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.25), width: 1),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.block_rounded, color: Colors.redAccent, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Strictly Prohibited',
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...actions.map(
+            (a) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Icon(a.$1, color: Colors.red.withValues(alpha: 0.7), size: 18),
+                  const SizedBox(width: 12),
+                  Text(
+                    a.$2,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontSize: 13.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'PROHIBITED',
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return Column(
+      children: [
+        Container(
+          height: 1,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.transparent,
+                Colors.amber.withValues(alpha: 0.4),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          '© 2026 M.shubham. All rights reserved.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.4),
+            fontSize: 13,
+            letterSpacing: 0.5,
+          ),
+        ),
+
+      ],
+    );
+  }
+
+  // Helpers
+
+  Widget _highlightText(String highlighted, String rest, {required Color highlight}) {
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: highlighted,
+            style: TextStyle(
+              color: highlight,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          TextSpan(
+            text: rest,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chipTag(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _devInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white38, size: 16),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 13),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+
+  Widget _copyButton(String text) {
+    return GestureDetector(
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: text));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Copied to clipboard!'),
+            backgroundColor: Colors.amber.shade800,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF64B5F6).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF64B5F6).withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.copy_rounded, color: Color(0xFF64B5F6), size: 15),
+            const SizedBox(width: 8),
+            Text(
+              'Copy copyright text',
+              style: const TextStyle(
+                color: Color(0xFF64B5F6),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Reusable expandable info card ───────────────────────────────────────────
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.isExpanded,
+    required this.onTap,
+    required this.expandedContent,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final bool isExpanded;
+  final VoidCallback onTap;
+  final Widget expandedContent;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: const Color(0xFF141420),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isExpanded ? iconColor.withValues(alpha: 0.45) : Colors.white.withValues(alpha: 0.07),
+          width: 1,
+        ),
+        boxShadow: isExpanded
+            ? [BoxShadow(color: iconColor.withValues(alpha: 0.08), blurRadius: 16, spreadRadius: 2)]
+            : [],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        splashColor: iconColor.withValues(alpha: 0.08),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: iconColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 20),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (!isExpanded)
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 280),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: iconColor.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+              AnimatedCrossFade(
+                firstChild: const SizedBox.shrink(),
+                secondChild: expandedContent,
+                crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 280),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

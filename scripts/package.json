@@ -1,0 +1,11 @@
+{
+  "name": "royal-pixels-scripts",
+  "version": "1.0.0",
+  "description": "Admin scripts for Royal Pixels Firebase",
+  "scripts": {
+    "seed": "node seed_wallpapers.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

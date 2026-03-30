@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "871231257178",
+    "project_id": "royal-pixel",
+    "storage_bucket": "royal-pixel.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:871231257178:android:bc425bd82fa03ff2e57663",
+        "android_client_info": {
+          "package_name": "com.example.royal_pixels"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "871231257178-38miodpssa48fctrb8r5tetjgeojj4t5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.royal_pixels",
+            "certificate_hash": "10d9d273406d7246af7e058f77aa3ff6d010c1a9"
+          }
+        },
+        {
+          "client_id": "871231257178-vtn84glpkom9qtrg075tt4hs7uhp0a6h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXpDCaAbelPJiL1GHA7nwWzisXnToV4MQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "871231257178-vtn84glpkom9qtrg075tt4hs7uhp0a6h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

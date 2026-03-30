@@ -1,0 +1,37 @@
+Running Gradle task 'assembleDebug'...                          
+e: file:///C:/royal_pixels/android/build.gradle.kts:58:42: Unresolved reference: kotlin
+e: file:///C:/royal_pixels/android/build.gradle.kts:59:9: Unresolved reference: compilerOptions
+e: file:///C:/royal_pixels/android/build.gradle.kts:60:13: Unresolved reference: jvmTarget
+e: file:///C:/royal_pixels/android/build.gradle.kts:60:41: Unresolved reference: kotlin
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Build file 'C:\royal_pixels\android\build.gradle.kts' line: 58
+
+* What went wrong:
+Script compilation errors:
+
+  Line 58:     project.tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+                                                    ^ Unresolved reference: kotlin
+
+  Line 59:         compilerOptions {
+                   ^ Unresolved reference: compilerOptions
+
+  Line 60:             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                       ^ Unresolved reference: jvmTarget
+
+  Line 60:             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                                                   ^ Unresolved reference: kotlin
+
+4 errors
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1s
+Running Gradle task 'assembleDebug'...                           1,894ms
+Gradle task assembleDebug failed with exit code 1

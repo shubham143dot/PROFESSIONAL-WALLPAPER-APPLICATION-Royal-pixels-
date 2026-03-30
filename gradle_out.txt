@@ -1,0 +1,199 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/Subha/.gradle/wrapper/dists/gradle-8.14-all/c2qonpi39x1mddn7hk5gh9iqj/gradle-8.14/lib/native-platform-0.22-milestone-28.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle:compileKotlin UP-TO-DATE
+> Task :gradle:compileJava NO-SOURCE
+> Task :gradle:compileGroovy NO-SOURCE
+> Task :gradle:pluginDescriptors UP-TO-DATE
+> Task :gradle:processResources UP-TO-DATE
+> Task :gradle:classes UP-TO-DATE
+> Task :gradle:jar UP-TO-DATE
+> Task :app:ReleaseMinSdkCheck
+> Task :app:compileFlutterBuildRelease
+> Task :app:packJniLibsflutterBuildRelease UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:configureCMakeRelease[arm64-v8a]
+> Task :app:buildCMakeRelease[arm64-v8a]
+> Task :app:configureCMakeRelease[armeabi-v7a]
+> Task :app:buildCMakeRelease[armeabi-v7a]
+> Task :app:configureCMakeRelease[x86_64]
+> Task :app:buildCMakeRelease[x86_64]
+> Task :app:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :cloud_firestore:preBuild UP-TO-DATE
+> Task :cloud_firestore:preReleaseBuild UP-TO-DATE
+> Task :cloud_firestore:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :cloud_firestore:mergeReleaseNativeLibs NO-SOURCE
+> Task :cloud_firestore:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :firebase_auth:preBuild UP-TO-DATE
+> Task :firebase_auth:preReleaseBuild UP-TO-DATE
+> Task :firebase_auth:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :firebase_auth:mergeReleaseNativeLibs NO-SOURCE
+> Task :firebase_auth:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :firebase_core:preBuild UP-TO-DATE
+> Task :firebase_core:preReleaseBuild UP-TO-DATE
+> Task :firebase_core:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :firebase_core:mergeReleaseNativeLibs NO-SOURCE
+> Task :firebase_core:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :firebase_storage:preBuild UP-TO-DATE
+> Task :firebase_storage:preReleaseBuild UP-TO-DATE
+> Task :firebase_storage:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :firebase_storage:mergeReleaseNativeLibs NO-SOURCE
+> Task :firebase_storage:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :google_sign_in_android:preBuild UP-TO-DATE
+> Task :google_sign_in_android:preReleaseBuild UP-TO-DATE
+> Task :google_sign_in_android:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :google_sign_in_android:mergeReleaseNativeLibs NO-SOURCE
+> Task :google_sign_in_android:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :image_gallery_saver:preBuild UP-TO-DATE
+> Task :image_gallery_saver:preReleaseBuild UP-TO-DATE
+> Task :image_gallery_saver:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :image_gallery_saver:mergeReleaseNativeLibs NO-SOURCE
+> Task :image_gallery_saver:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :path_provider_android:preBuild UP-TO-DATE
+> Task :path_provider_android:preReleaseBuild UP-TO-DATE
+> Task :path_provider_android:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :path_provider_android:mergeReleaseNativeLibs NO-SOURCE
+> Task :path_provider_android:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :permission_handler_android:preBuild UP-TO-DATE
+> Task :permission_handler_android:preReleaseBuild UP-TO-DATE
+> Task :permission_handler_android:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :permission_handler_android:mergeReleaseNativeLibs NO-SOURCE
+> Task :permission_handler_android:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :shared_preferences_android:preBuild UP-TO-DATE
+> Task :shared_preferences_android:preReleaseBuild UP-TO-DATE
+> Task :shared_preferences_android:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :shared_preferences_android:mergeReleaseNativeLibs NO-SOURCE
+> Task :shared_preferences_android:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :sqflite_android:preBuild UP-TO-DATE
+> Task :sqflite_android:preReleaseBuild UP-TO-DATE
+> Task :sqflite_android:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :sqflite_android:mergeReleaseNativeLibs NO-SOURCE
+> Task :sqflite_android:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :url_launcher_android:preBuild UP-TO-DATE
+> Task :url_launcher_android:preReleaseBuild UP-TO-DATE
+> Task :url_launcher_android:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :url_launcher_android:mergeReleaseNativeLibs NO-SOURCE
+> Task :url_launcher_android:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :app:mergeReleaseNativeLibs UP-TO-DATE
+> Task :app:stripReleaseDebugSymbols UP-TO-DATE
+> Task :app:extractReleaseNativeSymbolTables UP-TO-DATE
+> Task :app:mergeReleaseNativeDebugMetadata UP-TO-DATE
+> Task :cloud_firestore:generateReleaseBuildConfig UP-TO-DATE
+> Task :cloud_firestore:generateReleaseResValues UP-TO-DATE
+> Task :cloud_firestore:generateReleaseResources UP-TO-DATE
+> Task :cloud_firestore:packageReleaseResources UP-TO-DATE
+> Task :cloud_firestore:parseReleaseLocalResources UP-TO-DATE
+> Task :cloud_firestore:generateReleaseRFile UP-TO-DATE
+> Task :cloud_firestore:javaPreCompileRelease UP-TO-DATE
+> Task :firebase_core:generateReleaseBuildConfig UP-TO-DATE
+> Task :firebase_core:generateReleaseResValues UP-TO-DATE
+> Task :firebase_core:generateReleaseResources UP-TO-DATE
+> Task :firebase_core:packageReleaseResources UP-TO-DATE
+> Task :firebase_core:parseReleaseLocalResources UP-TO-DATE
+> Task :firebase_core:generateReleaseRFile UP-TO-DATE
+> Task :firebase_core:javaPreCompileRelease UP-TO-DATE
+> Task :firebase_core:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :firebase_core:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :cloud_firestore:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :cloud_firestore:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :cloud_firestore:exportReleaseConsumerProguardFiles UP-TO-DATE
+> Task :firebase_auth:generateReleaseBuildConfig UP-TO-DATE
+> Task :firebase_auth:generateReleaseResValues UP-TO-DATE
+> Task :firebase_auth:generateReleaseResources UP-TO-DATE
+> Task :firebase_auth:packageReleaseResources UP-TO-DATE
+> Task :firebase_auth:parseReleaseLocalResources UP-TO-DATE
+> Task :firebase_auth:generateReleaseRFile UP-TO-DATE
+> Task :firebase_auth:javaPreCompileRelease UP-TO-DATE
+> Task :firebase_auth:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :firebase_auth:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :firebase_auth:exportReleaseConsumerProguardFiles UP-TO-DATE
+> Task :firebase_storage:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :firebase_storage:generateReleaseBuildConfig UP-TO-DATE
+> Task :firebase_storage:generateReleaseResValues UP-TO-DATE
+> Task :firebase_storage:generateReleaseResources UP-TO-DATE
+> Task :firebase_storage:packageReleaseResources UP-TO-DATE
+> Task :firebase_storage:parseReleaseLocalResources UP-TO-DATE
+> Task :firebase_storage:generateReleaseRFile UP-TO-DATE
+> Task :firebase_storage:compileReleaseKotlin UP-TO-DATE
+> Task :firebase_storage:javaPreCompileRelease UP-TO-DATE
+> Task :firebase_storage:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :firebase_storage:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :firebase_storage:exportReleaseConsumerProguardFiles UP-TO-DATE
+> Task :firebase_core:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :firebase_core:exportReleaseConsumerProguardFiles UP-TO-DATE
+> Task :google_sign_in_android:generateReleaseResValues UP-TO-DATE
+> Task :google_sign_in_android:generateReleaseResources UP-TO-DATE
+> Task :google_sign_in_android:packageReleaseResources UP-TO-DATE
+> Task :google_sign_in_android:parseReleaseLocalResources UP-TO-DATE
+> Task :google_sign_in_android:generateReleaseRFile UP-TO-DATE
+> Task :google_sign_in_android:javaPreCompileRelease UP-TO-DATE
+> Task :google_sign_in_android:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :google_sign_in_android:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :google_sign_in_android:exportReleaseConsumerProguardFiles UP-TO-DATE
+> Task :image_gallery_saver:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :image_gallery_saver:generateReleaseResValues UP-TO-DATE
+> Task :image_gallery_saver:generateReleaseResources UP-TO-DATE
+> Task :image_gallery_saver:packageReleaseResources UP-TO-DATE
+> Task :image_gallery_saver:parseReleaseLocalResources UP-TO-DATE
+> Task :image_gallery_saver:generateReleaseRFile UP-TO-DATE
+> Task :image_gallery_saver:javaPreCompileRelease UP-TO-DATE
+> Task :path_provider_android:generateReleaseResValues UP-TO-DATE
+> Task :path_provider_android:generateReleaseResources UP-TO-DATE
+> Task :path_provider_android:packageReleaseResources UP-TO-DATE
+> Task :path_provider_android:parseReleaseLocalResources UP-TO-DATE
+> Task :path_provider_android:generateReleaseRFile UP-TO-DATE
+> Task :path_provider_android:javaPreCompileRelease UP-TO-DATE
+> Task :path_provider_android:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :path_provider_android:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :path_provider_android:exportReleaseConsumerProguardFiles UP-TO-DATE
+> Task :permission_handler_android:generateReleaseResValues UP-TO-DATE
+> Task :permission_handler_android:generateReleaseResources UP-TO-DATE
+> Task :permission_handler_android:packageReleaseResources UP-TO-DATE
+> Task :permission_handler_android:parseReleaseLocalResources UP-TO-DATE
+> Task :permission_handler_android:generateReleaseRFile UP-TO-DATE
+> Task :permission_handler_android:javaPreCompileRelease UP-TO-DATE
+> Task :permission_handler_android:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :permission_handler_android:mergeReleaseGeneratedProguardFiles
+> Task :shared_preferences_android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :shared_preferences_android:generateReleaseResValues UP-TO-DATE
+> Task :permission_handler_android:exportReleaseConsumerProguardFiles
+> Task :shared_preferences_android:generateReleaseResources UP-TO-DATE
+> Task :shared_preferences_android:packageReleaseResources UP-TO-DATE
+> Task :shared_preferences_android:parseReleaseLocalResources
+> Task :shared_preferences_android:javaPreCompileRelease
+> Task :sqflite_android:generateReleaseResValues
+> Task :shared_preferences_android:generateReleaseRFile
+> Task :sqflite_android:generateReleaseResources
+
+> Task :image_gallery_saver:compileReleaseKotlin FAILED
+e: file:///C:/Users/Subha/AppData/Local/Pub/Cache/hosted/pub.dev/image_gallery_saver-2.0.3/android/src/main/kotlin/com/example/imagegallerysaver/ImageGallerySaverPlugin.kt:21:48 Unresolved reference 'Registrar'.
+
+> Task :shared_preferences_android:compileReleaseKotlin
+
+[Incubating] Problems report is available at: file:///C:/royal_pixels/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':image_gallery_saver:compileReleaseKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 19s
+125 actionable tasks: 17 executed, 108 up-to-date
