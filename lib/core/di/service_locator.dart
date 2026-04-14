@@ -15,6 +15,11 @@ import '../../domain/repositories/wallpaper_repository.dart';
 import '../../domain/usecases/buy_premium_wallpaper_usecase.dart';
 import '../../domain/usecases/get_wallpapers_usecase.dart';
 import '../../domain/usecases/login_usecase.dart';
+import '../../domain/usecases/add_wallpaper_usecase.dart';
+import '../../domain/usecases/delete_wallpaper_usecase.dart';
+import '../../domain/usecases/update_wallpaper_usecase.dart';
+import '../../domain/usecases/rename_category_usecase.dart';
+
 
 final sl = GetIt.instance;
 
@@ -56,4 +61,8 @@ void setupLocator() {
   sl.registerLazySingleton(() => LoginUseCase(sl()));
   sl.registerLazySingleton(() => GetWallpapersUseCase(sl()));
   sl.registerLazySingleton(() => BuyPremiumWallpaperUseCase(sl()));
+  sl.registerLazySingleton(() => AddWallpaperUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteWallpaperUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateWallpaperUseCase(sl()));
+  sl.registerLazySingleton(() => RenameCategoryUseCase(sl()));
 }

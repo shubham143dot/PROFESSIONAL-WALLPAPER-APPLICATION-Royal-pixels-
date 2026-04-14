@@ -1,22 +1,28 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/diamond_loader.dart';
 
-class LoginPage extends ConsumerWidget {
+class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends ConsumerState<LoginPage> {
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
-    // Listen for auth success and navigate
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.user != null) {
-        context.go('/home'); // We will define this route
-      }
-      if (next.error != null) {
+      if (next.user != null && previous?.user == null) {
+        if (mounted) context.go('/home');
+      } else if (next.error != null && previous?.error != next.error) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${next.error}')),
         );
@@ -24,74 +30,264 @@ class LoginPage extends ConsumerWidget {
     });
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1E1E1E), Color(0xFF121212)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ── Background wallpaper ─────────────────────────────────────
+          Image.asset(
+            'assets/login_bg.png',
+            fit: BoxFit.cover,
           ),
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.diamond,
-                  size: 100,
-                  color: Colors.amber,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Welcome to Royal Pixels',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 1.2,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Premium wallpapers for your device.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.white70,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 64),
-                if (authState.isLoading)
-                  const DiamondLoader()
-                else
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      ref.read(authProvider.notifier).loginWithGoogle();
-                    },
-                    icon: const Icon(Icons.login, color: Colors.black),
-                    label: const Text(
-                      'Sign in with Google',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      elevation: 8,
-                    ),
-                  ),
-              ],
+          // ── Dark + blur overlay ──────────────────────────────────────
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              color: AppColors.bg0.withAlpha(180),
             ),
           ),
-        ),
+          // ── Centered frosted glass card ──────────────────────────────
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(28, 36, 28, 36),
+                    decoration: BoxDecoration(
+                      color: AppColors.glassFill,
+                      borderRadius: BorderRadius.circular(28),
+                      border:
+                          Border.all(color: AppColors.glassBorder, width: 1.2),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // ── Diamond icon with gold ring ────────────────
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: AppColors.goldRingGradient,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.goldMid.withAlpha(80),
+                                blurRadius: 24,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(2.5),
+                            child: CircleAvatar(
+                              backgroundColor: AppColors.bg0,
+                              child: const Icon(
+                                Icons.diamond,
+                                size: 36,
+                                color: AppColors.goldLight,
+                              ),
+                            ),
+                          ),
+                        )
+                            .animate()
+                            .fade(duration: 600.ms, delay: 100.ms)
+                            .scale(
+                                begin: const Offset(0.7, 0.7),
+                                duration: 500.ms,
+                                curve: Curves.easeOutBack),
+                        const SizedBox(height: 24),
+                        // ── Title ──────────────────────────────────────
+                        ShaderMask(
+                          shaderCallback: (bounds) =>
+                              AppColors.goldGradient.createShader(bounds),
+                          child: const Text(
+                            'Royal Pixels',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              fontSize: 30,
+                              letterSpacing: 2.0,
+                            ),
+                          ),
+                        )
+                            .animate()
+                            .fade(duration: 600.ms, delay: 200.ms)
+                            .slideY(
+                                begin: 0.3,
+                                end: 0,
+                                duration: 500.ms,
+                                curve: Curves.easeOut),
+                        const SizedBox(height: 10),
+                        // ── Subtitle ───────────────────────────────────
+                        const Text(
+                          'Premium wallpapers for your device.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                            letterSpacing: 0.3,
+                          ),
+                          textAlign: TextAlign.center,
+                        )
+                            .animate()
+                            .fade(duration: 500.ms, delay: 300.ms),
+                        const SizedBox(height: 40),
+                        // ── Sign-in button ─────────────────────────────
+                        if (authState.isLoading)
+                          const SizedBox(
+                            height: 52,
+                            child: Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppColors.goldLight),
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              ref.read(authProvider.notifier).loginWithGoogle();
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.white.withAlpha(240),
+                                    Colors.white,
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.goldLight.withAlpha(40),
+                                    blurRadius: 20,
+                                    spreadRadius: 0,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                  BoxShadow(
+                                    color: Colors.black.withAlpha(20),
+                                    blurRadius: 10,
+                                    spreadRadius: 0,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Actual Google Logo Asset
+                                  Image.asset(
+                                    'assets/google_logo.png',
+                                    width: 24,
+                                    height: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Continue with Google',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F1420),
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                              .animate()
+                              .fade(duration: 500.ms, delay: 400.ms)
+                              .slideY(
+                                  begin: 0.3,
+                                  end: 0,
+                                  duration: 450.ms,
+                                  curve: Curves.easeOut),
+
+                        const SizedBox(height: 20),
+                        // ── Trust badges ───────────────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _TrustBadge(icon: Icons.lock_outline, label: 'Secure'),
+                            _TrustDot(),
+                            _TrustBadge(icon: Icons.shield_outlined, label: 'Private'),
+                            _TrustDot(),
+                            _TrustBadge(icon: Icons.block_outlined, label: 'No Spam'),
+                          ],
+                        )
+                            .animate()
+                            .fade(duration: 400.ms, delay: 550.ms),
+
+                        const SizedBox(height: 20),
+                        // ── Version ────────────────────────────────────
+                        Text(
+                          'Royal Pixels • v1.0',
+                          style: TextStyle(
+                            color: AppColors.textMuted.withAlpha(130),
+                            fontSize: 11,
+                            letterSpacing: 0.5,
+                          ),
+                        )
+                            .animate()
+                            .fade(duration: 400.ms, delay: 600.ms),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
+
+
+
+// ─── Trust badge ──────────────────────────────────────────────────────────────
+class _TrustBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _TrustBadge({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: AppColors.textMuted),
+        const SizedBox(width: 4),
+        Text(label,
+            style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+}
+
+class _TrustDot extends StatelessWidget {
+  const _TrustDot();
+  @override
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8),
+        child: Text('·', style: TextStyle(color: AppColors.textMuted)),
+      );
 }

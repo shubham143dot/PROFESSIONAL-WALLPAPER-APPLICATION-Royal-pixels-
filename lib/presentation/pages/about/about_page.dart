@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -17,9 +18,7 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
   late final Animation<double> _pulseAnim;
   late final Animation<double> _fadeAnim;
 
-  bool _copyrightExpanded = false;
-  bool _rightsExpanded = false;
-  bool _devExpanded = false;
+  bool _legalExpanded = false;
 
   @override
   void initState() {
@@ -70,17 +69,11 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                 child: Column(
                   children: [
                     const SizedBox(height: 16),
-                    _buildHeroBadge(),
-                    const SizedBox(height: 32),
-                    _buildCopyrightCard(),
+                    _buildLegalCard(),
                     const SizedBox(height: 16),
-                    _buildIPRightsCard(),
+                    _buildContactSupportButton(),
                     const SizedBox(height: 16),
-                    _buildDeveloperCard(),
-                    const SizedBox(height: 16),
-                    _buildProhibitedActionsCard(),
-                    const SizedBox(height: 32),
-                    _buildFooter(),
+                    _buildPrivacyPolicyButton(),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -181,9 +174,9 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.amber.withValues(alpha: 0.5),
-                            blurRadius: 24,
-                            spreadRadius: 4,
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),
@@ -213,6 +206,24 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                       letterSpacing: 1.0,
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Premium wallpapers for your device',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Developed by Royal Shubham Pixel Labs',
+                    style: TextStyle(
+                      color: Colors.amber,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -222,59 +233,14 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildHeroBadge() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [
-            Colors.amber.withValues(alpha: 0.15),
-            Colors.orange.withValues(alpha: 0.08),
-          ],
-        ),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.verified_rounded, color: Colors.amber, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Official Application',
-                  style: TextStyle(
-                    color: Colors.amber,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  '© 2026 M.shubham. All rights reserved.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCopyrightCard() {
+  Widget _buildLegalCard() {
     return _InfoCard(
-      icon: Icons.copyright_rounded,
+      icon: Icons.gavel_rounded,
       iconColor: const Color(0xFF64B5F6),
-      title: 'Copyright Notice',
-      subtitle: 'Tap to expand',
-      isExpanded: _copyrightExpanded,
-      onTap: () => setState(() => _copyrightExpanded = !_copyrightExpanded),
+      title: 'Legal Information',
+      subtitle: null,
+      isExpanded: _legalExpanded,
+      onTap: () => setState(() => _legalExpanded = !_legalExpanded),
       expandedContent: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -282,208 +248,203 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
           const Divider(color: Colors.white12),
           const SizedBox(height: 12),
           _highlightText(
-            '© 2026 M.shubham.',
+            '© 2026 Royal Shubham Pixel Labs.',
             ' All rights reserved.',
             highlight: const Color(0xFF64B5F6),
           ),
           const SizedBox(height: 10),
           Text(
-            'This application and all of its content, code, and design are protected under applicable copyright law. Reproduction or redistribution of this material without explicit written permission from the owner is prohibited.',
+            'All wallpapers, designs, and content are owned or licensed by Royal Shubham Pixel Labs and are protected under applicable copyright laws. These wallpapers are provided for personal use only. Unauthorized copying, reproduction, distribution, or resale is strictly prohibited.\n\nIf you believe any content violates copyright, please contact us for immediate removal.',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.65),
               fontSize: 13.5,
               height: 1.7,
             ),
-          ),
-          const SizedBox(height: 12),
-          _copyButton('© 2026 M.shubham. All rights reserved.'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIPRightsCard() {
-    return _InfoCard(
-      icon: Icons.gavel_rounded,
-      iconColor: const Color(0xFFFFB74D),
-      title: 'Intellectual Property Rights',
-      subtitle: 'Tap to expand',
-      isExpanded: _rightsExpanded,
-      onTap: () => setState(() => _rightsExpanded = !_rightsExpanded),
-      expandedContent: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-          const Divider(color: Colors.white12),
-          const SizedBox(height: 12),
-          Text(
-            'All wallpapers, designs, and content available in this application are the intellectual property of the developer.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
-              fontSize: 13.5,
-              fontWeight: FontWeight.w500,
-              height: 1.7,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Unauthorized copying, reproduction, distribution, or resale of any content is strictly prohibited.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.65),
-              fontSize: 13.5,
-              height: 1.7,
-            ),
-          ),
-          const SizedBox(height: 14),
-          // IP tags row
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _chipTag(Icons.image_rounded, 'Wallpapers', const Color(0xFFFFB74D)),
-              _chipTag(Icons.design_services_rounded, 'Designs', const Color(0xFF81C784)),
-              _chipTag(Icons.layers_rounded, 'Content', const Color(0xFF64B5F6)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDeveloperCard() {
-    return _InfoCard(
-      icon: Icons.person_rounded,
-      iconColor: const Color(0xFF81C784),
-      title: 'Developer',
-      subtitle: 'M.shubham',
-      isExpanded: _devExpanded,
-      onTap: () => setState(() => _devExpanded = !_devExpanded),
-      expandedContent: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-          const Divider(color: Colors.white12),
-          const SizedBox(height: 12),
-          _devInfoRow(Icons.code_rounded, 'Developer', 'M.shubham'),
-          const SizedBox(height: 8),
-          _devInfoRow(Icons.apps_rounded, 'App Name', 'Royal Pixels'),
-          const SizedBox(height: 8),
-          _devInfoRow(Icons.calendar_today_rounded, 'Year', '2026'),
-          const SizedBox(height: 8),
-          _devInfoRow(Icons.security_rounded, 'License', 'Proprietary'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProhibitedActionsCard() {
-    final actions = [
-      (Icons.content_copy_rounded, 'Unauthorized Copying'),
-      (Icons.loop_rounded, 'Reproduction'),
-      (Icons.share_rounded, 'Unauthorized Distribution'),
-      (Icons.sell_rounded, 'Resale of Content'),
-    ];
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A0A0A),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.red.withValues(alpha: 0.25), width: 1),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.block_rounded, color: Colors.redAccent, size: 20),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Strictly Prohibited',
-                style: TextStyle(
-                  color: Colors.redAccent,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
           ),
           const SizedBox(height: 16),
-          ...actions.map(
-            (a) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.2), width: 1),
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.block_rounded, color: Colors.redAccent.withValues(alpha: 0.85), size: 14),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Restricted Usage',
+                      style: TextStyle(
+                        color: Colors.redAccent.withValues(alpha: 0.85),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    'Copying',
+                    'Reproduction',
+                    'Distribution',
+                    'Resale',
+                  ].map((a) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.close, color: Colors.redAccent, size: 12),
+                      const SizedBox(width: 4),
+                      Text(a, style: TextStyle(color: Colors.redAccent.withValues(alpha: 0.8), fontSize: 12)),
+                    ],
+                  )).toList(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactSupportButton() {
+    return InkWell(
+      onTap: () async {
+        final Uri emailLaunchUri = Uri(
+          scheme: 'mailto',
+          path: 'royalshubhampixellabs@gmail.com',
+          query: 'subject=Royal%20Pixels%20Support',
+        );
+        try {
+          if (!await launchUrl(emailLaunchUri, mode: LaunchMode.externalApplication)) {
+            await launchUrl(emailLaunchUri);
+          }
+        } catch (e) {
+          debugPrint('Could not launch email: $e');
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141420),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.07), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.email_rounded, color: Colors.greenAccent, size: 22),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(a.$1, color: Colors.red.withValues(alpha: 0.7), size: 18),
-                  const SizedBox(width: 12),
                   Text(
-                    a.$2,
+                    'Contact Support',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 13.5,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
                     ),
                   ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'PROHIBITED',
-                      style: TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
+                  SizedBox(height: 2),
+                  Text(
+                    'royalshubhampixellabs@gmail.com',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.greenAccent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3)),
+              ),
+              child: const Text('Contact Us', style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildFooter() {
-    return Column(
-      children: [
-        Container(
-          height: 1,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.transparent,
-                Colors.amber.withValues(alpha: 0.4),
-                Colors.transparent,
-              ],
+  Widget _buildPrivacyPolicyButton() {
+    return InkWell(
+      onTap: () async {
+        final url = Uri.parse('https://sites.google.com/view/royal-pixels-privacy/home');
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141420),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.07), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.privacy_tip_rounded, color: Colors.blueAccent, size: 22),
             ),
-          ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Privacy Policy',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Open in browser',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.open_in_new_rounded, color: Colors.white54, size: 20),
+          ],
         ),
-        const SizedBox(height: 20),
-        Text(
-          '© 2026 M.shubham. All rights reserved.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.4),
-            fontSize: 13,
-            letterSpacing: 0.5,
-          ),
-        ),
-
-      ],
+      ),
     );
   }
+
+
 
   // Helpers
 
@@ -596,7 +557,7 @@ class _InfoCard extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.isExpanded,
     required this.onTap,
     required this.expandedContent,
@@ -605,7 +566,7 @@ class _InfoCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final bool isExpanded;
   final VoidCallback onTap;
   final Widget expandedContent;
@@ -623,7 +584,7 @@ class _InfoCard extends StatelessWidget {
           width: 1,
         ),
         boxShadow: isExpanded
-            ? [BoxShadow(color: iconColor.withValues(alpha: 0.08), blurRadius: 16, spreadRadius: 2)]
+            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))]
             : [],
       ),
       child: InkWell(
@@ -658,9 +619,9 @@ class _InfoCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (!isExpanded)
+                        if (!isExpanded && subtitle != null)
                           Text(
-                            subtitle,
+                            subtitle!,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.4),
                               fontSize: 12,

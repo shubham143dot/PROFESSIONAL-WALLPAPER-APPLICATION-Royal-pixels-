@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_animate/flutter_animate.dart';
+
+import 'dart:ui';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../domain/entities/wallpaper_entity.dart';
+import '../../../core/theme/app_colors.dart';
+import 'package:flutter/services.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/wallpaper_provider.dart';
 import '../../widgets/wallpaper_card.dart';
-import '../../widgets/diamond_loader.dart';
 import 'wallpaper_search_delegate.dart';
+import '../my_wallpapers/my_wallpapers_page.dart';
+import '../category/categories_list_page.dart';
+
+// ─── Filter enum ─────────────────────────────────────────────────────────────
+enum WallpaperFilter { all, free, premium, special }
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -18,246 +27,19 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+    with TickerProviderStateMixin {
+  // Bottom nav index: 0=Home, 1=Categories, 2=Favorites, 3=Profile
+  int _navIndex = 0;
 
-  // Speech-to-text
-  final stt.SpeechToText _speech = stt.SpeechToText();
-  bool _speechAvailable = false;
-  bool _isListening = false;
-  String _voiceWords = '';
-  // Track whether we've already shown the in-app rationale dialog
-  bool _permissionRationaleShown = false;
+  // Active wallpaper filter (on Home tab)
+  WallpaperFilter _filter = WallpaperFilter.all;
+
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     Future.microtask(
         () => ref.read(wallpaperProvider.notifier).loadWallpapers());
-    // Do NOT auto-init speech on startup – we request permission only on demand.
-  }
-
-  // ─── Permission helpers ───────────────────────────────────────
-
-  /// Shows an in-app rationale dialog BEFORE the OS system prompt.
-  /// Returns true if the user tapped "Allow" (proceed to OS prompt).
-  Future<bool> _showRationaleDialog() async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Row(
-          children: [
-            Icon(Icons.mic, color: Colors.amber),
-            SizedBox(width: 10),
-            Text('Voice Search',
-                style: TextStyle(color: Colors.white, fontSize: 18)),
-          ],
-        ),
-        content: const Text(
-          'Royal Pixels needs microphone access to let you search wallpapers by voice.\n\n'
-          'Tap "Allow" to grant microphone permission.',
-          style: TextStyle(color: Colors.white70, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Not Now',
-                style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Allow',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
-
-  /// Shows «Open Settings» dialog when permission is permanently denied.
-  void _showSettingsDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Row(
-          children: [
-            Icon(Icons.mic_off, color: Colors.amber),
-            SizedBox(width: 10),
-            Text('Microphone Blocked',
-                style: TextStyle(color: Colors.white, fontSize: 18)),
-          ],
-        ),
-        content: const Text(
-          'Microphone permission was denied.\n\n'
-          'Go to Settings → App Permissions → Microphone and enable access for Royal Pixels.',
-          style: TextStyle(color: Colors.white70, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              openAppSettings();
-            },
-            child: const Text('Open Settings',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Requests microphone permission on-demand.
-  /// Shows our rationale dialog first if this is the first request.
-  Future<bool> _requestMicPermission() async {
-    final status = await Permission.microphone.status;
-
-    // Already granted – great, proceed.
-    if (status.isGranted) return true;
-
-    // Permanently denied – cannot show system prompt anymore, go to Settings.
-    if (status.isPermanentlyDenied) {
-      if (mounted) _showSettingsDialog();
-      return false;
-    }
-
-    // Show our in-app rationale before the OS system prompt (first-time ask).
-    if (!_permissionRationaleShown) {
-      _permissionRationaleShown = true;
-      if (!mounted) return false;
-      final proceed = await _showRationaleDialog();
-      if (!proceed) return false;
-    }
-
-    // Trigger the actual OS permission request.
-    final result = await Permission.microphone.request();
-    if (result.isGranted) return true;
-
-    if (result.isPermanentlyDenied && mounted) _showSettingsDialog();
-    return false;
-  }
-
-  /// Initialises speech_to_text after confirming microphone permission.
-  Future<bool> _initSpeech() async {
-    final granted = await _requestMicPermission();
-    if (!granted) return false;
-
-    // If already initialised, skip re-init to avoid issues.
-    if (_speechAvailable) return true;
-
-    bool ok = false;
-    try {
-      ok = await _speech.initialize(
-        onStatus: (status) {
-          if (status == 'done' || status == 'notListening') {
-            if (mounted) setState(() => _isListening = false);
-          }
-        },
-        onError: (error) {
-          debugPrint('STT error: ${error.errorMsg}');
-          if (mounted) setState(() => _isListening = false);
-        },
-        debugLogging: true,
-      );
-    } catch (e) {
-      debugPrint('STT init exception: $e');
-      ok = false;
-    }
-
-    if (mounted) setState(() => _speechAvailable = ok);
-    return ok;
-  }
-
-  /// Opens an animated bottom-sheet microphone UI, listens, then
-  /// opens the search delegate pre-filled with the recognised words.
-  Future<void> _startVoiceSearch() async {
-    // Always try to init/re-check permission when the user taps mic.
-    final ready = await _initSpeech();
-
-    if (!ready || !_speech.isAvailable) {
-      // Permission denied or STT unavailable – already shown dialog.
-      return;
-    }
-
-    setState(() {
-      _voiceWords = '';
-      _isListening = false;
-    });
-
-    // Use a local variable to capture the recognised words reliably —
-    // avoids setState-timing races where _voiceWords might not be committed
-    // by the time the code after await showModalBottomSheet runs.
-    String recognisedWords = '';
-
-    // Show the mic bottom-sheet
-    if (!mounted) return;
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isDismissible: true,
-      builder: (_) => _MicSheet(
-        speech: _speech,
-        onWordsFinal: (words) {
-          recognisedWords = words; // capture immediately, no setState race
-          if (mounted) {
-            setState(() {
-              _voiceWords = words;
-              _isListening = false;
-            });
-          }
-        },
-      ),
-    );
-
-    if (mounted) setState(() => _isListening = false);
-
-    // When the sheet is dismissed, open search if we got recognised words.
-    // Wait for bottom-sheet dismiss animation to fully complete before pushing
-    // search — chaining navigations without this can silently fail.
-    if (!mounted) return;
-    final query = recognisedWords.trim().isNotEmpty
-        ? recognisedWords.trim()
-        : _voiceWords.trim();
-
-    if (query.isNotEmpty) {
-      // Small pause so the modal-route exit animation finishes.
-      await Future.delayed(const Duration(milliseconds: 200));
-      if (!mounted) return;
-
-      final wallpaperState = ref.read(wallpaperProvider);
-      final allWallpapers = [
-        ...wallpaperState.freeWallpapers,
-        ...wallpaperState.premiumWallpapers,
-      ];
-      showSearch(
-        context: context,
-        delegate: WallpaperSearchDelegate(allWallpapers),
-        query: query,
-      );
-    }
   }
 
   void _openSearch() {
@@ -274,352 +56,756 @@ class _HomePageState extends ConsumerState<HomePage>
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _speech.cancel();
     super.dispose();
+  }
+
+  // ── Apply filter to full wallpaper list ────────────────────────────────────
+  List<WallpaperEntity> _filteredWallpapers(WallpaperState state) {
+    switch (_filter) {
+      case WallpaperFilter.free:
+        return state.freeWallpapers;
+      case WallpaperFilter.premium:
+        return state.premiumWallpapers;
+      case WallpaperFilter.special:
+        return state.specialWallpapers;
+      case WallpaperFilter.all:
+        return [
+          ...state.freeWallpapers,
+          ...state.premiumWallpapers,
+          ...state.specialWallpapers,
+        ];
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final wallpaperState = ref.watch(wallpaperProvider);
     final userState = ref.watch(authProvider);
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Royal Pixels'),
-        actions: [
-          // ── Mic button ──
-          IconButton(
-            tooltip: 'Voice Search',
-            icon: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Icon(
-                _isListening ? Icons.mic : Icons.mic_none,
-                key: ValueKey(_isListening),
-                color: _isListening ? Colors.amber : Colors.white,
+      extendBody: true,
+      extendBodyBehindAppBar: true,
+      // ── AppBar ─────────────────────────────────────────────────────────────
+      appBar: _navIndex == 0
+          ? AppBar(
+              toolbarHeight: 56,
+              flexibleSpace: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18.0, sigmaY: 18.0),
+                  child: Container(color: AppColors.bg0.withAlpha(160)),
+                ),
               ),
-            ),
-            onPressed: _startVoiceSearch,
-          ),
-          // ── Search button ──
-          IconButton(
-            tooltip: 'Search',
-            icon: const Icon(Icons.search),
-            onPressed: _openSearch,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.amber,
-          labelColor: Colors.amber,
-          unselectedLabelColor: Colors.white60,
-          tabs: const [
-            Tab(text: 'Free'),
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.diamond, size: 16),
-                  SizedBox(width: 6),
-                  Text('Premium'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      drawer: Drawer(
-        backgroundColor: const Color(0xFF1E1E1E),
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Color(0xFF121212),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.diamond, size: 40, color: Colors.amber),
-                  const Spacer(),
-                  Text(
-                    userState.user?.name ?? 'Guest User',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
+              title: ShaderMask(
+                shaderCallback: (bounds) =>
+                    AppColors.goldGradient.createShader(bounds),
+                child: const Text(
+                  'Royal Pixels',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2.0,
+                    color: Colors.white,
+                    fontSize: 20,
                   ),
-                  Text(
-                    userState.user?.email ?? '',
-                    style:
-                        const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                ],
+                ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.home, color: Colors.amber),
-              title: const Text('Home'),
-              onTap: () => context.pop(),
-            ),
-            ListTile(
-              leading: const Icon(Icons.favorite, color: Colors.amber),
-              title: const Text('My Wallpapers',
-                  style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.of(context).pop();
-                context.push('/my-wallpapers');
-              },
-            ),
-            ListTile(
-              leading:
-                  const Icon(Icons.info_outline_rounded, color: Colors.amber),
-              title:
-                  const Text('About', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.of(context).pop();
-                context.push('/about');
-              },
-            ),
-            const Divider(color: Colors.white24),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.white70),
-              title: const Text('Logout',
-                  style: TextStyle(color: Colors.white)),
-              onTap: () async {
-                Navigator.of(context).pop();
-                await ref.read(authProvider.notifier).logout();
-                if (context.mounted) context.go('/login');
-              },
-            ),
-          ],
-        ),
-      ),
-      body: wallpaperState.isLoading
-          ? const Center(
-              child: DiamondLoader())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildGrid(wallpaperState.freeWallpapers),
-                _buildGrid(wallpaperState.premiumWallpapers),
+              actions: [
+                IconButton(
+                  tooltip: 'Search',
+                  icon: const Icon(Icons.search,
+                      color: AppColors.textSecondary),
+                  onPressed: _openSearch,
+                ),
               ],
-            ),
+            )
+          : null,
+      // ── Bottom Navigation Bar ──────────────────────────────────────────────
+      bottomNavigationBar: _buildBottomNav(userState, bottomPadding),
+      // ── Body ───────────────────────────────────────────────────────────────
+      body: IndexedStack(
+        index: _navIndex,
+        children: [
+          // Tab 0: Home wallpaper grid
+          _buildHomeTab(wallpaperState),
+          // Tab 1: Categories
+          const CategoriesListPage(embeddedMode: true),
+          // Tab 2: Favorites
+          const MyWallpapersPage(embeddedMode: true),
+          // Tab 3: Profile
+          _buildProfileTab(userState),
+        ],
+      ),
     );
   }
 
-  Widget _buildGrid(List<WallpaperEntity> wallpapers) {
-    if (wallpapers.isEmpty) {
-      return const Center(
-          child:
-              Text('No Wallpapers Found', style: TextStyle(color: Colors.white)));
-    }
-    return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.65,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+  // ── Bottom navigation bar ──────────────────────────────────────────────────
+  Widget _buildBottomNav(AuthState userState, double bottomPadding) {
+    final items = [
+      _NavItem(Icons.home_rounded, Icons.home_outlined, 'Home'),
+      _NavItem(Icons.grid_view_rounded, Icons.grid_view_outlined, 'Categories'),
+      _NavItem(Icons.favorite_rounded, Icons.favorite_border_rounded,
+          'Favorites'),
+      _NavItem(Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
+    ];
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          padding: EdgeInsets.only(
+            bottom: bottomPadding > 0 ? bottomPadding : 8,
+            top: 8,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.bg0.withAlpha(200),
+            border: const Border(
+              top: BorderSide(color: AppColors.glassBorder, width: 0.8),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(items.length, (i) {
+              final item = items[i];
+              final isActive = _navIndex == i;
+              return _buildNavItem(item, i, isActive);
+            }),
+          ),
+        ),
       ),
-      itemCount: wallpapers.length,
+    );
+  }
+
+  Widget _buildNavItem(_NavItem item, int index, bool isActive) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _navIndex = index);
+      },
+      child: AnimatedScale(
+        scale: isActive ? 1.05 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutBack,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: isActive
+                ? AppColors.goldMid.withAlpha(25)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: AppColors.goldMid.withAlpha(35),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    )
+                  ]
+                : [],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: isActive
+                  ? ShaderMask(
+                      key: const ValueKey('active'),
+                      shaderCallback: (b) =>
+                          AppColors.goldGradient.createShader(b),
+                      child: Icon(item.activeIcon,
+                          color: Colors.white, size: 24),
+                    )
+                  : Icon(item.inactiveIcon,
+                      key: const ValueKey('inactive'),
+                      color: AppColors.textMuted,
+                      size: 24),
+            ),
+            const SizedBox(height: 3),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight:
+                    isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? AppColors.goldLight : AppColors.textMuted,
+                letterSpacing: 0.3,
+              ),
+              child: Text(item.label),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+  // ── Home tab: filter chips + wallpaper grid ────────────────────────────────
+  Widget _buildHomeTab(WallpaperState wallpaperState) {
+    final filtered = _filteredWallpapers(wallpaperState);
+    return Column(
+      children: [
+        // Filter chips strip
+        _buildFilterStrip(wallpaperState),
+        // Grid
+        Expanded(
+          child: wallpaperState.isLoading
+              ? _buildSkeleton()
+              : filtered.isEmpty
+                  ? _buildEmptyState()
+                  : _buildGrid(filtered),
+        ),
+      ],
+    );
+  }
+
+  // ── Filter chips ───────────────────────────────────────────────────────────
+  Widget _buildFilterStrip(WallpaperState state) {
+    final filters = [
+      (WallpaperFilter.all, Icons.auto_awesome_mosaic_outlined, 'All',
+          [
+            ...state.freeWallpapers,
+            ...state.premiumWallpapers,
+            ...state.specialWallpapers,
+          ].length),
+      (WallpaperFilter.free, Icons.wallpaper_outlined, 'Free',
+          state.freeWallpapers.length),
+      (WallpaperFilter.premium, Icons.diamond_outlined, 'Premium',
+          state.premiumWallpapers.length),
+      (WallpaperFilter.special, Icons.auto_awesome_outlined, 'Special',
+          state.specialWallpapers.length),
+    ];
+
+    return Container(
+      // Top padding for AppBar height
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 64,
+        bottom: 8,
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: filters.map((f) {
+            final isActive = _filter == f.$1;
+            Color chipColor;
+            LinearGradient? chipGradient;
+            if (f.$1 == WallpaperFilter.special) {
+              chipColor = AppColors.accentPurple;
+              chipGradient =
+                  isActive ? AppColors.specialGradient : null;
+            } else if (f.$1 == WallpaperFilter.premium) {
+              chipColor = AppColors.goldMid;
+              chipGradient = isActive ? AppColors.goldGradient : null;
+            } else {
+              chipColor = AppColors.goldMid;
+              chipGradient = isActive ? AppColors.goldGradient : null;
+            }
+
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _filter = f.$1);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.only(right: 10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: chipGradient,
+                  color: isActive ? null : AppColors.bg2,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: isActive
+                        ? Colors.transparent
+                        : chipColor.withAlpha(50),
+                    width: 1.2,
+                  ),
+                  boxShadow: isActive
+                      ? [
+                          BoxShadow(
+                            color: chipColor.withAlpha(90),
+                            blurRadius: 16,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      : [],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      f.$2,
+                      size: 14,
+                      color: isActive
+                          ? (f.$1 == WallpaperFilter.special
+                              ? Colors.white
+                              : Colors.black)
+                          : chipColor,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      f.$3,
+                      style: TextStyle(
+                        color: isActive
+                            ? (f.$1 == WallpaperFilter.special
+                                ? Colors.white
+                                : Colors.black)
+                            : AppColors.textSecondary,
+                        fontWeight: isActive
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        fontSize: 13,
+                      ),
+                    ),
+                    if (!state.isLoading && f.$4 > 0) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? Colors.black.withAlpha(40)
+                              : chipColor.withAlpha(30),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${f.$4}',
+                          style: TextStyle(
+                            color: isActive
+                                ? (f.$1 == WallpaperFilter.special
+                                    ? Colors.white70
+                                    : Colors.black54)
+                                : chipColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  // ── Skeleton ───────────────────────────────────────────────────────────────
+  Widget _buildSkeleton() {
+    return MasonryGridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      gridDelegate:
+          const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2),
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      itemCount: 10,
       itemBuilder: (context, index) {
-        final wp = wallpapers[index];
-        return WallpaperCard(
-          wallpaper: wp,
-          onTap: () => context.push('/detail', extra: wp),
-        );
+        final heights = [200.0, 260.0, 180.0, 240.0, 220.0];
+        final h = heights[index % heights.length];
+        return _SkeletonCard(height: h);
       },
     );
   }
-}
 
-// ─────────────────────────────────────────────────────────────
-// Mic bottom-sheet widget with animated pulsing mic
-// ─────────────────────────────────────────────────────────────
-class _MicSheet extends StatefulWidget {
-  final stt.SpeechToText speech;
-  final ValueChanged<String> onWordsFinal;
-
-  const _MicSheet({required this.speech, required this.onWordsFinal});
-
-  @override
-  State<_MicSheet> createState() => _MicSheetState();
-}
-
-class _MicSheetState extends State<_MicSheet>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseCtrl;
-  late Animation<double> _pulseAnim;
-  String _currentWords = '';
-  bool _listening = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 1.0, end: 1.35).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+  // ── Grid ───────────────────────────────────────────────────────────────────
+  Widget _buildGrid(List<WallpaperEntity> wallpapers) {
+    return MasonryGridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      gridDelegate:
+          const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2),
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      itemCount: wallpapers.length,
+      itemBuilder: (context, index) {
+        final wp = wallpapers[index];
+        final heights = [200.0, 260.0, 180.0, 240.0, 220.0];
+        final h = heights[index % heights.length];
+        return SizedBox(
+          height: h,
+          child: WallpaperCard(
+            key: ValueKey(wp.id),
+            wallpaper: wp,
+            onTap: () => context.push('/detail', extra: wp),
+          ),
+        )
+            .animate(delay: (index * 35).ms)
+            .fade(duration: 300.ms, curve: Curves.easeOut)
+            .slideY(
+                begin: 0.06,
+                end: 0,
+                duration: 300.ms,
+                curve: Curves.easeOutQuart);
+      },
     );
-    _startListening();
   }
 
-  Future<void> _startListening() async {
-    // Give the bottom-sheet time to fully mount before starting the engine.
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-
-    // If STT reports not available after the delay, close gracefully.
-    if (!widget.speech.isAvailable) {
-      // Try one more time — the engine sometimes needs a moment after init.
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (!mounted) return;
-      if (!widget.speech.isAvailable) {
-        Navigator.of(context).pop();
-        return;
-      }
-    }
-
-    setState(() => _listening = true);
-    bool finalFired = false;
-    try {
-      await widget.speech.listen(
-        onResult: (result) {
-          if (!mounted) return;
-          setState(() => _currentWords = result.recognizedWords);
-          if (result.finalResult && !finalFired) {
-            finalFired = true;
-            widget.onWordsFinal(result.recognizedWords);
-            if (mounted) Navigator.of(context).pop();
-          }
-        },
-        listenFor: const Duration(seconds: 15),
-        pauseFor: const Duration(seconds: 4),
-        // No localeId → use device's default language (avoids silent failures
-        // on non-en_US locales and on devices without en_US speech model).
-      );
-    } catch (e) {
-      debugPrint('STT listen error: $e');
-      if (mounted) setState(() => _listening = false);
-    }
-  }
-
-  void _stopAndConfirm() {
-    widget.speech.stop();
-    widget.onWordsFinal(_currentWords);
-    Navigator.of(context).pop();
-  }
-
-  @override
-  void dispose() {
-    _pulseCtrl.dispose();
-    widget.speech.stop();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1A2E),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+  // ── Empty state ────────────────────────────────────────────────────────────
+  Widget _buildEmptyState() {
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(2),
-            ),
+          ShaderMask(
+            shaderCallback: (b) =>
+                AppColors.goldGradient.createShader(b),
+            child: const Icon(Icons.photo_library_outlined,
+                size: 64, color: Colors.white),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           const Text(
-            'Listening…',
+            'No wallpapers here yet',
             style: TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-              letterSpacing: 0.5,
+              color: AppColors.textMuted,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 32),
-          // Pulsing mic
-          AnimatedBuilder(
-            animation: _pulseAnim,
-            builder: (_, child) => Transform.scale(
-              scale: _listening ? _pulseAnim.value : 1.0,
-              child: child,
-            ),
-            child: Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Colors.amber.withAlpha(230),
-                    Colors.orange.shade700.withAlpha(180),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.amber.withAlpha(120),
-                    blurRadius: 24,
-                    spreadRadius: 4,
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.mic, color: Colors.white, size: 44),
-            ),
-          ),
-          const SizedBox(height: 28),
-          // Live transcript
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: Text(
-              _currentWords.isEmpty
-                  ? 'Say something like "nature" or "abstract"'
-                  : '"$_currentWords"',
-              key: ValueKey(_currentWords),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: _currentWords.isEmpty ? Colors.white38 : Colors.white,
-                fontSize: _currentWords.isEmpty ? 14 : 18,
-                fontStyle: _currentWords.isEmpty
-                    ? FontStyle.italic
-                    : FontStyle.normal,
-                fontWeight: _currentWords.isEmpty
-                    ? FontWeight.normal
-                    : FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(height: 28),
-          // Done button
-          ElevatedButton.icon(
-            onPressed: _stopAndConfirm,
-            icon: const Icon(Icons.check_circle_outline),
-            label: const Text('Search'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              minimumSize: const Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              textStyle: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+          const SizedBox(height: 8),
+          const Text(
+            'Try a different filter',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
         ],
+      )
+          .animate()
+          .fade(duration: 500.ms)
+          .scale(begin: const Offset(0.9, 0.9), duration: 500.ms),
+    );
+  }
+
+  // ── Profile tab ────────────────────────────────────────────────────────────
+  Widget _buildProfileTab(AuthState userState) {
+    final user = userState.user;
+    final isSubscribed = user?.isSubscribed ?? false;
+
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+                20, MediaQuery.of(context).padding.top + 24, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── User card ────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.bg1,
+                    borderRadius: BorderRadius.circular(24),
+                    border:
+                        Border.all(color: AppColors.glassBorder, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      // Avatar with gold ring
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: AppColors.goldRingGradient,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2.5),
+                          child: CircleAvatar(
+                            backgroundColor: AppColors.bg0,
+                            child: const Icon(Icons.diamond,
+                                color: AppColors.goldMid, size: 30),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user?.name ?? 'Guest User',
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              user?.email ?? '',
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      // PRO badge
+                      if (isSubscribed)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            gradient: AppColors.goldGradient,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'PRO',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ── PRO membership tile ───────────────────────────────
+                _ProfileMenuTile(
+                  icon: Icons.workspace_premium,
+                  label: isSubscribed ? 'PRO Member' : 'Get PRO',
+                  subtitle: isSubscribed
+                      ? 'All Premium wallpapers unlocked'
+                      : 'Unlock all Premium wallpapers',
+                  isGold: true,
+                  trailingWidget: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.goldGradient,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      isSubscribed ? 'ACTIVE' : 'UPGRADE',
+                      style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5),
+                    ),
+                  ),
+                  onTap: () => context.push('/subscription'),
+                ),
+                const SizedBox(height: 14),
+
+                // ── Navigation items ─────────────────────────────────
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 10),
+                  child: Text('Navigation',
+                      style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2)),
+                ),
+                _ProfileMenuTile(
+                  icon: Icons.leaderboard_rounded,
+                  label: 'Leaderboard',
+                  onTap: () => context.push('/leaderboard'),
+                ),
+                const SizedBox(height: 8),
+                _ProfileMenuTile(
+                  icon: Icons.info_outline_rounded,
+                  label: 'About',
+                  onTap: () => context.push('/about'),
+                ),
+
+                // ── Admin section ────────────────────────────────────
+                if (user?.email == 'subhamsoudeep@gmail.com') ...[
+                  const SizedBox(height: 20),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 10),
+                    child: Text('Admin',
+                        style: TextStyle(
+                            color: AppColors.goldMid,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2)),
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.admin_panel_settings_rounded,
+                    label: 'Admin Upload',
+                    isGold: true,
+                    onTap: () => context.push('/upload'),
+                  ),
+                  const SizedBox(height: 8),
+                  _ProfileMenuTile(
+                    icon: Icons.edit_note_rounded,
+                    label: 'Rename Category',
+                    isGold: true,
+                    onTap: () => context.push('/rename-category'),
+                  ),
+                  const SizedBox(height: 8),
+                  _ProfileMenuTile(
+                    icon: Icons.category_rounded,
+                    label: 'Category Covers',
+                    isGold: true,
+                    onTap: () => context.push('/upload-category-cover'),
+                  ),
+                ],
+
+                const SizedBox(height: 20),
+                Divider(color: AppColors.divider, height: 1),
+                const SizedBox(height: 8),
+
+                // ── Logout ────────────────────────────────────────────
+                _ProfileMenuTile(
+                  icon: Icons.logout_rounded,
+                  label: 'Logout',
+                  isDanger: true,
+                  onTap: () async {
+                    await ref.read(authProvider.notifier).logout();
+                    if (mounted) context.go('/login');
+                  },
+                ),
+                const SizedBox(height: 80),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Nav item data class ──────────────────────────────────────────────────────
+class _NavItem {
+  final IconData activeIcon;
+  final IconData inactiveIcon;
+  final String label;
+  const _NavItem(this.activeIcon, this.inactiveIcon, this.label);
+}
+
+// ─── Profile menu tile ─────────────────────────────────────────────────────────
+class _ProfileMenuTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final bool isGold;
+  final bool isDanger;
+  final VoidCallback onTap;
+  final Widget? trailingWidget;
+
+  const _ProfileMenuTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.subtitle,
+    this.isGold = false,
+    this.isDanger = false,
+    this.trailingWidget,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color iconColor = isDanger
+        ? Colors.redAccent
+        : isGold
+            ? AppColors.goldMid
+            : AppColors.textSecondary;
+
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.bg1,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: isGold
+                  ? AppColors.goldMid.withAlpha(40)
+                  : AppColors.glassBorder,
+              width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isDanger
+                    ? Colors.red.withAlpha(20)
+                    : isGold
+                        ? AppColors.goldMid.withAlpha(25)
+                        : AppColors.bg2,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: isDanger
+                          ? Colors.redAccent
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: const TextStyle(
+                          color: AppColors.textMuted, fontSize: 11),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            trailingWidget ??
+                Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textMuted, size: 20),
+          ],
+        ),
       ),
     );
   }
 }
+
+// ─── Skeleton card ────────────────────────────────────────────────────────────
+class _SkeletonCard extends StatelessWidget {
+  final double height;
+  const _SkeletonCard({super.key, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: AppColors.bg2,
+      highlightColor: AppColors.bg3,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+}
+

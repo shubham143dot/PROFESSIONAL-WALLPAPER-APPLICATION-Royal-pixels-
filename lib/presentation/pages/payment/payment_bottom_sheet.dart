@@ -4,8 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/error/failures.dart';
+import '../../../core/utils/screenshot_analyzer.dart';
 import '../../../domain/repositories/payment_repository.dart';
+import 'package:dartz/dartz.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/diamond_loader.dart';
 
@@ -15,6 +20,8 @@ Future<bool> showPaymentBottomSheet(
   required String wallpaperId,
   required String wallpaperTitle,
   required double amount,
+  bool isSubscription = false,
+  int subscriptionMonths = 0,
 }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
@@ -24,6 +31,8 @@ Future<bool> showPaymentBottomSheet(
       wallpaperId: wallpaperId,
       wallpaperTitle: wallpaperTitle,
       amount: amount,
+      isSubscription: isSubscription,
+      subscriptionMonths: subscriptionMonths,
     ),
   );
   return result ?? false;
@@ -33,12 +42,16 @@ class PaymentBottomSheet extends ConsumerStatefulWidget {
   final String wallpaperId;
   final String wallpaperTitle;
   final double amount;
+  final bool isSubscription;
+  final int subscriptionMonths;
 
   const PaymentBottomSheet({
     super.key,
     required this.wallpaperId,
     required this.wallpaperTitle,
     required this.amount,
+    this.isSubscription = false,
+    this.subscriptionMonths = 0,
   });
 
   @override
@@ -54,6 +67,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
   /// The screenshot file selected by the user (optional but encouraged).
   File? _screenshotFile;
   bool _isUploadingScreenshot = false;
+  bool _isAnalyzingScreenshot = false;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -87,9 +101,47 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
         maxWidth: 1080,
       );
       if (picked == null) return;
-      setState(() => _screenshotFile = File(picked.path));
+      
+      setState(() {
+        _screenshotFile = File(picked.path);
+        _isAnalyzingScreenshot = true;
+      });
+
+      // Analyze screenshot
+      final result = await ScreenshotAnalyzer.analyzePaymentScreenshot(_screenshotFile!);
+      
+      if (!mounted) return;
+      setState(() {
+        _isAnalyzingScreenshot = false;
+      });
+
+      if (result.isDatePotentiallyOld) {
+         _showWarning('Screenshot appears to be old. Please upload a recent payment receipt.');
+      }
+
+      if (!result.isPayeeValid) {
+         _showError('Payment does not appear to be made to "royal shubham pixel labs". Please upload a valid screenshot.');
+         setState(() => _screenshotFile = null);
+         return;
+      }
+
+      if (result.transactionId != null) {
+         _txnController.text = result.transactionId!;
+         ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Transaction ID automatically extracted!'), 
+              backgroundColor: Colors.green.shade600,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            )
+         );
+      } else {
+         _showWarning('Could not read Transaction ID from image. Please enter it manually.');
+      }
     } catch (e) {
+      if (!mounted) return;
       _showError('Could not open ${source == ImageSource.camera ? 'camera' : 'gallery'}: $e');
+      setState(() => _isAnalyzingScreenshot = false);
     }
   }
 
@@ -187,6 +239,38 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
     );
   }
 
+  Future<void> _downloadQR() async {
+    try {
+      final hasAccess = await Gal.hasAccess();
+      if (!hasAccess) {
+        final granted = await Gal.requestAccess();
+        if (!granted) {
+          _showError('Gallery permission denied');
+          return;
+        }
+      }
+
+      final byteData = await rootBundle.load('assets/qr_code.png');
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/royal_pixels_qr.png');
+      await tempFile.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+      
+      await Gal.putImage(tempFile.path);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('QR Code saved to gallery!'),
+          backgroundColor: Colors.green.shade600,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Failed to save QR Code: $e');
+    }
+  }
+
   // ─── Payment Submission ──────────────────────────────────────────────────
 
   Future<void> _confirmPayment() async {
@@ -222,14 +306,25 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
       );
     }
 
-    final result = await repo.submitManualPayment(
-      userId: user.uid,
-      wallpaperId: widget.wallpaperId,
-      amount: widget.amount,
-      txnId: _txnController.text.trim(),
-      wallpaperTitle: widget.wallpaperTitle,
-      screenshotUrl: uploadedScreenshotUrl,
-    );
+    final Either<Failure, void> result;
+    if (widget.isSubscription) {
+      result = await repo.submitSubscriptionPayment(
+        userId: user.uid,
+        months: widget.subscriptionMonths,
+        amount: widget.amount,
+        txnId: _txnController.text.trim(),
+        screenshotUrl: uploadedScreenshotUrl,
+      );
+    } else {
+      result = await repo.submitManualPayment(
+        userId: user.uid,
+        wallpaperId: widget.wallpaperId,
+        amount: widget.amount,
+        txnId: _txnController.text.trim(),
+        wallpaperTitle: widget.wallpaperTitle,
+        screenshotUrl: uploadedScreenshotUrl,
+      );
+    }
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
@@ -237,12 +332,14 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
     result.fold(
       (failure) => _showError(failure.message),
       (_) async {
-        // ── Save unlocked wallpaper ID to SharedPreferences ──────────────────
-        final prefs = await SharedPreferences.getInstance();
-        final ids = prefs.getStringList('downloaded_wallpaper_ids') ?? [];
-        if (!ids.contains(widget.wallpaperId)) {
-          ids.add(widget.wallpaperId);
-          await prefs.setStringList('downloaded_wallpaper_ids', ids);
+        if (!widget.isSubscription) {
+          // ── Save unlocked wallpaper ID to SharedPreferences ──────────────────
+          final prefs = await SharedPreferences.getInstance();
+          final ids = prefs.getStringList('downloaded_wallpaper_ids') ?? [];
+          if (!ids.contains(widget.wallpaperId)) {
+            ids.add(widget.wallpaperId);
+            await prefs.setStringList('downloaded_wallpaper_ids', ids);
+          }
         }
         if (mounted) Navigator.of(context).pop(true);
       },
@@ -377,9 +474,9 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFFFCC00).withValues(alpha: 0.3),
-                blurRadius: 16,
-                spreadRadius: 2,
+                color: Colors.black.withAlpha(50),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -430,9 +527,10 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFFCC00).withValues(alpha: 0.2),
-            blurRadius: 24,
-            spreadRadius: 4,
+            color: Colors.black.withAlpha(20),
+            blurRadius: 16,
+            spreadRadius: 0,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -498,12 +596,38 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            'Scan with any UPI app',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Scan with any UPI app',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _downloadQR,
+                  icon: const Icon(Icons.download, size: 18, color: Color(0xFF5F259F)),
+                  label: const Text(
+                    'Save QR',
+                    style: TextStyle(
+                      color: Color(0xFF5F259F),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    backgroundColor: const Color(0xFF5F259F).withAlpha(26),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -718,7 +842,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
 
         // Screenshot preview or upload tap area
         GestureDetector(
-          onTap: _showScreenshotSourceDialog,
+          onTap: _isAnalyzingScreenshot ? null : _showScreenshotSourceDialog,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             width: double.infinity,
@@ -806,7 +930,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
           ),
         ),
 
-        // Dark overlay for controls
+        // Dark overlay for controls or analyzing state
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
@@ -816,48 +940,81 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withValues(alpha: 0.6),
+                  Colors.black.withValues(alpha: _isAnalyzingScreenshot ? 0.8 : 0.6),
                 ],
               ),
             ),
           ),
         ),
 
-        // ✓ checkmark top-right
-        Positioned(
-          top: 10,
-          right: 10,
-          child: Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: Colors.green,
-              borderRadius: BorderRadius.circular(20),
+        if (_isAnalyzingScreenshot)
+          const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: CircularProgressIndicator(
+                    color: Colors.amber,
+                    strokeWidth: 3,
+                  ),
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Analyzing receipt...',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-            child: const Icon(Icons.check, color: Colors.white, size: 14),
           ),
-        ),
 
-        // Change / remove bottom row
-        Positioned(
-          bottom: 10,
-          left: 0,
-          right: 0,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _previewActionChip(
-                icon: Icons.edit_rounded,
-                label: 'Change',
-                onTap: _showScreenshotSourceDialog,
+        // ✓ checkmark top-right (only show if not analyzing)
+        if (!_isAnalyzingScreenshot)
+          Positioned(
+            top: 10,
+            right: 10,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(20),
               ),
-              const SizedBox(width: 10),
-              _previewActionChip(
-                icon: Icons.delete_rounded,
-                label: 'Remove',
-                color: Colors.redAccent,
-                onTap: () => setState(() => _screenshotFile = null),
-              ),
-            ],
+              child: const Icon(Icons.check, color: Colors.white, size: 14),
+            ),
+          ),
+
+        // Change / remove bottom row (hide if analyzing)
+        if (!_isAnalyzingScreenshot)
+          Positioned(
+            bottom: 10,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _previewActionChip(
+                  icon: Icons.edit_rounded,
+                  label: 'Change',
+                  onTap: _showScreenshotSourceDialog,
+                ),
+                const SizedBox(width: 10),
+                _previewActionChip(
+                  icon: Icons.delete_rounded,
+                  label: 'Remove',
+                  color: Colors.redAccent,
+                  onTap: () {
+                    setState(() {
+                      _screenshotFile = null;
+                      _txnController.clear();
+                    });
+                  },
+                ),
+              ],
           ),
         ),
       ],

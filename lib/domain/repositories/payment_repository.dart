@@ -14,6 +14,14 @@ abstract class PaymentRepository {
     required String wallpaperTitle,
     String? screenshotUrl,
   });
+  Future<Either<Failure, void>> submitSubscriptionPayment({
+    required String userId,
+    required int months,
+    required double amount,
+    required String txnId,
+    String? screenshotUrl,
+  });
+  Future<Either<Failure, bool>> checkSubscriptionStatus(String userId);
 
   /// Uploads a payment screenshot to Firebase Storage and returns its download URL.
   Future<Either<Failure, String>> uploadPaymentScreenshot({

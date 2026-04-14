@@ -41,12 +41,14 @@ class _DiamondLoaderState extends State<DiamondLoader>
       builder: (context, child) {
         // Continuous 3D Y-axis rotation
         final angle = _controller.value * 2 * math.pi;
-        return Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.001) // perspective
-            ..rotateY(angle),
-          child: child,
+        return RepaintBoundary(
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.001) // perspective
+              ..rotateY(angle),
+            child: child,
+          ),
         );
       },
       child: Center(

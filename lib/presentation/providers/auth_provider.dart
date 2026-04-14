@@ -5,6 +5,8 @@ import '../../core/di/service_locator.dart';
 import '../../core/usecases/usecase.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/usecases/login_usecase.dart';
+import '../../data/datasources/firestore_data_source.dart';
+import '../../domain/repositories/auth_repository.dart';
 
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
   return AuthNotifier();
@@ -41,6 +43,19 @@ class AuthNotifier extends Notifier<AuthState> {
     // Check if a user is already signed in (persists between restarts)
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
+      // Hydrate with proper Firestore user data shortly after build
+      Future.microtask(() async {
+        sl<FirestoreDataSource>().updateUserActivity(currentUser.uid);
+        final result = await sl<AuthRepository>().getCurrentUser();
+        result.fold(
+          (_) => null,
+          (userData) {
+            if (userData != null) {
+              state = state.copyWith(user: userData);
+            }
+          },
+        );
+      });
       return AuthState(
         user: UserEntity(
           uid: currentUser.uid,
@@ -62,11 +77,28 @@ class AuthNotifier extends Notifier<AuthState> {
 
       result.fold(
         (failure) => state = state.copyWith(isLoading: false, error: failure.message),
-        (user) => state = state.copyWith(isLoading: false, user: user),
+        (user) {
+          sl<FirestoreDataSource>().updateUserActivity(user.uid);
+          state = state.copyWith(isLoading: false, user: user);
+        },
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
+  }
+
+  /// Re-fetches the current user document from Firestore and updates state.
+  /// Call this after a subscription payment to reflect isSubscribed immediately.
+  Future<void> refreshUser() async {
+    final result = await sl<AuthRepository>().getCurrentUser();
+    result.fold(
+      (_) => null,
+      (userData) {
+        if (userData != null) {
+          state = state.copyWith(user: userData);
+        }
+      },
+    );
   }
 
   Future<void> logout() async {

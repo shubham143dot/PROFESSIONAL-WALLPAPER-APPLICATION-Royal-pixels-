@@ -9,6 +9,7 @@ class WallpaperModel extends WallpaperEntity {
     required super.isPremium,
     required super.price,
     required super.tags,
+    super.size,
   });
 
   factory WallpaperModel.fromFirestore(Map<String, dynamic> json, String id) {
@@ -20,6 +21,7 @@ class WallpaperModel extends WallpaperEntity {
       isPremium: json['is_premium'] ?? false,
       price: (json['price'] ?? 0.0).toDouble(),
       tags: List<String>.from(json['tags'] ?? []),
+      size: json['size'] ?? '',
     );
   }
 
@@ -31,6 +33,7 @@ class WallpaperModel extends WallpaperEntity {
       'is_premium': isPremium,
       'price': price,
       'tags': tags,
+      'size': size,
     };
   }
 }

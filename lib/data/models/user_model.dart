@@ -9,6 +9,10 @@ class UserModel extends UserEntity {
     super.phoneNo,
     super.loginHistory,
     required super.ownedWallpaperCount,
+    super.totalSpent = 0.0,
+    super.activityScore = 0,
+    super.isSubscribed = false,
+    super.subscriptionExpiry,
   });
 
   factory UserModel.fromFirestore(Map<String, dynamic> json, String uid) {
@@ -19,6 +23,10 @@ class UserModel extends UserEntity {
       phoneNo: json['phone_no'],
       loginHistory: (json['login_history'] as Timestamp?)?.toDate(),
       ownedWallpaperCount: json['owned_wallpaper'] ?? 0,
+      totalSpent: (json['total_spent'] ?? 0.0).toDouble(),
+      activityScore: json['activity_score'] ?? 0,
+      isSubscribed: json['is_subscribed'] ?? false,
+      subscriptionExpiry: (json['subscription_expiry'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -29,6 +37,10 @@ class UserModel extends UserEntity {
       if (phoneNo != null) 'phone_no': phoneNo,
       if (loginHistory != null) 'login_history': Timestamp.fromDate(loginHistory!),
       'owned_wallpaper': ownedWallpaperCount,
+      'total_spent': totalSpent,
+      'activity_score': activityScore,
+      'is_subscribed': isSubscribed,
+      if (subscriptionExpiry != null) 'subscription_expiry': Timestamp.fromDate(subscriptionExpiry!),
     };
   }
 }

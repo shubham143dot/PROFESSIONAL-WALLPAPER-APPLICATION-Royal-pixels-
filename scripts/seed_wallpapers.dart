@@ -12,6 +12,7 @@
 // ──────────────────────────────────────────────────────────────────────────────
 
 import 'dart:convert';
+// ignore_for_file: avoid_print, unused_local_variable
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const String projectId = 'royalpixels-c2b02'; // ← your Firebase project ID

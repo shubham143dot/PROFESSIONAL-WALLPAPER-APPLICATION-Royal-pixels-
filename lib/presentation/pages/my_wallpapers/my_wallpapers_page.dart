@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/wallpaper_provider.dart';
+import '../../providers/favorites_provider.dart';
 import '../../widgets/wallpaper_card.dart';
 import '../../widgets/diamond_loader.dart';
 
@@ -14,13 +15,16 @@ final myWallpaperIdsProvider = FutureProvider<List<String>>((ref) async {
 });
 
 class MyWallpapersPage extends ConsumerStatefulWidget {
-  const MyWallpapersPage({super.key});
+  final bool embeddedMode;
+  const MyWallpapersPage({super.key, this.embeddedMode = false});
 
   @override
   ConsumerState<MyWallpapersPage> createState() => _MyWallpapersPageState();
 }
 
 class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
+  bool _showFavorites = false;
+
   @override
   void initState() {
     super.initState();
@@ -222,18 +226,25 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text(
-          'My Wallpapers',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        leading: widget.embeddedMode
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => context.pop(),
+              ),
+        title: Text(
+          _showFavorites ? 'Favorite Wallpapers' : 'My Wallpapers',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.favorite, color: Colors.amber),
-            onPressed: null,
+            icon: Icon(
+              _showFavorites ? Icons.favorite : Icons.favorite_border,
+              color: Colors.amber,
+            ),
+            onPressed: () {
+              setState(() => _showFavorites = !_showFavorites);
+            },
           ),
         ],
       ),
@@ -244,7 +255,9 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
           child: Text('Error: $e', style: const TextStyle(color: Colors.white)),
         ),
         data: (myIds) {
-          if (myIds.isEmpty) {
+          final targetIds = _showFavorites ? ref.watch(favoritesProvider) : myIds;
+
+          if (targetIds.isEmpty) {
             return _buildEmptyState();
           }
 
@@ -263,7 +276,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
 
           // Match saved IDs against loaded wallpapers
           final myWallpapers =
-              allWallpapers.where((w) => myIds.contains(w.id)).toList();
+              allWallpapers.where((w) => targetIds.contains(w.id)).toList();
 
           // Loaded but no match found (e.g. wallpapers deleted from DB)
           if (myWallpapers.isEmpty) {
@@ -276,11 +289,14 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.download_done,
-                        color: Colors.amber, size: 18),
+                    Icon(
+                      _showFavorites ? Icons.favorite : Icons.download_done,
+                      color: Colors.amber, 
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Text(
-                      '${myWallpapers.length} wallpaper${myWallpapers.length != 1 ? 's' : ''} saved',
+                      '${myWallpapers.length} wallpaper${myWallpapers.length != 1 ? 's' : ''} ${_showFavorites ? 'favorited' : 'saved'}',
                       style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],
@@ -288,7 +304,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
               ),
               Expanded(
                 child: GridView.builder(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.fromLTRB(12, 12, 12, widget.embeddedMode ? 100 : 12),
                   gridDelegate:
                       const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
@@ -308,13 +324,18 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
                             onTap: () => context.push('/detail', extra: wp),
                           ),
                         ),
-                        // Delete button — top-right corner
+                        // Delete or Favorite button — top-right corner
                         Positioned(
                           top: 8,
                           right: 8,
                           child: GestureDetector(
-                            onTap: () =>
-                                _deleteWallpaper(wp.id, wp.title),
+                            onTap: () {
+                              if (_showFavorites) {
+                                ref.read(favoritesProvider.notifier).toggleFavorite(wp.id);
+                              } else {
+                                _deleteWallpaper(wp.id, wp.title);
+                              }
+                            },
                             child: Container(
                               width: 34,
                               height: 34,
@@ -326,8 +347,8 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
                                   width: 1.2,
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.delete_outline_rounded,
+                              child: Icon(
+                                _showFavorites ? Icons.favorite : Icons.delete_outline_rounded,
                                 color: Colors.redAccent,
                                 size: 18,
                               ),
@@ -358,24 +379,26 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
               color: Colors.amber.withAlpha(25),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.download, size: 48, color: Colors.amber),
+            child: Icon(_showFavorites ? Icons.favorite_border : Icons.download, size: 48, color: Colors.amber),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'No Saved Wallpapers',
-            style: TextStyle(
+          Text(
+            _showFavorites ? 'No Favorites Yet' : 'No Saved Wallpapers',
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 12),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 48),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48),
             child: Text(
-              'Download a wallpaper from the home screen and it will appear here.',
+              _showFavorites 
+                ? 'Tap the heart icon on any wallpaper to add it to your favorites.'
+                : 'Download a wallpaper from the home screen and it will appear here.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 15),
+              style: const TextStyle(color: Colors.white54, fontSize: 15),
             ),
           ),
         ],

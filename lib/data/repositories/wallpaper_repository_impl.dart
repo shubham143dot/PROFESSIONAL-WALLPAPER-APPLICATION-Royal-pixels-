@@ -3,6 +3,7 @@ import '../../core/error/failures.dart';
 import '../../domain/entities/wallpaper_entity.dart';
 import '../../domain/repositories/wallpaper_repository.dart';
 import '../datasources/firestore_data_source.dart';
+import '../models/wallpaper_model.dart';
 
 class WallpaperRepositoryImpl implements WallpaperRepository {
   final FirestoreDataSource remoteDataSource;
@@ -24,6 +25,55 @@ class WallpaperRepositoryImpl implements WallpaperRepository {
     try {
       final model = await remoteDataSource.getWallpaperDetails(id);
       return Right(model);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> addWallpaper(WallpaperEntity wallpaper) async {
+    try {
+      final model = WallpaperModel(
+        id: wallpaper.id,
+        title: wallpaper.title,
+        imageUrl: wallpaper.imageUrl,
+        category: wallpaper.category,
+        isPremium: wallpaper.isPremium,
+        price: wallpaper.price,
+        tags: wallpaper.tags,
+      );
+      await remoteDataSource.addWallpaper(model);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteWallpaper(String id) async {
+    try {
+      await remoteDataSource.deleteWallpaper(id);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateWallpaper(String id, String newTitle, String newCategory) async {
+    try {
+      await remoteDataSource.updateWallpaper(id, newTitle, newCategory);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> renameCategory(String oldName, String newName) async {
+    try {
+      await remoteDataSource.renameCategory(oldName, newName);
+      return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
