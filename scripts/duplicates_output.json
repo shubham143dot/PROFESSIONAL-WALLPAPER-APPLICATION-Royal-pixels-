@@ -1,0 +1,17 @@
+{
+  "totalDuplicates": 2,
+  "duplicates": [
+    {
+      "id": "kc31BmI6YdbDjM5thHjq",
+      "title": "gradient",
+      "reason": "Duplicate Title",
+      "premium": true
+    },
+    {
+      "id": "rFJDg84bfcamX6gT5L8e",
+      "title": "iPhone 15",
+      "reason": "Duplicate Title",
+      "premium": true
+    }
+  ]
+}

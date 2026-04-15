@@ -8,6 +8,9 @@ import '../../providers/auth_provider.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/repositories/payment_repository.dart';
 
+// ── Sentinel for Lifetime (admin sets expiry to this date) ──────────────────
+const int _kLifetimeMonths = 9999;
+
 class SubscriptionPage extends ConsumerStatefulWidget {
   const SubscriptionPage({super.key});
 
@@ -18,14 +21,13 @@ class SubscriptionPage extends ConsumerStatefulWidget {
 class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
   bool _isRefreshing = false;
 
-  /// After payment confirmed, refresh the auth state so isSubscribed updates.
+  /// After payment confirmed, refresh auth state so isSubscribed updates.
   Future<void> _refreshSubscriptionStatus() async {
     final user = ref.read(authProvider).user;
     if (user == null) return;
     setState(() => _isRefreshing = true);
     final repo = sl<PaymentRepository>();
     await repo.checkSubscriptionStatus(user.uid);
-    // Re-fetch user data from Firestore into the auth provider
     if (mounted) {
       await ref.read(authProvider.notifier).refreshUser();
     }
@@ -41,7 +43,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
     final messenger = ScaffoldMessenger.of(context);
     final paid = await showPaymentBottomSheet(
       context,
-      wallpaperId: 'SUB_PLAN_${months}M',
+      wallpaperId: 'SUB_PLAN_${months == _kLifetimeMonths ? 'LIFETIME' : '${months}M'}',
       wallpaperTitle: 'PRO – $title',
       amount: price,
       isSubscription: true,
@@ -53,7 +55,11 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
       if (mounted) {
         messenger.showSnackBar(
           SnackBar(
-            content: const Text('🎉 You\'re now a PRO member! Enjoy all Premium wallpapers.'),
+            content: Text(
+              months == _kLifetimeMonths
+                  ? '🎉 Lifetime PRO unlocked! Enjoy all Premium wallpapers — forever!'
+                  : '🎉 You\'re now a PRO member! Enjoy all Premium wallpapers.',
+            ),
             backgroundColor: Colors.green.shade700,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -68,41 +74,43 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
     final user = ref.watch(authProvider).user;
     final isSubscribed = user?.isSubscribed ?? false;
     final expiry = user?.subscriptionExpiry;
+    final isLifetime = expiry != null &&
+        expiry.year >= DateTime.now().year + 50; // lifetime sentinel date
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
         children: [
-          // Background glow top-right
+          // Background glow — top right (gold)
           Positioned(
-            top: -120,
-            right: -120,
+            top: -140,
+            right: -140,
             child: Container(
-              width: 350,
-              height: 350,
+              width: 380,
+              height: 380,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFFFFCC00).withValues(alpha: 0.12),
+                    const Color(0xFFFFCC00).withValues(alpha: 0.14),
                     Colors.transparent,
                   ],
                 ),
               ),
             ),
           ),
-          // Background glow bottom-left
+          // Background glow — bottom left (orange)
           Positioned(
-            bottom: -80,
-            left: -80,
+            bottom: -100,
+            left: -100,
             child: Container(
-              width: 250,
-              height: 250,
+              width: 300,
+              height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFFFF8C00).withValues(alpha: 0.08),
+                    const Color(0xFFFF8C00).withValues(alpha: 0.09),
                     Colors.transparent,
                   ],
                 ),
@@ -113,7 +121,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                // ── AppBar ──────────────────────────────────────────────
+                // ── AppBar ────────────────────────────────────────────────
                 SliverAppBar(
                   backgroundColor: Colors.transparent,
                   elevation: 0,
@@ -133,52 +141,31 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
+                        letterSpacing: 2.5,
                       ),
                     ),
                   ),
                 ),
+
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
 
-                        // ── Hero Icon ─────────────────────────────────
-                        Container(
-                          width: 90,
-                          height: 90,
-                          decoration: BoxDecoration(
-                            gradient: AppColors.goldGradient,
-                            borderRadius: BorderRadius.circular(26),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFFF8C00)
-                                    .withValues(alpha: 0.4),
-                                blurRadius: 28,
-                                offset: const Offset(0, 12),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.workspace_premium,
-                              color: Colors.black, size: 46),
-                        )
-                            .animate()
-                            .scale(
-                                begin: const Offset(0.7, 0.7),
-                                duration: 500.ms,
-                                curve: Curves.elasticOut)
-                            .fade(duration: 300.ms),
-                        const SizedBox(height: 24),
+                        // ── Hero Icon ──────────────────────────────────────
+                        _buildHeroIcon(),
+                        const SizedBox(height: 22),
 
+                        // ── Main Title ────────────────────────────────────
                         const Text(
                           'Unlock Every\nPremium Wallpaper',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 26,
+                            fontSize: 28,
                             fontWeight: FontWeight.w900,
                             height: 1.2,
                             letterSpacing: 0.3,
@@ -189,23 +176,25 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                             .slideY(begin: 0.1, end: 0),
                         const SizedBox(height: 12),
 
+                        // ── Subtitle ──────────────────────────────────────
                         Text(
-                          'One subscription gives you access to all\nPremium wallpapers — forever while active.',
+                          'Unlimited access to all premium wallpapers,\nno ads, and full HD downloads.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.5),
                             fontSize: 14,
-                            height: 1.6,
+                            height: 1.65,
                           ),
                         )
                             .animate()
                             .fade(delay: 150.ms, duration: 400.ms),
 
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 30),
 
-                        // ── Subscription Status Banner ─────────────────
+                        // ── Subscription Status Banner ─────────────────────
                         if (isSubscribed && expiry != null) ...[
-                          _buildActiveBanner(expiry).animate()
+                          _buildActiveBanner(expiry, isLifetime)
+                              .animate()
                               .fade(duration: 400.ms)
                               .slideY(begin: -0.05, end: 0),
                           const SizedBox(height: 24),
@@ -214,42 +203,40 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                           const SizedBox(height: 24),
                         ],
 
-                        // ── Feature List ──────────────────────────────
+                        // ── Feature List ───────────────────────────────────
                         _buildFeatureList()
                             .animate()
                             .fade(delay: 200.ms, duration: 400.ms),
 
                         const SizedBox(height: 36),
 
-                        // ── Plans ─────────────────────────────────────
+                        // ── Plans / Manage ─────────────────────────────────
                         if (!isSubscribed) ...[
+                          // Section header
                           const Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              'Choose your plan',
+                              'Choose Your Plan',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 16,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          // Social proof
-                          Text(
-                            '✨ Join 2,000+ users who love Royal Pixels PRO',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
-                              fontSize: 12,
-                            ),
-                          ),
                           const SizedBox(height: 16),
+
+                          // ── Monthly Plan ───────────────────────────────
                           _PlanCard(
-                            months: 1,
-                            price: 99,
-                            title: '1 Month',
-                            subtitle: 'Try it out',
-                            perMonthLabel: null,
+                            label: 'MONTHLY',
+                            title: 'Monthly Plan',
+                            price: '₹99',
+                            priceSize: 26,
+                            billingNote: '/ month',
+                            subtitle: 'Perfect to get started',
+                            perMonthChip: null,
+                            isPopular: false,
+                            isBestValue: false,
                             onTap: () => _onPlanTapped(
                               context: context,
                               months: 1,
@@ -258,53 +245,84 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                             ),
                           ).animate().fade(delay: 250.ms, duration: 400.ms).slideY(begin: 0.05, end: 0),
                           const SizedBox(height: 14),
+
+                          // ── Yearly Plan (MOST POPULAR) ─────────────────
                           _PlanCard(
-                            months: 3,
-                            price: 249,
-                            title: '3 Months',
-                            subtitle: 'Most popular · Save ₹48',
-                            perMonthLabel: '₹83/month',
+                            label: 'YEARLY',
+                            title: 'Yearly Plan',
+                            price: '₹499',
+                            priceSize: 30, // bigger to draw the eye
+                            billingNote: '/ year',
+                            subtitle: 'Save 58% compared to monthly',
+                            perMonthChip: 'Just ₹41/month',
                             isPopular: true,
-                            onTap: () => _onPlanTapped(
-                              context: context,
-                              months: 3,
-                              price: 249,
-                              title: '3 Month Plan',
-                            ),
-                          ).animate().fade(delay: 300.ms, duration: 400.ms).slideY(begin: 0.05, end: 0),
-                          const SizedBox(height: 14),
-                          _PlanCard(
-                            months: 12,
-                            price: 799,
-                            title: '1 Year',
-                            subtitle: 'Best value · Save ₹389',
-                            perMonthLabel: '₹67/month',
+                            isBestValue: false,
                             onTap: () => _onPlanTapped(
                               context: context,
                               months: 12,
-                              price: 799,
-                              title: '1 Year Plan',
+                              price: 499,
+                              title: 'Yearly Plan',
+                            ),
+                          ).animate().fade(delay: 300.ms, duration: 400.ms).slideY(begin: 0.05, end: 0),
+                          const SizedBox(height: 14),
+
+                          // ── Lifetime Plan (BEST VALUE) ─────────────────
+                          _PlanCard(
+                            label: 'LIFETIME',
+                            title: 'Lifetime Plan',
+                            price: '₹999',
+                            priceSize: 26,
+                            billingNote: 'one-time',
+                            subtitle: 'Pay once, unlock forever',
+                            perMonthChip: null,
+                            isPopular: false,
+                            isBestValue: true,
+                            onTap: () => _onPlanTapped(
+                              context: context,
+                              months: _kLifetimeMonths,
+                              price: 999,
+                              title: 'Lifetime Plan',
                             ),
                           ).animate().fade(delay: 350.ms, duration: 400.ms).slideY(begin: 0.05, end: 0),
+
+                          const SizedBox(height: 28),
+
+                          // ── CTA Button ─────────────────────────────────
+                          _buildCtaButton(context),
+
+                          const SizedBox(height: 16),
+
+                          // ── Trust Line ─────────────────────────────────
+                          Text(
+                            '✨ Join 2,000+ users enjoying premium wallpapers',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.45),
+                              fontSize: 13,
+                            ),
+                          ).animate().fade(delay: 400.ms, duration: 400.ms),
+
                         ] else ...[
-                          // Already subscribed — show manage section
-                          _buildManageSection().animate().fade(delay: 250.ms, duration: 400.ms),
+                          // Already subscribed — manage section
+                          _buildManageSection()
+                              .animate()
+                              .fade(delay: 250.ms, duration: 400.ms),
                         ],
 
                         const SizedBox(height: 28),
 
-                        // ── Fine print ────────────────────────────────
+                        // ── Fine print ─────────────────────────────────────
                         Text(
                           'Payment via UPI. Subscription is activated\nmanually within a few hours of payment.\nContact support if not activated within 24h.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3),
+                            color: Colors.white.withValues(alpha: 0.28),
                             fontSize: 11,
-                            height: 1.6,
+                            height: 1.65,
                           ),
                         ),
 
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 44),
                       ],
                     ),
                   ),
@@ -317,11 +335,37 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
     );
   }
 
-  Widget _buildActiveBanner(DateTime expiry) {
+  // ── Hero Icon ──────────────────────────────────────────────────────────────
+  Widget _buildHeroIcon() {
+    return Container(
+      width: 92,
+      height: 92,
+      decoration: BoxDecoration(
+        gradient: AppColors.goldGradient,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF8C00).withValues(alpha: 0.42),
+            blurRadius: 32,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.workspace_premium, color: Colors.black, size: 48),
+    )
+        .animate()
+        .scale(
+            begin: const Offset(0.7, 0.7),
+            duration: 500.ms,
+            curve: Curves.elasticOut)
+        .fade(duration: 300.ms);
+  }
+
+  // ── Active subscription banner ─────────────────────────────────────────────
+  Widget _buildActiveBanner(DateTime expiry, bool isLifetime) {
     final now = DateTime.now();
     final daysLeft = expiry.difference(now).inDays;
-    final expiryStr =
-        '${expiry.day} ${_monthName(expiry.month)} ${expiry.year}';
+    final expiryStr = '${expiry.day} ${_monthName(expiry.month)} ${expiry.year}';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -350,19 +394,44 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'PRO • Active',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
+                    Row(
+                      children: [
+                        const Text(
+                          'PRO • Active',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        if (isLifetime) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.goldGradient,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'LIFETIME',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      daysLeft > 0
-                          ? 'Expires $expiryStr · $daysLeft days left'
-                          : 'Expired on $expiryStr',
+                      isLifetime
+                          ? 'Lifetime access — enjoy forever 🎉'
+                          : daysLeft > 0
+                              ? 'Expires $expiryStr · $daysLeft days left'
+                              : 'Expired on $expiryStr',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.55),
                         fontSize: 12,
@@ -378,16 +447,17 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
     );
   }
 
+  // ── Feature list ───────────────────────────────────────────────────────────
   Widget _buildFeatureList() {
     final features = [
       (Icons.auto_awesome_rounded, 'All Premium Wallpapers Unlocked',
-          'Browse and download every Premium wallpaper'),
+          'Browse and download every premium wallpaper'),
       (Icons.high_quality_rounded, 'Full Resolution Downloads',
-          'Always download the highest quality'),
-      (Icons.refresh_rounded, 'New Premiums Every Month',
-          'Fresh exclusives added regularly'),
-      (Icons.support_agent_rounded, 'Priority Support',
-          'Get help faster as a PRO member'),
+          'Always get the highest quality'),
+      (Icons.refresh_rounded, 'New Wallpapers Every Month',
+          'Fresh exclusive content regularly'),
+      (Icons.block_rounded, 'No Ads Experience',
+          'Enjoy a clean and smooth app'),
     ];
 
     return Column(
@@ -436,6 +506,59 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
     );
   }
 
+  // ── Big CTA button ─────────────────────────────────────────────────────────
+  Widget _buildCtaButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: GestureDetector(
+        onTap: () {
+          // Scroll down is implicit — tapping any plan card is the real CTA.
+          // This button taps the Yearly plan as the smart default.
+          _onPlanTapped(
+            context: context,
+            months: 12,
+            price: 499,
+            title: 'Yearly Plan',
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            gradient: AppColors.goldGradient,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFFCC00).withValues(alpha: 0.35),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.rocket_launch_rounded, color: Colors.black, size: 20),
+              SizedBox(width: 10),
+              Text(
+                'Unlock Premium Now',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    )
+        .animate()
+        .fade(delay: 400.ms, duration: 400.ms)
+        .slideY(begin: 0.08, end: 0);
+  }
+
+  // ── Already subscribed — manage / extend ───────────────────────────────────
   Widget _buildManageSection() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -469,11 +592,38 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  _SmallPlanChip(label: '+1M  ₹99', months: 1, price: 99, onTap: (m, p) => _onPlanTapped(context: context, months: m, price: p, title: '1 Month Extension')),
+                  _SmallPlanChip(
+                    label: '+1M  ₹99',
+                    months: 1,
+                    price: 99,
+                    onTap: (m, p) => _onPlanTapped(
+                        context: context,
+                        months: m,
+                        price: p,
+                        title: '1 Month Extension'),
+                  ),
                   const SizedBox(width: 10),
-                  _SmallPlanChip(label: '+3M  ₹249', months: 3, price: 249, onTap: (m, p) => _onPlanTapped(context: context, months: m, price: p, title: '3 Month Extension')),
+                  _SmallPlanChip(
+                    label: '+1Y  ₹499',
+                    months: 12,
+                    price: 499,
+                    onTap: (m, p) => _onPlanTapped(
+                        context: context,
+                        months: m,
+                        price: p,
+                        title: 'Yearly Extension'),
+                  ),
                   const SizedBox(width: 10),
-                  _SmallPlanChip(label: '+1Y  ₹799', months: 12, price: 799, onTap: (m, p) => _onPlanTapped(context: context, months: m, price: p, title: '1 Year Extension')),
+                  _SmallPlanChip(
+                    label: 'Lifetime  ₹999',
+                    months: _kLifetimeMonths,
+                    price: 999,
+                    onTap: (m, p) => _onPlanTapped(
+                        context: context,
+                        months: m,
+                        price: p,
+                        title: 'Lifetime Plan'),
+                  ),
                 ],
               ),
             ],
@@ -490,7 +640,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
       ][m];
 }
 
-// ─── Refreshing banner ────────────────────────────────────────────────────────
+// ─── Refreshing Banner ────────────────────────────────────────────────────────
 class _RefreshingBanner extends StatelessWidget {
   const _RefreshingBanner();
 
@@ -507,8 +657,10 @@ class _RefreshingBanner extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SizedBox(
-            width: 16, height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFFCC00)),
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: Color(0xFFFFCC00)),
           ),
           SizedBox(width: 12),
           Text('Refreshing subscription status…',
@@ -519,24 +671,30 @@ class _RefreshingBanner extends StatelessWidget {
   }
 }
 
-// ─── Plan card ────────────────────────────────────────────────────────────────
+// ─── Plan Card ────────────────────────────────────────────────────────────────
 class _PlanCard extends StatelessWidget {
-  final int months;
-  final double price;
-  final String title;
-  final String subtitle;
-  final String? perMonthLabel;
-  final bool isPopular;
+  final String label;       // e.g. 'MONTHLY', 'YEARLY', 'LIFETIME'
+  final String title;       // e.g. 'Yearly Plan'
+  final String price;       // e.g. '₹499'
+  final double priceSize;   // font size for the price text
+  final String billingNote; // e.g. '/ year', 'one-time'
+  final String subtitle;    // description below title
+  final String? perMonthChip; // green chip e.g. 'Just ₹41/month'
+  final bool isPopular;     // gold border + MOST POPULAR badge
+  final bool isBestValue;   // BEST VALUE badge
   final VoidCallback onTap;
 
   const _PlanCard({
-    required this.months,
-    required this.price,
+    required this.label,
     required this.title,
+    required this.price,
+    required this.priceSize,
+    required this.billingNote,
     required this.subtitle,
     required this.onTap,
-    this.perMonthLabel,
+    this.perMonthChip,
     this.isPopular = false,
+    this.isBestValue = false,
   });
 
   @override
@@ -544,21 +702,27 @@ class _PlanCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: isPopular
-              ? AppColors.goldGradient
-              : null,
-          border: isPopular
-              ? null
-              : Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
+        padding: isPopular ? const EdgeInsets.all(2) : EdgeInsets.zero,
+        decoration: isPopular
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: AppColors.goldGradient,
+              )
+            : BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isBestValue
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.1),
+                ),
+              ),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           decoration: BoxDecoration(
-            color: const Color(0xFF131313),
-            borderRadius: BorderRadius.circular(18),
+            color: isPopular
+                ? const Color(0xFF161000) // slightly warm dark for popular
+                : const Color(0xFF131313),
+            borderRadius: BorderRadius.circular(isPopular ? 18 : 20),
           ),
           child: Row(
             children: [
@@ -566,31 +730,31 @@ class _PlanCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (isPopular) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          gradient: AppColors.goldGradient,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          '⭐ MOST POPULAR',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1,
-                          ),
-                        ),
+                    // ── Badges ──────────────────────────────────────────
+                    if (isPopular)
+                      _Badge(
+                        text: '⭐ MOST POPULAR',
+                        gradient: AppColors.goldGradient,
+                        textColor: Colors.black,
                       ),
-                    ],
+                    if (isBestValue)
+                      _Badge(
+                        text: '🔥 BEST VALUE',
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF4500), Color(0xFFFF8C00)],
+                        ),
+                        textColor: Colors.white,
+                      ),
+                    if (isPopular || isBestValue) const SizedBox(height: 8),
+
+                    // ── Title ────────────────────────────────────────────
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
+                      style: TextStyle(
+                        color: isPopular
+                            ? const Color(0xFFFFE566)
+                            : Colors.white,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -605,6 +769,8 @@ class _PlanCard extends StatelessWidget {
                   ],
                 ),
               ),
+
+              // ── Price Column ───────────────────────────────────────────
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -612,28 +778,37 @@ class _PlanCard extends StatelessWidget {
                     shaderCallback: (b) =>
                         AppColors.goldGradient.createShader(b),
                     child: Text(
-                      '₹${price.toStringAsFixed(0)}',
-                      style: const TextStyle(
+                      price,
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: priceSize,
                         fontWeight: FontWeight.w900,
+                        height: 1.1,
                       ),
                     ),
                   ),
-                  if (perMonthLabel != null) ...[  
-                    const SizedBox(height: 4),
+                  Text(
+                    billingNote,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 11,
+                    ),
+                  ),
+                  if (perMonthChip != null) ...[
+                    const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 2),
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: Colors.green.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                            color: Colors.green.withValues(alpha: 0.35),
-                            width: 0.8),
+                          color: Colors.green.withValues(alpha: 0.35),
+                          width: 0.8,
+                        ),
                       ),
                       child: Text(
-                        perMonthLabel!,
+                        perMonthChip!,
                         style: const TextStyle(
                           color: Colors.green,
                           fontSize: 10,
@@ -642,7 +817,7 @@ class _PlanCard extends StatelessWidget {
                       ),
                     ),
                   ] else
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                   const SizedBox(height: 4),
                   const Icon(Icons.arrow_forward_ios_rounded,
                       color: Colors.white30, size: 14),
@@ -656,7 +831,40 @@ class _PlanCard extends StatelessWidget {
   }
 }
 
-// ─── Small plan chip (for re-subscribe / extend) ──────────────────────────────
+// ─── Badge (MOST POPULAR / BEST VALUE) ───────────────────────────────────────
+class _Badge extends StatelessWidget {
+  final String text;
+  final LinearGradient gradient;
+  final Color textColor;
+
+  const _Badge({
+    required this.text,
+    required this.gradient,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Small plan chip (extend / manage) ───────────────────────────────────────
 class _SmallPlanChip extends StatelessWidget {
   final String label;
   final int months;
@@ -686,7 +894,7 @@ class _SmallPlanChip extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.black,
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
           ),

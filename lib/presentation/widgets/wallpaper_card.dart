@@ -9,11 +9,16 @@ import 'dart:ui';
 class WallpaperCard extends StatefulWidget {
   final WallpaperEntity wallpaper;
   final VoidCallback onTap;
+  /// Optional long-press handler. When provided, a medium haptic fires
+  /// immediately on long-press start (before the callback), giving a
+  /// zero-lag premium feel.
+  final VoidCallback? onLongPress;
 
   const WallpaperCard({
     super.key,
     required this.wallpaper,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -82,6 +87,14 @@ class _WallpaperCardState extends State<WallpaperCard>
         onTapDown: _onTapDown,
         onTapUp: _onTapUp,
         onTapCancel: _onTapCancel,
+        onLongPress: widget.onLongPress == null
+            ? null
+            : () {
+                // Haptic fires the moment the long-press is recognised (~300ms
+                // after finger-down) — feels instant vs waiting for a callback.
+                HapticFeedback.mediumImpact();
+                widget.onLongPress!();
+              },
         child: AnimatedBuilder(
           animation: _glowAnim,
           builder: (context, child) {

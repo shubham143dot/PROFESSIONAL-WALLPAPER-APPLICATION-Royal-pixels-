@@ -13,6 +13,9 @@ class UserModel extends UserEntity {
     super.activityScore = 0,
     super.isSubscribed = false,
     super.subscriptionExpiry,
+    super.diamonds = 0,
+    super.streak = 0,
+    super.adsWatchedToday = 0,
   });
 
   factory UserModel.fromFirestore(Map<String, dynamic> json, String uid) {
@@ -27,6 +30,9 @@ class UserModel extends UserEntity {
       activityScore: json['activity_score'] ?? 0,
       isSubscribed: json['is_subscribed'] ?? false,
       subscriptionExpiry: (json['subscription_expiry'] as Timestamp?)?.toDate(),
+      diamonds: json['diamonds'] ?? 0,
+      streak: json['streak'] ?? 0,
+      adsWatchedToday: json['adsWatchedToday'] ?? 0,
     );
   }
 

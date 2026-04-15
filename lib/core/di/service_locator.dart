@@ -7,9 +7,11 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
 import '../../data/datasources/firestore_data_source.dart';
 import '../../data/repositories/auth_repository_impl.dart';
+import '../../data/repositories/diamond_repository_impl.dart';
 import '../../data/repositories/payment_repository_impl.dart';
 import '../../data/repositories/wallpaper_repository_impl.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/repositories/diamond_repository.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/repositories/wallpaper_repository.dart';
 import '../../domain/usecases/buy_premium_wallpaper_usecase.dart';
@@ -55,6 +57,9 @@ void setupLocator() {
   );
   sl.registerLazySingleton<PaymentRepository>(
     () => PaymentRepositoryImpl(remoteDataSource: sl(), storage: sl()),
+  );
+  sl.registerLazySingleton<DiamondRepository>(
+    () => DiamondRepositoryImpl(dataSource: sl()),
   );
 
   // --- Use Cases ---

@@ -7,6 +7,7 @@ import '../../domain/entities/user_entity.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../../data/datasources/firestore_data_source.dart';
 import '../../domain/repositories/auth_repository.dart';
+import 'diamond_provider.dart';
 
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
   return AuthNotifier();
@@ -52,6 +53,8 @@ class AuthNotifier extends Notifier<AuthState> {
           (userData) {
             if (userData != null) {
               state = state.copyWith(user: userData);
+              // Load diamond wallet for restored session
+              ref.read(diamondProvider.notifier).load(userData.uid);
             }
           },
         );
@@ -80,6 +83,8 @@ class AuthNotifier extends Notifier<AuthState> {
         (user) {
           sl<FirestoreDataSource>().updateUserActivity(user.uid);
           state = state.copyWith(isLoading: false, user: user);
+          // Load diamond wallet after Google login
+          ref.read(diamondProvider.notifier).load(user.uid);
         },
       );
     } catch (e) {

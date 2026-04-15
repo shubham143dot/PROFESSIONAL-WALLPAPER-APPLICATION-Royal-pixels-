@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../domain/entities/wallpaper_entity.dart';
 import '../../widgets/wallpaper_card.dart';
+import '../../widgets/wallpaper_long_press_preview.dart';
 
 class CategoryPage extends StatelessWidget {
   final String categoryName;
@@ -46,6 +47,7 @@ class CategoryPage extends StatelessWidget {
                     key: ValueKey(wp.id),
                     wallpaper: wp,
                     onTap: () => context.push('/detail', extra: wp),
+                    onLongPress: () => showWallpaperLongPressPreview(context, wp),
                   ),
                 )
                     .animate(delay: (index * 40).ms)

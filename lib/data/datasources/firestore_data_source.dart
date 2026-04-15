@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/wallpaper_model.dart';
-import '../models/user_model.dart';
 
 abstract class FirestoreDataSource {
   Future<List<WallpaperModel>> getWallpapers({required int page, required int limit, bool isPremium = false});
@@ -29,8 +28,17 @@ abstract class FirestoreDataSource {
   });
   Future<bool> checkSubscriptionStatus(String userId);
   Future<void> updateUserActivity(String userId);
-  Future<List<UserModel>> getLeaderboard(String category, {int limit = 20});
+
+  // ── Diamond System ─────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> getDiamondData(String userId);
+  Future<Map<String, dynamic>> claimDailyReward(String userId);
+  Future<int> addAdReward(String userId);
+  Future<int> spendDiamonds(String userId, String wallpaperId, int cost);
+  /// Awards +5 diamonds for download/set-as (unified, per-wallpaper dedup + 80/day cap).
+  /// Returns a map: { 'granted': bool, 'newBalance': int, 'reason': String? }
+  Future<Map<String, dynamic>> addSmallReward(String userId, String wallpaperId);
 }
+
 
 class FirestoreDataSourceImpl implements FirestoreDataSource {
   final FirebaseFirestore firestore;
@@ -154,6 +162,7 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     String? screenshotUrl,
   }) async {
     final cleanTxnId = txnId.trim().toUpperCase();
+    final bool isLifetime = months == 9999;
 
     final existing = await firestore
         .collection('pending_purchases')
@@ -163,7 +172,7 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
 
     if (existing.docs.isNotEmpty) {
       throw Exception(
-        'This UTR/Transaction ID has already been used. '  
+        'This UTR/Transaction ID has already been used. '
         'Please enter a valid, unique Transaction ID from your UPI app.',
       );
     }
@@ -171,7 +180,8 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     await firestore.collection('pending_purchases').add({
       'userId': userId,
       'type': 'subscription',
-      'months': months,
+      'planType': isLifetime ? 'lifetime' : 'recurring',
+      'months': isLifetime ? 0 : months,
       'amount': amount,
       'txnId': cleanTxnId,
       'status': 'pending',
@@ -183,19 +193,28 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     await firestore.runTransaction((transaction) async {
       final userSnapshot = await transaction.get(userRef);
       if (!userSnapshot.exists) throw Exception('User not found');
-      
+
       final currentSpent = (userSnapshot.data()?['total_spent'] ?? 0.0).toDouble();
-      
       final now = DateTime.now();
-      // Calculate expiry date
-      final oldExpiry = (userSnapshot.data()?['subscription_expiry'] as Timestamp?)?.toDate();
-      final baseDate = (oldExpiry != null && oldExpiry.isAfter(now)) ? oldExpiry : now;
-      final newExpiry = DateTime(baseDate.year, baseDate.month + months, baseDate.day);
-      
+
+      DateTime newExpiry;
+      if (isLifetime) {
+        // Lifetime: set expiry 100 years in the future as a sentinel
+        newExpiry = DateTime(now.year + 100, now.month, now.day);
+      } else {
+        // Standard recurring: add months on top of existing expiry if still active
+        final oldExpiry =
+            (userSnapshot.data()?['subscription_expiry'] as Timestamp?)?.toDate();
+        final baseDate =
+            (oldExpiry != null && oldExpiry.isAfter(now)) ? oldExpiry : now;
+        newExpiry = DateTime(baseDate.year, baseDate.month + months, baseDate.day);
+      }
+
       transaction.update(userRef, {
         'total_spent': currentSpent + amount,
         'is_subscribed': true,
         'subscription_expiry': Timestamp.fromDate(newExpiry),
+        if (isLifetime) 'plan_type': 'lifetime',
       });
     });
   }
@@ -207,11 +226,19 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     final data = doc.data();
     final isSubscribed = data?['is_subscribed'] ?? false;
     final expiry = (data?['subscription_expiry'] as Timestamp?)?.toDate();
+    final planType = data?['plan_type'] as String? ?? '';
+
+    // Lifetime plan — never expires
+    if (isSubscribed && planType == 'lifetime') return true;
+
     if (isSubscribed && expiry != null && expiry.isAfter(DateTime.now())) {
       return true;
     }
-    // Automatically revert if expired
-    if (isSubscribed && expiry != null && expiry.isBefore(DateTime.now())) {
+    // Automatically revert if expired (only for non-lifetime plans)
+    if (isSubscribed &&
+        expiry != null &&
+        expiry.isBefore(DateTime.now()) &&
+        planType != 'lifetime') {
       await firestore.collection('users').doc(userId).update({
         'is_subscribed': false,
       });
@@ -246,7 +273,7 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
       
       Map<String, dynamic> updates = {};
       
-      // Initialize new fields for backward compatibility so older users appear on leaderboards
+      // Initialize new fields for backward compatibility
       if (data?['activity_score'] == null) {
         updates['activity_score'] = currentScore;
       }
@@ -265,33 +292,243 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     });
   }
 
-  @override
-  Future<List<UserModel>> getLeaderboard(String category, {int limit = 20}) async {
-    String orderByField;
-    switch (category) {
-      case 'collectors':
-        orderByField = 'owned_wallpaper';
-        break;
-      case 'supporters':
-        orderByField = 'total_spent';
-        break;
-      case 'active':
-        orderByField = 'activity_score';
-        break;
-      default:
-        orderByField = 'owned_wallpaper';
-    }
+  // ── DIAMOND SYSTEM ──────────────────────────────────────────────────────
 
-    final querySnapshot = await firestore
-        .collection('users')
-        .orderBy(orderByField, descending: true)
-        .limit(limit)
-        .get();
-
-    return querySnapshot.docs
-        .map((doc) => UserModel.fromFirestore(doc.data(), doc.id))
-        .toList();
+  String _todayString() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
+
+  @override
+  Future<Map<String, dynamic>> getDiamondData(String userId) async {
+    final doc = await firestore.collection('users').doc(userId).get();
+    final data = doc.data() ?? {};
+    final today = _todayString();
+    final lastRewardDate      = data['lastRewardDate']      as String? ?? '';
+    final lastAdDate          = data['lastAdDate']          as String? ?? '';
+    final lastSmallRewardDate = data['lastSmallRewardDate'] as String? ?? '';
+
+    // Reset counters when the date changes
+    final adsWatchedToday        = (lastAdDate          == today)
+        ? (data['adsWatchedToday']        as int? ?? 0) : 0;
+    final smallRewardEarnedToday = (lastSmallRewardDate == today)
+        ? (data['smallRewardEarnedToday'] as int? ?? 0) : 0;
+
+    return {
+      'diamonds':               data['diamonds'] as int? ?? 0,
+      'streak':                 data['streak']   as int? ?? 0,
+      'adsWatchedToday':        adsWatchedToday,
+      'smallRewardEarnedToday': smallRewardEarnedToday,
+      'lastRewardDate':         lastRewardDate,
+      'lastAdDate':             lastAdDate,
+      'lastSmallRewardDate':    lastSmallRewardDate,
+      'canClaimToday':          lastRewardDate != today,
+    };
+  }
+
+
+  @override
+  Future<Map<String, dynamic>> claimDailyReward(String userId) async {
+    final userRef = firestore.collection('users').doc(userId);
+    late Map<String, dynamic> result;
+
+    await firestore.runTransaction((transaction) async {
+      final snap = await transaction.get(userRef);
+      if (!snap.exists) throw Exception('User not found');
+
+      final data = snap.data()!;
+      final today = _todayString();
+      final lastRewardDate = data['lastRewardDate'] as String? ?? '';
+
+      // Guard: already claimed today
+      if (lastRewardDate == today) {
+        throw Exception('Already claimed today');
+      }
+
+      final currentDiamonds = data['diamonds'] as int? ?? 0;
+      int currentStreak = data['streak'] as int? ?? 0;
+
+      // Check if streak is still valid (claimed yesterday or first time)
+      bool streakContinues = false;
+      if (lastRewardDate.isNotEmpty) {
+        try {
+          final lastParts = lastRewardDate.split('-');
+          final lastDate = DateTime(
+            int.parse(lastParts[0]),
+            int.parse(lastParts[1]),
+            int.parse(lastParts[2]),
+          );
+          final now = DateTime.now();
+          final yesterday = DateTime(now.year, now.month, now.day - 1);
+          if (lastDate.year == yesterday.year &&
+              lastDate.month == yesterday.month &&
+              lastDate.day == yesterday.day) {
+            streakContinues = true;
+          }
+        } catch (_) {}
+      }
+
+      if (!streakContinues) {
+        currentStreak = 0; // Reset to 0, will become 1 below
+      }
+
+      // Advance streak (wraps 7 -> 1)
+      final newStreak = (currentStreak % 7) + 1;
+      final reward = _rewardForDay(newStreak);
+      final isBonus = newStreak == 7;
+      final newDiamonds = currentDiamonds + reward;
+
+      transaction.update(userRef, {
+        'diamonds': newDiamonds,
+        'streak': newStreak,
+        'lastRewardDate': today,
+      });
+
+      result = {
+        'day': newStreak,
+        'diamonds': reward,
+        'newTotal': newDiamonds,
+        'isBonus': isBonus,
+      };
+    });
+
+    return result;
+  }
+
+  int _rewardForDay(int day) {
+    const rewards = [10, 15, 20, 25, 30, 40, 50];
+    return rewards[(day - 1).clamp(0, 6)];
+  }
+
+  @override
+  Future<int> addAdReward(String userId) async {
+    final userRef = firestore.collection('users').doc(userId);
+    late int newBalance;
+
+    await firestore.runTransaction((transaction) async {
+      final snap = await transaction.get(userRef);
+      if (!snap.exists) throw Exception('User not found');
+
+      final data = snap.data()!;
+      final today = _todayString();
+      final lastAdDate = data['lastAdDate'] as String? ?? '';
+      final adsWatchedToday = (lastAdDate == today)
+          ? (data['adsWatchedToday'] as int? ?? 0)
+          : 0;
+
+      if (adsWatchedToday >= 5) {
+        throw Exception('Daily ad limit reached (5/day)');
+      }
+
+      final currentDiamonds = data['diamonds'] as int? ?? 0;
+      newBalance = currentDiamonds + 10;
+
+      transaction.update(userRef, {
+        'diamonds': newBalance,
+        'adsWatchedToday': adsWatchedToday + 1,
+        'lastAdDate': today,
+      });
+    });
+
+    return newBalance;
+  }
+
+  @override
+  Future<int> spendDiamonds(
+      String userId, String wallpaperId, int cost) async {
+    final userRef = firestore.collection('users').doc(userId);
+    late int newBalance;
+
+    await firestore.runTransaction((transaction) async {
+      final snap = await transaction.get(userRef);
+      if (!snap.exists) throw Exception('User not found');
+
+      final data = snap.data()!;
+      final currentDiamonds = data['diamonds'] as int? ?? 0;
+
+      if (currentDiamonds < cost) {
+        throw Exception('Insufficient diamonds');
+      }
+
+      newBalance = currentDiamonds - cost;
+
+      transaction.update(userRef, {
+        'diamonds': newBalance,
+        'unlocked_wallpapers': FieldValue.arrayUnion([wallpaperId]),
+        'owned_wallpaper': FieldValue.increment(1),
+      });
+    });
+
+    return newBalance;
+  }
+
+  @override
+  Future<Map<String, dynamic>> addSmallReward(
+      String userId, String wallpaperId) async {
+    final userRef = firestore.collection('users').doc(userId);
+    late Map<String, dynamic> result;
+
+    await firestore.runTransaction((transaction) async {
+      final snap = await transaction.get(userRef);
+      if (!snap.exists) throw Exception('User not found');
+
+      final data = snap.data()!;
+      final today = _todayString();
+      final lastSmallRewardDate = data['lastSmallRewardDate'] as String? ?? '';
+      final isNewDay = lastSmallRewardDate != today;
+
+      // Reset daily tracking on new day
+      final smallRewardEarnedToday = isNewDay
+          ? 0
+          : (data['smallRewardEarnedToday'] as int? ?? 0);
+      final rewardedWallpapers = isNewDay
+          ? <String>[]
+          : List<String>.from(
+              (data['rewardedWallpapersToday'] as List<dynamic>?) ?? []);
+
+      // Rule 1: per-wallpaper dedup — each wallpaper can only earn once/day
+      if (rewardedWallpapers.contains(wallpaperId)) {
+        result = {
+          'granted': false,
+          'newBalance': data['diamonds'] as int? ?? 0,
+          'reason': 'wallpaperAlreadyRewarded',
+        };
+        return; // no Firestore update
+      }
+
+      // Rule 2: 80-diamond combined daily cap for all download/set-as actions
+      const int dailyCap = 80;
+      if (smallRewardEarnedToday >= dailyCap) {
+        result = {
+          'granted': false,
+          'newBalance': data['diamonds'] as int? ?? 0,
+          'reason': 'dailyCapReached',
+        };
+        return;
+      }
+
+      const int rewardAmount = 5;
+      final currentDiamonds = data['diamonds'] as int? ?? 0;
+      final newBalance = currentDiamonds + rewardAmount;
+      rewardedWallpapers.add(wallpaperId);
+
+      transaction.update(userRef, {
+        'diamonds': newBalance,
+        'smallRewardEarnedToday': smallRewardEarnedToday + rewardAmount,
+        'rewardedWallpapersToday': rewardedWallpapers,
+        'lastSmallRewardDate': today,
+      });
+
+      result = {
+        'granted': true,
+        'newBalance': newBalance,
+        'reason': null,
+      };
+    });
+
+    return result;
+  }
+
 
   @override
   Future<void> addWallpaper(WallpaperModel wallpaper) async {

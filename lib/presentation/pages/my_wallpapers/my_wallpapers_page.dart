@@ -16,7 +16,8 @@ final myWallpaperIdsProvider = FutureProvider<List<String>>((ref) async {
 
 class MyWallpapersPage extends ConsumerStatefulWidget {
   final bool embeddedMode;
-  const MyWallpapersPage({super.key, this.embeddedMode = false});
+  final bool showFavoritesOnly;
+  const MyWallpapersPage({super.key, this.embeddedMode = false, this.showFavoritesOnly = false});
 
   @override
   ConsumerState<MyWallpapersPage> createState() => _MyWallpapersPageState();
@@ -28,6 +29,8 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
   @override
   void initState() {
     super.initState();
+    // Lock to favorites view when embedded in the Favorites tab
+    _showFavorites = widget.showFavoritesOnly;
     Future.microtask(() {
       // Always re-read SharedPreferences so newly downloaded wallpapers appear
       // immediately without requiring an app restart.
@@ -40,6 +43,127 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
         ref.read(wallpaperProvider.notifier).loadWallpapers();
       }
     });
+  }
+
+  /// Shows a confirmation sheet and removes the wallpaper from favorites.
+  Future<void> _removeFromFavorites(String wallpaperId, String wallpaperTitle) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.pinkAccent.withAlpha(30),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.heart_broken_rounded,
+                color: Colors.pinkAccent,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Remove from Favorites',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Remove "$wallpaperTitle" from your favorites?',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white60, fontSize: 14),
+            ),
+            const SizedBox(height: 28),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white24),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.pinkAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Remove',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      ref.read(favoritesProvider.notifier).toggleFavorite(wallpaperId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.heart_broken_rounded,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '"$wallpaperTitle" removed from favorites',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF2A2A2A),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   /// Shows a confirmation sheet and removes the wallpaper ID from SharedPreferences.
@@ -184,8 +308,8 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
       if (!ps.hasAccess) return;
 
       // The filename the Gal package used when saving:
-      // Gal.putImageBytes(bytes, name: 'royal_pixel_$id')
-      final String targetPrefix = 'royal_pixel_$wallpaperId';
+      // Gal.putImageBytes(bytes, name: 'rp_$id.jpg')
+      final String targetPrefix = 'rp_$wallpaperId';
 
       // Search recent images (last 500) in the gallery
       final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
@@ -237,6 +361,8 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
+          // Only show the toggle when NOT locked to favorites-only mode
+          if (!widget.showFavoritesOnly)
           IconButton(
             icon: Icon(
               _showFavorites ? Icons.favorite : Icons.favorite_border,
@@ -324,14 +450,13 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
                             onTap: () => context.push('/detail', extra: wp),
                           ),
                         ),
-                        // Delete or Favorite button — top-right corner
                         Positioned(
                           top: 8,
                           right: 8,
                           child: GestureDetector(
                             onTap: () {
                               if (_showFavorites) {
-                                ref.read(favoritesProvider.notifier).toggleFavorite(wp.id);
+                                _removeFromFavorites(wp.id, wp.title);
                               } else {
                                 _deleteWallpaper(wp.id, wp.title);
                               }
@@ -343,13 +468,19 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
                                 color: Colors.black.withAlpha(160),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.redAccent.withAlpha(180),
+                                  color: _showFavorites
+                                      ? Colors.pinkAccent.withAlpha(180)
+                                      : Colors.redAccent.withAlpha(180),
                                   width: 1.2,
                                 ),
                               ),
                               child: Icon(
-                                _showFavorites ? Icons.favorite : Icons.delete_outline_rounded,
-                                color: Colors.redAccent,
+                                _showFavorites
+                                    ? Icons.heart_broken_rounded
+                                    : Icons.delete_outline_rounded,
+                                color: _showFavorites
+                                    ? Colors.pinkAccent
+                                    : Colors.redAccent,
                                 size: 18,
                               ),
                             ),

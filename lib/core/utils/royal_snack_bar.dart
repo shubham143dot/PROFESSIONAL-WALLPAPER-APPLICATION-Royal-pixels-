@@ -19,6 +19,27 @@ class RoyalSnackBar {
     SnackBarType type = SnackBarType.success,
     Duration duration = const Duration(seconds: 3),
   }) {
+    _showOnState(ScaffoldMessenger.of(context), message, type: type, duration: duration);
+  }
+
+  /// Use this variant when you need to show a snackbar after an `await` —
+  /// capture `ScaffoldMessenger.of(context)` *before* the async gap, then
+  /// pass the captured state here.
+  static void showOnMessenger(
+    ScaffoldMessengerState messenger,
+    String message, {
+    SnackBarType type = SnackBarType.success,
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    _showOnState(messenger, message, type: type, duration: duration);
+  }
+
+  static void _showOnState(
+    ScaffoldMessengerState messenger,
+    String message, {
+    SnackBarType type = SnackBarType.success,
+    Duration duration = const Duration(seconds: 3),
+  }) {
     final Color bgColor;
     final Color borderColor;
     final IconData icon;
@@ -45,7 +66,7 @@ class RoyalSnackBar {
         break;
     }
 
-    ScaffoldMessenger.of(context)
+    messenger
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(

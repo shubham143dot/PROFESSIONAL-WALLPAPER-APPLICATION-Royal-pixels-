@@ -2,8 +2,14 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdHelper {
-  // Test Rewarded Ad Unit ID from Android
-  static const String rewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
+  static String get rewardedAdUnitId {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'ca-app-pub-3940256099942544/5224354917';
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return 'ca-app-pub-3940256099942544/1712485313';
+    }
+    return 'ca-app-pub-3940256099942544/5224354917';
+  }
 
   static void showRewardedAd({required VoidCallback onCompleted}) {
     RewardedAd.load(

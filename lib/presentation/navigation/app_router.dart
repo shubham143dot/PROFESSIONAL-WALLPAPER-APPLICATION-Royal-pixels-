@@ -7,13 +7,13 @@ import '../pages/home/home_page.dart';
 import '../pages/detail/wallpaper_detail_page.dart';
 import '../pages/my_wallpapers/my_wallpapers_page.dart';
 import '../pages/about/about_page.dart';
-import '../pages/leaderboard/leaderboard_page.dart';
 import '../pages/upload/upload_wallpaper_page.dart';
 import '../pages/category/category_page.dart';
 import '../pages/category/categories_list_page.dart';
 import '../pages/upload/upload_category_cover_page.dart';
 import '../pages/upload/rename_category_page.dart';
 import '../pages/subscription/subscription_page.dart';
+import '../pages/diamond/diamond_store_page.dart';
 
 CustomTransitionPage buildPageWithDefaultTransition<T>({
   required BuildContext context, 
@@ -77,15 +77,6 @@ final GoRouter appRouter = GoRouter(
         context: context, 
         state: state, 
         child: const MyWallpapersPage()
-      ),
-    ),
-    GoRoute(
-      path: '/leaderboard',
-      name: 'leaderboard',
-      pageBuilder: (context, state) => buildPageWithDefaultTransition(
-        context: context, 
-        state: state, 
-        child: const LeaderboardPage()
       ),
     ),
     GoRoute(
@@ -155,6 +146,15 @@ final GoRouter appRouter = GoRouter(
         context: context, 
         state: state, 
         child: const RenameCategoryPage()
+      ),
+    ),
+    GoRoute(
+      path: '/diamonds',
+      name: 'diamonds',
+      pageBuilder: (context, state) => buildPageWithDefaultTransition(
+        context: context,
+        state: state,
+        child: const DiamondStorePage(),
       ),
     ),
   ],

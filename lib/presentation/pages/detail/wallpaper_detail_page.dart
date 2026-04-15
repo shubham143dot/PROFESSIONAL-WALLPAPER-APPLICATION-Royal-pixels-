@@ -15,9 +15,11 @@ import 'package:image_cropper/image_cropper.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/royal_snack_bar.dart';
+import '../../../domain/entities/diamond_data.dart';
 import '../../../domain/entities/wallpaper_entity.dart';
 import '../../../domain/repositories/payment_repository.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/diamond_provider.dart';
 import '../../providers/wallpaper_provider.dart';
 import '../../widgets/diamond_loader.dart';
 import '../payment/payment_bottom_sheet.dart';
@@ -59,8 +61,8 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     _clockTimer = Stream.periodic(const Duration(seconds: 1)).listen((_) {
       if (mounted) setState(() => _now = DateTime.now());
     });
-    // For free wallpapers, skip the check
-    if (widget.wallpaper.isSpecial) {
+    // For special and premium wallpapers, check if already unlocked
+    if (widget.wallpaper.isSpecial || widget.wallpaper.isPremium) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _checkIfAlreadyUnlocked();
       });
@@ -247,15 +249,42 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
 
   Future<void> _downloadWallpaper() async {
     final isFree = !widget.wallpaper.isSpecial && !widget.wallpaper.isPremium;
+    final user = ref.read(authProvider).user;
     if (isFree) {
       if (mounted) {
         RoyalSnackBar.show(context, 'Loading Ad...', type: SnackBarType.info);
       }
       AdHelper.showRewardedAd(onCompleted: () async {
         await _performDownload();
+        // +5 diamonds for free section download (80/day cap, once per wallpaper per day)
+        if (user != null) {
+          final result = await ref
+              .read(diamondProvider.notifier)
+              .addSmallReward(user.uid, widget.wallpaper.id);
+          if (mounted && !result.granted) {
+            final msg = result.denyReason ==
+                    SmallRewardDenyReason.wallpaperAlreadyRewarded
+                ? 'Already earned reward for this wallpaper today'
+                : 'Daily reward cap reached (80/day). Come back tomorrow!';
+            RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+          }
+        }
       });
     } else {
       await _performDownload();
+      // +5 diamonds per unique wallpaper/day, 80 combined cap
+      if (user != null) {
+        final result = await ref
+            .read(diamondProvider.notifier)
+            .addSmallReward(user.uid, widget.wallpaper.id);
+        if (mounted && !result.granted) {
+          final msg = result.denyReason ==
+                  SmallRewardDenyReason.wallpaperAlreadyRewarded
+              ? 'Already earned reward for this wallpaper today'
+              : 'Daily reward cap reached (80/day). Come back tomorrow!';
+          RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+        }
+      }
     }
   }
 
@@ -292,8 +321,17 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       final Uint8List bytes = response.bodyBytes;
       final processedBytes =
           await ImageFilterUtils.applyFilterToBytes(bytes, _currentFilter);
-      await Gal.putImageBytes(processedBytes,
-          name: 'royal_pixel_${widget.wallpaper.id}');
+
+      // Write bytes to a temp file first, then save via path.
+      // Gal.putImageBytes() fails with GalException/UNEXPECTED on many
+      // Android devices; using a temp file + Gal.putImage() is reliable.
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File(
+          '${tempDir.path}/rp_download_${widget.wallpaper.id}_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      await tempFile.writeAsBytes(processedBytes);
+      await Gal.putImage(tempFile.path, album: 'Royal Pixels');
+      // Clean up the temp file after saving
+      tempFile.deleteSync();
 
       final prefs = await SharedPreferences.getInstance();
       final ids = prefs.getStringList('downloaded_wallpaper_ids') ?? [];
@@ -303,7 +341,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       }
 
       if (mounted) {
-        RoyalSnackBar.show(context, 'Saved to Gallery!');
+        RoyalSnackBar.show(context, 'Saved to Gallery! 💎 +5');
       }
     } catch (e) {
       if (mounted) {
@@ -345,15 +383,42 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     if (choice == null || !mounted) return;
 
     final isFree = !widget.wallpaper.isSpecial && !widget.wallpaper.isPremium;
+    final user = ref.read(authProvider).user;
     if (isFree) {
       if (mounted) {
         RoyalSnackBar.show(context, 'Loading Ad...', type: SnackBarType.info);
       }
       AdHelper.showRewardedAd(onCompleted: () async {
         await _performSetWallpaper(choice);
+        // +5 diamonds for free section set-as (80/day cap, once per wallpaper per day)
+        if (user != null) {
+          final result = await ref
+              .read(diamondProvider.notifier)
+              .addSmallReward(user.uid, widget.wallpaper.id);
+          if (mounted && !result.granted) {
+            final msg = result.denyReason ==
+                    SmallRewardDenyReason.wallpaperAlreadyRewarded
+                ? 'Already earned reward for this wallpaper today'
+                : 'Daily reward cap reached (80/day). Come back tomorrow!';
+            RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+          }
+        }
       });
     } else {
       await _performSetWallpaper(choice);
+      // +5 diamonds per unique wallpaper/day, 80 combined cap
+      if (user != null) {
+        final result = await ref
+            .read(diamondProvider.notifier)
+            .addSmallReward(user.uid, widget.wallpaper.id);
+        if (mounted && !result.granted) {
+          final msg = result.denyReason ==
+                  SmallRewardDenyReason.wallpaperAlreadyRewarded
+              ? 'Already earned reward for this wallpaper today'
+              : 'Daily reward cap reached (80/day). Come back tomorrow!';
+          RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+        }
+      }
     }
   }
 
@@ -550,7 +615,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     final isPremiumUnlocked = user?.isSubscribed ?? false;
-    final isPremiumAndLocked = widget.wallpaper.isPremium && !widget.wallpaper.isSpecial && !isPremiumUnlocked;
+    final isPremiumAndLocked = widget.wallpaper.isPremium && !widget.wallpaper.isSpecial && !isPremiumUnlocked && !_isUnlocked;
     
     final favorites = ref.watch(favoritesProvider);
     final isFavorite = favorites.contains(widget.wallpaper.id);
@@ -822,6 +887,115 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                                 ),
                               ),
                             ),
+
+                            const SizedBox(height: 10),
+
+                            // 💎 Diamond unlock button (Special = 300)
+                            Builder(builder: (context) {
+                              final diamonds = ref.watch(diamondProvider).diamonds;
+                              final canAfford = diamonds >= 300;
+                              return GestureDetector(
+                                onTap: canAfford
+                                    ? () async {
+                                        final user = ref.read(authProvider).user;
+                                        if (user == null) return;
+                                        final messenger = ScaffoldMessenger.of(context);
+                                        final success = await ref
+                                            .read(diamondProvider.notifier)
+                                            .spendDiamonds(user.uid, widget.wallpaper.id, 300);
+                                        if (success && mounted) {
+                                          setState(() => _isUnlocked = true);
+                                          RoyalSnackBar.showOnMessenger(messenger, '💎 Wallpaper unlocked!');
+                                        }
+                                      }
+                                    : () => RoyalSnackBar.show(
+                                          context,
+                                          'Need 300 💎 — you have $diamonds',
+                                          type: SnackBarType.info,
+                                        ),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 13),
+                                  decoration: BoxDecoration(
+                                    color: canAfford
+                                        ? AppColors.goldMid.withAlpha(30)
+                                        : AppColors.bg2,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: canAfford
+                                          ? AppColors.goldMid.withAlpha(120)
+                                          : AppColors.glassBorder,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text('💎', style: TextStyle(fontSize: 18)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        canAfford
+                                            ? 'Unlock with 300 Diamonds'
+                                            : 'Need 300 💎 (you have $diamonds)',
+                                        style: TextStyle(
+                                          color: canAfford
+                                              ? AppColors.goldLight
+                                              : AppColors.textMuted,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+
+                            const SizedBox(height: 10),
+
+                            // 📺 Watch ad to unlock (special)
+                            GestureDetector(
+                              onTap: () {
+                                final user = ref.read(authProvider).user;
+                                if (user == null) return;
+                                RoyalSnackBar.show(context, 'Loading Ad...', type: SnackBarType.info);
+                                final messenger = ScaffoldMessenger.of(context);
+                                AdHelper.showRewardedAd(onCompleted: () async {
+                                  await ref
+                                      .read(diamondProvider.notifier)
+                                      .addAdReward(user.uid);
+                                  if (mounted) {
+                                    setState(() => _isUnlocked = true);
+                                    RoyalSnackBar.showOnMessenger(messenger, '📺 Ad watched — wallpaper unlocked!');
+                                  }
+                                });
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentPurple.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: AppColors.accentPurple.withAlpha(100)),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.play_circle_fill_rounded,
+                                        color: Colors.purpleAccent, size: 20),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Watch Ad → Unlock Free',
+                                      style: TextStyle(
+                                        color: Colors.purpleAccent,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -892,6 +1066,68 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                                 ),
                               ),
                             ),
+
+                            const SizedBox(height: 10),
+
+                            // 💎 Diamond unlock button (Premium = 100)
+                            Builder(builder: (context) {
+                              final diamonds = ref.watch(diamondProvider).diamonds;
+                              final canAfford = diamonds >= 100;
+                              return GestureDetector(
+                                onTap: canAfford
+                                    ? () async {
+                                        final user = ref.read(authProvider).user;
+                                        if (user == null) return;
+                                        final messenger = ScaffoldMessenger.of(context);
+                                        final success = await ref
+                                            .read(diamondProvider.notifier)
+                                            .spendDiamonds(user.uid, widget.wallpaper.id, 100);
+                                        if (success && mounted) {
+                                          setState(() => _isUnlocked = true);
+                                          RoyalSnackBar.showOnMessenger(messenger, '💎 Wallpaper unlocked!');
+                                        }
+                                      }
+                                    : () => RoyalSnackBar.show(
+                                          context,
+                                          'Need 100 💎 — you have $diamonds',
+                                          type: SnackBarType.info,
+                                        ),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 13),
+                                  decoration: BoxDecoration(
+                                    color: canAfford
+                                        ? AppColors.goldMid.withAlpha(30)
+                                        : AppColors.bg2,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: canAfford
+                                          ? AppColors.goldMid.withAlpha(120)
+                                          : AppColors.glassBorder,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text('💎', style: TextStyle(fontSize: 18)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        canAfford
+                                            ? 'Unlock with 100 Diamonds'
+                                            : 'Need 100 💎 (you have $diamonds)',
+                                        style: TextStyle(
+                                          color: canAfford
+                                              ? AppColors.goldLight
+                                              : AppColors.textMuted,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
                           ],
                         ),
                       ),

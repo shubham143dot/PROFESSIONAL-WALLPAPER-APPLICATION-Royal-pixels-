@@ -12,6 +12,11 @@ class UserEntity extends Equatable {
   final bool isSubscribed;
   final DateTime? subscriptionExpiry;
 
+  // ── Diamond System fields ─────────────────────────────────────────────────
+  final int diamonds;
+  final int streak;
+  final int adsWatchedToday;
+
   const UserEntity({
     required this.uid,
     required this.name,
@@ -23,6 +28,9 @@ class UserEntity extends Equatable {
     this.activityScore = 0,
     this.isSubscribed = false,
     this.subscriptionExpiry,
+    this.diamonds = 0,
+    this.streak = 0,
+    this.adsWatchedToday = 0,
   });
 
   @override
@@ -37,5 +45,8 @@ class UserEntity extends Equatable {
         activityScore,
         isSubscribed,
         subscriptionExpiry,
+        diamonds,
+        streak,
+        adsWatchedToday,
       ];
 }

@@ -10,11 +10,15 @@ import '../../../domain/entities/wallpaper_entity.dart';
 import '../../../core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/diamond_provider.dart';
 import '../../providers/wallpaper_provider.dart';
 import '../../widgets/wallpaper_card.dart';
+import '../../widgets/diamond_counter_widget.dart';
+import '../../widgets/wallpaper_long_press_preview.dart';
 import 'wallpaper_search_delegate.dart';
 import '../my_wallpapers/my_wallpapers_page.dart';
 import '../category/categories_list_page.dart';
+import '../diamond/diamond_reward_popup.dart';
 
 // ─── Filter enum ─────────────────────────────────────────────────────────────
 enum WallpaperFilter { all, free, premium, special }
@@ -28,11 +32,12 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage>
     with TickerProviderStateMixin {
-  // Bottom nav index: 0=Home, 1=Categories, 2=Favorites, 3=Profile
+  // Bottom nav index: 0=Home, 1=Categories, 2=My Wallpapers, 3=Favorites, 4=Profile
   int _navIndex = 0;
 
   // Active wallpaper filter (on Home tab)
   WallpaperFilter _filter = WallpaperFilter.all;
+  bool _rewardPopupShown = false;
 
 
   @override
@@ -40,6 +45,24 @@ class _HomePageState extends ConsumerState<HomePage>
     super.initState();
     Future.microtask(
         () => ref.read(wallpaperProvider.notifier).loadWallpapers());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Show daily reward popup once per page lifecycle when user is logged in
+    final diamond = ref.read(diamondProvider);
+    if (!_rewardPopupShown &&
+        diamond.canClaimToday &&
+        diamond.pendingReward != null &&
+        ref.read(authProvider).user != null) {
+      _rewardPopupShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          showDailyRewardPopup(context, ref, diamond.pendingReward!);
+        }
+      });
+    }
   }
 
   void _openSearch() {
@@ -52,11 +75,6 @@ class _HomePageState extends ConsumerState<HomePage>
       context: context,
       delegate: WallpaperSearchDelegate(allWallpapers),
     );
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   // ── Apply filter to full wallpaper list ────────────────────────────────────
@@ -110,6 +128,16 @@ class _HomePageState extends ConsumerState<HomePage>
                 ),
               ),
               actions: [
+                // 💎 Diamond counter
+                Consumer(
+                  builder: (context, ref, _) {
+                    final diamonds = ref.watch(diamondProvider).diamonds;
+                    return DiamondCounterWidget(
+                      diamonds: diamonds,
+                      onTap: () => context.push('/diamonds'),
+                    );
+                  },
+                ),
                 IconButton(
                   tooltip: 'Search',
                   icon: const Icon(Icons.search,
@@ -129,9 +157,11 @@ class _HomePageState extends ConsumerState<HomePage>
           _buildHomeTab(wallpaperState),
           // Tab 1: Categories
           const CategoriesListPage(embeddedMode: true),
-          // Tab 2: Favorites
+          // Tab 2: My Wallpapers (downloaded)
           const MyWallpapersPage(embeddedMode: true),
-          // Tab 3: Profile
+          // Tab 3: Favorites
+          const MyWallpapersPage(embeddedMode: true, showFavoritesOnly: true),
+          // Tab 4: Profile
           _buildProfileTab(userState),
         ],
       ),
@@ -143,8 +173,8 @@ class _HomePageState extends ConsumerState<HomePage>
     final items = [
       _NavItem(Icons.home_rounded, Icons.home_outlined, 'Home'),
       _NavItem(Icons.grid_view_rounded, Icons.grid_view_outlined, 'Categories'),
-      _NavItem(Icons.favorite_rounded, Icons.favorite_border_rounded,
-          'Favorites'),
+      _NavItem(Icons.download_done_rounded, Icons.download_outlined, 'My Saved'),
+      _NavItem(Icons.favorite_rounded, Icons.favorite_border_rounded, 'Favorites'),
       _NavItem(Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
     ];
 
@@ -435,6 +465,7 @@ class _HomePageState extends ConsumerState<HomePage>
             key: ValueKey(wp.id),
             wallpaper: wp,
             onTap: () => context.push('/detail', extra: wp),
+            onLongPress: () => showWallpaperLongPressPreview(context, wp),
           ),
         )
             .animate(delay: (index * 35).ms)
@@ -602,6 +633,39 @@ class _HomePageState extends ConsumerState<HomePage>
                 ),
                 const SizedBox(height: 14),
 
+                // ── Diamond Store tile ────────────────────────────────
+                Consumer(
+                  builder: (context, ref, _) {
+                    final diamonds = ref.watch(diamondProvider).diamonds;
+                    return _ProfileMenuTile(
+                      icon: Icons.diamond_rounded,
+                      label: 'Diamond Store',
+                      subtitle: '💎 $diamonds diamonds in wallet',
+                      isGold: true,
+                      trailingWidget: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.goldMid.withAlpha(30),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColors.goldMid.withAlpha(80)),
+                        ),
+                        child: const Text(
+                          '💎 EARN',
+                          style: TextStyle(
+                              color: AppColors.goldLight,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5),
+                        ),
+                      ),
+                      onTap: () => context.push('/diamonds'),
+                    );
+                  },
+                ),
+                const SizedBox(height: 14),
+
                 // ── Navigation items ─────────────────────────────────
                 const Padding(
                   padding: EdgeInsets.only(left: 4, bottom: 10),
@@ -612,12 +676,6 @@ class _HomePageState extends ConsumerState<HomePage>
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1.2)),
                 ),
-                _ProfileMenuTile(
-                  icon: Icons.leaderboard_rounded,
-                  label: 'Leaderboard',
-                  onTap: () => context.push('/leaderboard'),
-                ),
-                const SizedBox(height: 8),
                 _ProfileMenuTile(
                   icon: Icons.info_outline_rounded,
                   label: 'About',
@@ -791,7 +849,7 @@ class _ProfileMenuTile extends StatelessWidget {
 // ─── Skeleton card ────────────────────────────────────────────────────────────
 class _SkeletonCard extends StatelessWidget {
   final double height;
-  const _SkeletonCard({super.key, required this.height});
+  const _SkeletonCard({required this.height});
 
   @override
   Widget build(BuildContext context) {
