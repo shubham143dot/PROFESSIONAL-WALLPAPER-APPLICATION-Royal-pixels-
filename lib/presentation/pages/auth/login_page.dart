@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/haptic_provider.dart';
+import '../../../core/constants/app_constants.dart';
+
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -20,8 +22,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final authState = ref.watch(authProvider);
 
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.user != null && previous?.user == null) {
-        if (mounted) context.go('/home');
+      // Navigate to home on successful login OR guest mode
+      final wasLoggedIn = previous?.user != null || (previous?.isGuest ?? false);
+      final isLoggedIn = next.user != null || next.isGuest;
+      
+      if (isLoggedIn && !wasLoggedIn) {
+        if (mounted) {
+          // Special welcome for Premium users
+          if (next.user?.isSubscribed == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('👑 Welcome back, Premium Member! All features unlocked.'),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          context.go('/home');
+        }
       } else if (next.error != null && previous?.error != next.error) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${next.error}')),
@@ -152,7 +170,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         else
                           GestureDetector(
                             onTap: () {
-                              HapticFeedback.lightImpact();
+                              ref.read(hapticProvider.notifier).lightImpact();
                               ref.read(authProvider.notifier).loginWithGoogle();
                             },
                             child: Container(
@@ -218,6 +236,58 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   duration: 450.ms,
                                   curve: Curves.easeOut),
 
+                        const SizedBox(height: 14),
+                        // ── Continue as Guest ─────────────────────────────
+                        if (!authState.isLoading)
+                          GestureDetector(
+                            onTap: () async {
+                              ref.read(hapticProvider.notifier).lightImpact();
+                              await ref
+                                  .read(authProvider.notifier)
+                                  .continueAsGuest();
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withAlpha(10),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white.withAlpha(35),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.person_outline_rounded,
+                                    color: AppColors.textSecondary,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 9),
+                                  const Text(
+                                    'Continue as Guest',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                              .animate()
+                              .fade(duration: 500.ms, delay: 450.ms)
+                              .slideY(
+                                  begin: 0.3,
+                                  end: 0,
+                                  duration: 450.ms,
+                                  curve: Curves.easeOut),
+
                         const SizedBox(height: 20),
                         // ── Trust badges ───────────────────────────────
                         Row(
@@ -236,7 +306,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         const SizedBox(height: 20),
                         // ── Version ────────────────────────────────────
                         Text(
-                          'Royal Pixels • v1.0',
+                          '${AppConstants.appName} • v${AppConstants.appVersion}',
                           style: TextStyle(
                             color: AppColors.textMuted.withAlpha(130),
                             fontSize: 11,

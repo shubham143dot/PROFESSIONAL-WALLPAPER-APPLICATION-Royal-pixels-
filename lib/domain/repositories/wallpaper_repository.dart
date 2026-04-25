@@ -7,6 +7,6 @@ abstract class WallpaperRepository {
   Future<Either<Failure, WallpaperEntity>> getWallpaperDetails(String id);
   Future<Either<Failure, void>> addWallpaper(WallpaperEntity wallpaper);
   Future<Either<Failure, void>> deleteWallpaper(String id);
-  Future<Either<Failure, void>> updateWallpaper(String id, String newTitle, String newCategory);
+  Future<Either<Failure, void>> updateWallpaper(String id, {required String newTitle, required String newCategory, required bool isPremium, required int diamondCost, required List<String> tags});
   Future<Either<Failure, void>> renameCategory(String oldName, String newName);
 }

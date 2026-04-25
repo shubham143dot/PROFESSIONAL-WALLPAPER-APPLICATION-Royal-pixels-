@@ -1,51 +1,94 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:io' show Platform;
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter/services.dart';
 import 'package:screen_protector/screen_protector.dart';
 
-import 'core/theme/app_theme.dart';
-import 'presentation/navigation/app_router.dart';
-import 'core/di/service_locator.dart';
-import 'presentation/providers/auth_provider.dart';
+import 'package:royal_pixels/core/theme/app_theme.dart';
+import 'package:royal_pixels/presentation/navigation/app_router.dart';
+import 'package:royal_pixels/core/di/service_locator.dart';
+import 'package:royal_pixels/presentation/providers/auth_provider.dart';
+import 'package:royal_pixels/core/services/notification_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:royal_pixels/core/constants/app_constants.dart';
+
+
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await MobileAds.instance.initialize();
-  setupLocator(); // setup GetIt Dependency Injection
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
+  // Set system UI as early as possible
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.light,
     statusBarIconBrightness: Brightness.light,
   ));
-  
-  try {
-    await ScreenProtector.preventScreenshotOn();
-    await ScreenProtector.protectDataLeakageWithColor(Colors.black);
-  } catch (e) {
-    debugPrint('Screen protector init failed: $e');
-  }
-  
-  try {
-    if (Platform.isAndroid) {
-      await FlutterDisplayMode.setHighRefreshRate();
-    }
-  } catch (_) {
-    // Ignore error if device doesn't support it or if it's not applicable
-  }
-  
+
+  // Parallelize non-dependent initializations for faster startup
+  await Future.wait([
+    _initFirebase(),
+    setupLocator(),
+    _initNotifications(),
+    _initDisplayMode(),
+    _initScreenProtector(),
+  ]);
+
   runApp(
     const ProviderScope(
       child: RoyalPixelsApp(),
     ),
   );
+  
+  // Remove splash after first frame or shortly after
+  FlutterNativeSplash.remove();
 }
+
+Future<void> _initFirebase() async {
+  try {
+    await Firebase.initializeApp();
+    await FirebaseAppCheck.instance.activate(
+      providerAndroid: AndroidPlayIntegrityProvider(),
+    );
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('Firebase initialization failed: $e');
+    }
+  }
+}
+
+Future<void> _initNotifications() async {
+  try {
+    await NotificationService.initialize();
+  } catch (_) {}
+}
+
+Future<void> _initScreenProtector() async {
+  try {
+    await ScreenProtector.preventScreenshotOn();
+    await ScreenProtector.protectDataLeakageWithColor(Colors.black);
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('Screen protector init failed: $e');
+    }
+  }
+}
+
+Future<void> _initDisplayMode() async {
+  try {
+    if (Platform.isAndroid) {
+      await FlutterDisplayMode.setHighRefreshRate();
+    }
+  } catch (_) {}
+}
+
 
 class RoyalPixelsApp extends ConsumerStatefulWidget {
   const RoyalPixelsApp({super.key});
@@ -73,7 +116,9 @@ class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp> {
         await ScreenProtector.protectDataLeakageWithColor(Colors.black);
       }
     } catch (e) {
+      if (kDebugMode) {
       debugPrint('Screen protector policy failed: $e');
+    }
     }
   }
 
@@ -86,7 +131,7 @@ class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp> {
     });
 
     return MaterialApp.router(
-      title: 'Royal Pixels',
+      title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark, // Enforce dark theme based on requirements
       theme: AppTheme.darkTheme,

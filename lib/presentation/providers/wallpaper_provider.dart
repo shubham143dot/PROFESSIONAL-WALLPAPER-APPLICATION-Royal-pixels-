@@ -4,6 +4,9 @@ import '../../domain/entities/wallpaper_entity.dart';
 import '../../domain/usecases/get_wallpapers_usecase.dart';
 import '../../domain/usecases/delete_wallpaper_usecase.dart';
 import '../../domain/usecases/update_wallpaper_usecase.dart';
+import '../../data/models/wallpaper_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 final wallpaperProvider = NotifierProvider<WallpaperNotifier, WallpaperState>(() {
   return WallpaperNotifier();
@@ -14,17 +17,6 @@ class WallpaperState {
   final List<WallpaperEntity> freeWallpapers;
   final List<WallpaperEntity> premiumWallpapers;
   final String? error;
-
-  List<WallpaperEntity> get specialWallpapers {
-    final all = [...freeWallpapers, ...premiumWallpapers];
-    return all.where((wp) {
-      final isCategorySpecial = wp.category.toLowerCase() == 'special' ||
-          wp.autoCategory.toLowerCase() == 'special';
-      final hasSpecialTag =
-          wp.tags.any((t) => t.toLowerCase() == 'special');
-      return isCategorySpecial || hasSpecialTag;
-    }).toList();
-  }
 
   WallpaperState({
     this.isLoading = false,
@@ -50,6 +42,7 @@ class WallpaperState {
 
 class WallpaperNotifier extends Notifier<WallpaperState> {
   bool _loaded = false;
+  bool _isFetching = false;
 
   @override
   WallpaperState build() {
@@ -57,45 +50,103 @@ class WallpaperNotifier extends Notifier<WallpaperState> {
   }
 
   List<WallpaperEntity> _deduplicate(List<WallpaperEntity> wallpapers) {
-    final seenUrls = <String>{};
-    return wallpapers.where((wp) => seenUrls.add(wp.imageUrl)).toList();
+    // Deduplicate by Firestore document ID — NOT imageUrl.
+    // Deduplicating by imageUrl caused wallpapers to silently vanish when two
+    // different Firestore docs happened to share the same image (e.g. re-uploads).
+    final seenIds = <String>{};
+    return wallpapers.where((wp) => wp.id.isNotEmpty && seenIds.add(wp.id)).toList();
   }
 
   Future<void> loadWallpapers({bool forceRefresh = false}) async {
     // Prevent redundant fetches on hot-restarts / tab switches
-    if (_loaded && !forceRefresh) return;
+    if ((_loaded && !forceRefresh) || _isFetching) return;
+    _isFetching = true;
 
-    state = state.copyWith(isLoading: true, error: null);
+    // ── Pre-load from cache for "Instant" feel ──────────────────────
+    if (!_loaded) {
+      final cached = _loadFromCache();
+      if (cached != null) {
+        state = cached;
+      }
+    }
 
-    final getWallpapersUseCase = sl<GetWallpapersUseCase>();
+    state = state.copyWith(isLoading: state.freeWallpapers.isEmpty && state.premiumWallpapers.isEmpty, error: null);
 
-    // ── Fetch both in parallel to cut load time in half ──────────────
-    final results = await Future.wait([
-      getWallpapersUseCase(GetWallpapersParams(page: 1, limit: 30, isPremium: false)),
-      getWallpapersUseCase(GetWallpapersParams(page: 1, limit: 30, isPremium: true)),
-    ]);
+    try {
+      final getWallpapersUseCase = sl<GetWallpapersUseCase>();
 
-    List<WallpaperEntity> freeList = [];
-    List<WallpaperEntity> premiumList = [];
-    String? errorMessage;
+      // ── Fetch both in parallel to cut load time in half ──────────────
+      final results = await Future.wait([
+        getWallpapersUseCase(GetWallpapersParams(page: 1, limit: 50, isPremium: false)),
+        getWallpapersUseCase(GetWallpapersParams(page: 1, limit: 50, isPremium: true)),
+      ]);
 
-    results[0].fold(
-      (failure) => errorMessage = failure.message,
-      (wallpapers) => freeList = _deduplicate(wallpapers),
-    );
+      List<WallpaperEntity> freeList = [];
+      List<WallpaperEntity> premiumList = [];
+      String? errorMessage;
 
-    results[1].fold(
-      (failure) => errorMessage ??= failure.message,
-      (wallpapers) => premiumList = _deduplicate(wallpapers),
-    );
+      results[0].fold(
+        (failure) => errorMessage = failure.message,
+        (wallpapers) => freeList = _deduplicate(wallpapers),
+      );
 
-    _loaded = true;
-    state = state.copyWith(
-      isLoading: false,
-      freeWallpapers: freeList,
-      premiumWallpapers: premiumList,
-      error: errorMessage,
-    );
+      results[1].fold(
+        (failure) => errorMessage ??= failure.message,
+        (wallpapers) => premiumList = _deduplicate(wallpapers),
+      );
+
+      _loaded = true;
+      state = state.copyWith(
+        isLoading: false,
+        freeWallpapers: freeList,
+        premiumWallpapers: premiumList,
+        error: errorMessage,
+      );
+
+      // Save to cache after successful network load
+      if (errorMessage == null) {
+        _saveToCache(state);
+      }
+    } finally {
+      _isFetching = false;
+    }
+  }
+
+  // ── Local Caching Logic ──────────────────────────────────────────────
+
+  static const String _kCacheKey = 'wallpaper_list_cache';
+
+  void _saveToCache(WallpaperState data) {
+    try {
+      final prefs = sl<SharedPreferences>();
+      final map = {
+        'free': data.freeWallpapers.map((w) => (w as WallpaperModel).toJson()).toList(),
+        'premium': data.premiumWallpapers.map((w) => (w as WallpaperModel).toJson()).toList(),
+      };
+      prefs.setString(_kCacheKey, jsonEncode(map));
+    } catch (_) {
+      // Silent fail for cache
+    }
+  }
+
+  WallpaperState? _loadFromCache() {
+    try {
+      final prefs = sl<SharedPreferences>();
+      final jsonStr = prefs.getString(_kCacheKey);
+      if (jsonStr == null) return null;
+
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final free = (map['free'] as List).map((j) => WallpaperModel.fromJson(j)).toList();
+      final premium = (map['premium'] as List).map((j) => WallpaperModel.fromJson(j)).toList();
+
+      return WallpaperState(
+        freeWallpapers: free,
+        premiumWallpapers: premium,
+        isLoading: false,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> deleteWallpaper(String id) async {
@@ -114,27 +165,75 @@ class WallpaperNotifier extends Notifier<WallpaperState> {
     );
   }
 
-  Future<void> updateWallpaper(String id, String newTitle, String newCategory) async {
+  Future<void> updateWallpaper(
+    String id, {
+    required String newTitle,
+    required String newCategory,
+    required bool isPremium,
+    required int diamondCost,
+    required List<String> tags,
+  }) async {
     final usecase = sl<UpdateWallpaperUseCase>();
-    final result = await usecase(id, newTitle, newCategory);
+    final result = await usecase(
+      id,
+      newTitle: newTitle,
+      newCategory: newCategory,
+      isPremium: isPremium,
+      diamondCost: diamondCost,
+      tags: tags,
+    );
     result.fold(
       (failure) {
-        // Can handle the error if necessary
+        state = state.copyWith(error: failure.message);
       },
       (_) {
+        // Build updated entity
+        WallpaperEntity? updated;
+
+        // First look in free list
+        final freeIdx = state.freeWallpapers.indexWhere((w) => w.id == id);
+        if (freeIdx != -1) {
+          updated = state.freeWallpapers[freeIdx].copyWith(
+            title: newTitle,
+            category: newCategory,
+            isPremium: isPremium,
+            diamondCost: diamondCost,
+            tags: tags,
+          );
+        }
+
+        // Otherwise look in premium list
+        final premIdx = state.premiumWallpapers.indexWhere((w) => w.id == id);
+        if (premIdx != -1) {
+          updated = state.premiumWallpapers[premIdx].copyWith(
+            title: newTitle,
+            category: newCategory,
+            isPremium: isPremium,
+            diamondCost: diamondCost,
+            tags: tags,
+          );
+        }
+
+        if (updated == null) return; // not in state yet — ignore
+
+        // ── Seamlessly migrate between free/premium lists ──────────────
+        List<WallpaperEntity> newFree = List.from(state.freeWallpapers);
+        List<WallpaperEntity> newPremium = List.from(state.premiumWallpapers);
+
+        // Remove from both (it will be added to the correct list below)
+        newFree.removeWhere((w) => w.id == id);
+        newPremium.removeWhere((w) => w.id == id);
+
+        if (isPremium) {
+          newPremium.insert(premIdx != -1 ? premIdx : 0, updated);
+        } else {
+          newFree.insert(freeIdx != -1 ? freeIdx : 0, updated);
+        }
+
         state = state.copyWith(
-          freeWallpapers: state.freeWallpapers.map((w) {
-            if (w.id == id) {
-              return w.copyWith(title: newTitle, category: newCategory);
-            }
-            return w;
-          }).toList(),
-          premiumWallpapers: state.premiumWallpapers.map((w) {
-            if (w.id == id) {
-              return w.copyWith(title: newTitle, category: newCategory);
-            }
-            return w;
-          }).toList(),
+          freeWallpapers: newFree,
+          premiumWallpapers: newPremium,
+          error: null,
         );
       },
     );

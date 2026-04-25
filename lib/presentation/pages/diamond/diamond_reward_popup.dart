@@ -1,12 +1,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/diamond_data.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/diamond_provider.dart';
+import '../../providers/haptic_provider.dart';
+
 
 /// Premium daily reward bottom sheet popup.
 /// Shows automatically on first app open per day.
@@ -47,7 +48,8 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
 
   Future<void> _claim() async {
     if (_claimed || _isLoading) return;
-    HapticFeedback.heavyImpact();
+    ref.read(hapticProvider.notifier).heavyImpact();
+
 
     if (widget.reward.isBonus) {
       setState(() => _showBonusChoice = true);

@@ -1,4 +1,4 @@
-package com.example.royal_pixels
+package com.royalpixels.app
 
 import io.flutter.embedding.android.FlutterActivity
 

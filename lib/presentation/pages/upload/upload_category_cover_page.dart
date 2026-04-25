@@ -5,8 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/utils/cloudinary_upload.dart';
+import '../../../core/utils/imagekit_upload.dart';
 import '../../providers/wallpaper_provider.dart';
+import '../../../core/utils/safe_tap.dart';
 
 class UploadCategoryCoverPage extends ConsumerStatefulWidget {
   const UploadCategoryCoverPage({super.key});
@@ -23,65 +24,79 @@ class _UploadCategoryCoverPageState extends ConsumerState<UploadCategoryCoverPag
   String? _selectedCategory;
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    // Compress image to reduce file size drastically and avoid slow uploads
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 70, // Covers don't need to be extremely high def
-    );
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
-    }
+    SafeTap.run('admin_pick_cover', () async {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+      if (pickedFile != null) {
+        final file = File(pickedFile.path);
+        final fileSizeInBytes = await file.length();
+        final fileSizeInMb = fileSizeInBytes / (1024 * 1024);
+        
+        if (fileSizeInMb > 2) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Cover size must be under 2 MB. Selected file is ${fileSizeInMb.toStringAsFixed(2)} MB.'),
+                backgroundColor: Colors.redAccent,
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+          }
+          return;
+        }
+
+        setState(() {
+          _selectedImage = file;
+        });
+      }
+    });
   }
 
   Future<void> _upload() async {
-    if (_selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an image first.')),
-      );
-      return;
-    }
-
-    if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category.')),
-      );
-      return;
-    }
-
-    setState(() => _isUploading = true);
-
-    try {
-      // 1. Upload to Cloudinary
-      final imageUrl = await CloudinaryUpload.uploadImage(_selectedImage!);
-      
-      if (imageUrl == null) {
-        throw Exception('Failed to upload image to Cloudinary');
+    SafeTap.run('admin_upload_cover', () async {
+      if (_selectedImage == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select an image first!')),
+          );
+        }
+        return;
       }
-
-      // 2. Save directly to Firestore collection 'category_covers'
-      // Use lowercase category name as doc id
-      final categoryKey = _selectedCategory!.toLowerCase();
-      await FirebaseFirestore.instance.collection('category_covers').doc(categoryKey).set({
-        'coverUrl': imageUrl,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Overrode $_selectedCategory cover successfully! 🚀')),
-      );
-      context.pop(); // Go back
       
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
-    }
+      setState(() => _isUploading = true);
+
+      try {
+        // 1. Upload image (ImageKit with Cloudinary fallback for free covers)
+        final imageUrl = await ImageKitUpload.uploadImage(_selectedImage!);
+        
+        if (imageUrl == null) {
+          throw Exception('Failed to upload image. Please check your connection and try again.');
+        }
+
+        // 2. Save directly to Firestore collection 'category_covers'
+        // Use lowercase category name as doc id
+        final categoryKey = _selectedCategory!.toLowerCase();
+        await FirebaseFirestore.instance.collection('category_covers').doc(categoryKey).set({
+          'coverUrl': imageUrl,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Overrode $_selectedCategory cover successfully! 🚀')),
+        );
+        context.pop(); // Go back
+        
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      } finally {
+        if (mounted) setState(() => _isUploading = false);
+      }
+    });
   }
 
   @override
@@ -92,15 +107,24 @@ class _UploadCategoryCoverPageState extends ConsumerState<UploadCategoryCoverPag
       ...wallpaperState.freeWallpapers,
       ...wallpaperState.premiumWallpapers,
     ];
-    final Set<String> catSet = {};
+    final Map<String, String> catMap = {};
     for (var wp in allWallpapers) {
-      if (wp.category.trim().isNotEmpty) {
-        catSet.add(wp.category.trim());
+      String cat = wp.category.trim();
+      if (cat.isEmpty) cat = wp.autoCategory.trim();
+      if (cat.isEmpty) continue;
+      
+      final lowerKey = cat.toLowerCase();
+      if (!catMap.containsKey(lowerKey)) {
+        catMap[lowerKey] = cat;
       } else {
-        catSet.add(wp.autoCategory);
+        // Prefer capitalized versions over lowercase ones
+        final existing = catMap[lowerKey]!;
+        if (existing.isNotEmpty && existing[0].toLowerCase() == existing[0] && cat.isNotEmpty && cat[0].toUpperCase() == cat[0]) {
+          catMap[lowerKey] = cat;
+        }
       }
     }
-    _existingCategories = catSet.toList()..sort();
+    _existingCategories = catMap.values.toList()..sort();
     
     List<String> dropDownItems = [..._existingCategories];
 
@@ -126,7 +150,7 @@ class _UploadCategoryCoverPageState extends ConsumerState<UploadCategoryCoverPag
                 children: [
                   CircularProgressIndicator(color: Colors.amber),
                   SizedBox(height: 16),
-                  Text('Uploading to Cloudinary & Firebase...', style: TextStyle(color: Colors.white70)),
+                  Text('Uploading to ImageKit & Firebase...', style: TextStyle(color: Colors.white70)),
                 ],
               ),
             )

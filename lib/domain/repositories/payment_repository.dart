@@ -29,4 +29,15 @@ abstract class PaymentRepository {
     required String wallpaperId,
     required String localFilePath,
   });
+
+  /// Submits a diamond pack purchase (UPI manual flow).
+  Future<Either<Failure, void>> submitDiamondPackPayment({
+    required String userId,
+    required String packId,
+    required String packLabel,
+    required double amount,
+    required int diamondsGranted,
+    required String txnId,
+    String? screenshotUrl,
+  });
 }

@@ -10,10 +10,12 @@
  *        node scripts/seed_wallpapers.js
  *
  * What it does:
- *   - Deletes ALL free wallpapers in `wallpapers` collection
+ *   - [DISABLED BY DEFAULT] Deletes ALL free wallpapers in `wallpapers` collection
+ *   - [DISABLED BY DEFAULT] Deletes ALL premium wallpapers in `wallpapers` collection
  *   - Adds 4 free wallpapers: Time Stone, Thor, Porsche GT3, Uchiha Itachi Classic
- *   - Deletes ALL premium wallpapers in `wallpapers` collection
  *   - Adds 2 premium wallpapers: iPhone 15, iPhone 17 Pro Max
+ *
+ * NOTE: Deletion is now disabled for safety. Use --force-delete to enable.
  */
 
 const admin = require('firebase-admin');
@@ -90,28 +92,34 @@ async function seedWallpapers() {
   console.log('══════════════════════════════════════════════════════\n');
 
   // 1. Delete ALL existing FREE wallpapers
-  console.log('🗑️  Deleting all existing free wallpapers...');
-  const freeSnap = await db.collection('wallpapers')
-    .where('is_premium', '==', false)
-    .get();
+  const forceDelete = process.argv.includes('--force-delete');
 
-  if (freeSnap.empty) {
-    console.log('   (none found – skipping deletion)');
-  } else {
-    const batchSize = 500;
-    let count = 0;
-    let batch = db.batch();
-    for (const doc of freeSnap.docs) {
-      console.log(`   Deleting: ${doc.id} (${doc.data().title || doc.data().category || 'untitled'})`);
-      batch.delete(doc.ref);
-      count++;
-      if (count % batchSize === 0) {
-        await batch.commit();
-        batch = db.batch();
+  if (forceDelete) {
+    console.log('🗑️  Deleting all existing free wallpapers...');
+    const freeSnap = await db.collection('wallpapers')
+      .where('is_premium', '==', false)
+      .get();
+
+    if (freeSnap.empty) {
+      console.log('   (none found – skipping deletion)');
+    } else {
+      const batchSize = 500;
+      let count = 0;
+      let batch = db.batch();
+      for (const doc of freeSnap.docs) {
+        console.log(`   Deleting: ${doc.id} (${doc.data().title || doc.data().category || 'untitled'})`);
+        batch.delete(doc.ref);
+        count++;
+        if (count % batchSize === 0) {
+          await batch.commit();
+          batch = db.batch();
+        }
       }
+      if (count % batchSize !== 0) await batch.commit();
+      console.log(`   ✅ Deleted ${freeSnap.size} free wallpaper(s)\n`);
     }
-    if (count % batchSize !== 0) await batch.commit();
-    console.log(`   ✅ Deleted ${freeSnap.size} free wallpaper(s)\n`);
+  } else {
+    console.log('⚠️  Skipping deletion of free wallpapers (use --force-delete to enable).');
   }
 
   // 2. Add all free wallpapers
@@ -123,28 +131,32 @@ async function seedWallpapers() {
   }
 
   // 3. Delete ALL existing PREMIUM wallpapers
-  console.log('\n🗑️  Deleting all existing premium wallpapers...');
-  const premiumSnap = await db.collection('wallpapers')
-    .where('is_premium', '==', true)
-    .get();
+  if (forceDelete) {
+    console.log('\n🗑️  Deleting all existing premium wallpapers...');
+    const premiumSnap = await db.collection('wallpapers')
+      .where('is_premium', '==', true)
+      .get();
 
-  if (premiumSnap.empty) {
-    console.log('   (none found – skipping deletion)');
-  } else {
-    const batchSizeP = 500;
-    let countP = 0;
-    let batchP = db.batch();
-    for (const doc of premiumSnap.docs) {
-      console.log(`   Deleting: ${doc.id} (${doc.data().title || 'untitled'})`);
-      batchP.delete(doc.ref);
-      countP++;
-      if (countP % batchSizeP === 0) {
-        await batchP.commit();
-        batchP = db.batch();
+    if (premiumSnap.empty) {
+      console.log('   (none found – skipping deletion)');
+    } else {
+      const batchSizeP = 500;
+      let countP = 0;
+      let batchP = db.batch();
+      for (const doc of premiumSnap.docs) {
+        console.log(`   Deleting: ${doc.id} (${doc.data().title || 'untitled'})`);
+        batchP.delete(doc.ref);
+        countP++;
+        if (countP % batchSizeP === 0) {
+          await batchP.commit();
+          batchP = db.batch();
+        }
       }
+      if (countP % batchSizeP !== 0) await batchP.commit();
+      console.log(`   ✅ Deleted ${premiumSnap.size} premium wallpaper(s)\n`);
     }
-    if (countP % batchSizeP !== 0) await batchP.commit();
-    console.log(`   ✅ Deleted ${premiumSnap.size} premium wallpaper(s)\n`);
+  } else {
+    console.log('\n⚠️  Skipping deletion of premium wallpapers (use --force-delete to enable).');
   }
 
   // 4. Add all premium wallpapers

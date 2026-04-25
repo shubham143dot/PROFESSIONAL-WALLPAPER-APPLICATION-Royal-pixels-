@@ -43,4 +43,33 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Heap dumps
+*.hprof
+
+# Node modules
+node_modules/
+scripts/node_modules/
+
+# Script backups and logs
+scripts/*.json
+!scripts/package.json
+!scripts/package-lock.json
+!scripts/service_account.json
+!scripts/*.js
+
+# Local environment
+.env*
+key.properties
+*.jks
+
+# Temporary files and logs
 *.txt
+*.log
+build_out.txt
+flutter_analyze.txt
+*output.txt
+temp*.txt
+analyze*.txt
+
+

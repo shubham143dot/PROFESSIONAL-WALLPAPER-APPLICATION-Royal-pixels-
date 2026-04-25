@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/wallpaper_model.dart';
 
 abstract class FirestoreDataSource {
@@ -6,7 +7,7 @@ abstract class FirestoreDataSource {
   Future<WallpaperModel> getWallpaperDetails(String id);
   Future<void> addWallpaper(WallpaperModel wallpaper);
   Future<void> deleteWallpaper(String id);
-  Future<void> updateWallpaper(String id, String newTitle, String newCategory);
+  Future<void> updateWallpaper(String id, {required String newTitle, required String newCategory, required bool isPremium, required int diamondCost, required List<String> tags});
   Future<void> renameCategory(String oldName, String newName);
   Future<String> getPaymentUpiId();
   Future<void> unlockPremiumWallpaper(String userId, String wallpaperId, [double amount = 0.0]);
@@ -27,6 +28,15 @@ abstract class FirestoreDataSource {
     String? screenshotUrl,
   });
   Future<bool> checkSubscriptionStatus(String userId);
+  Future<void> submitDiamondPackRequest({
+    required String userId,
+    required String packId,
+    required String packLabel,
+    required double amount,
+    required int diamondsGranted,
+    required String txnId,
+    String? screenshotUrl,
+  });
   Future<void> updateUserActivity(String userId);
 
   // ── Diamond System ─────────────────────────────────────────────────────
@@ -47,17 +57,64 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
 
   @override
   Future<List<WallpaperModel>> getWallpapers({required int page, required int limit, bool isPremium = false}) async {
-    // Basic pagination (for a real app, use cursor/startAfterDocument)
-    // Here we just fetch ordered by ID or a timestamp, with limit
-    final querySnapshot = await firestore
-        .collection('wallpapers')
-        .where('is_premium', isEqualTo: isPremium)
-        .limit(limit)
-        .get();
+    try {
+      // 1. Attempt server-side sorting (Preferred for performance)
+      // IMPORTANT: Requires a composite index (is_premium, created_at) in Firestore
+      final querySnapshot = await firestore
+          .collection('wallpapers')
+          .where('is_premium', isEqualTo: isPremium)
+          .orderBy('created_at', descending: true)
+          .limit(limit)
+          .get();
 
-    return querySnapshot.docs
-        .map((doc) => WallpaperModel.fromFirestore(doc.data(), doc.id))
-        .toList();
+      return querySnapshot.docs.expand((doc) {
+        try {
+          return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Error parsing wallpaper ${doc.id}: $e');
+          }
+          return <WallpaperModel>[];
+        }
+      }).toList();
+    } catch (e) {
+      final errorMsg = e.toString();
+      
+      // 2. Identify missing index error (failed-precondition)
+      if (errorMsg.contains('failed-precondition') || errorMsg.contains('requires an index')) {
+        if (kDebugMode) {
+          debugPrint('Firestore: Missing composite index for wallpapers. Falling back to client-side sorting.');
+        }
+        
+        // Use a simpler query that only filters (no ordering) to bypass index requirement
+        final querySnapshot = await firestore
+            .collection('wallpapers')
+            .where('is_premium', isEqualTo: isPremium)
+            .limit(limit * 2) // Fetch a bit more to improve sorting quality
+            .get();
+
+        final list = querySnapshot.docs.expand((doc) {
+          try {
+            return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
+          } catch (err) {
+            return <WallpaperModel>[];
+          }
+        }).toList();
+
+        // 3. Apply client-side sorting as a fallback
+        list.sort((a, b) {
+          final dateA = a.createdAt ?? DateTime(2000);
+          final dateB = b.createdAt ?? DateTime(2000);
+          return dateB.compareTo(dateA); // Descending (newest first)
+        });
+
+        // 4. Respect the original limit after sorting
+        return list.take(limit).toList();
+      }
+      
+      // If it's a different error, rethrow it
+      rethrow;
+    }
   }
 
   @override
@@ -72,15 +129,18 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
 
   @override
   Future<String> getPaymentUpiId() async {
+    // ── UPI System Removed ──────────────────────────────────────────────────
+    // Manual UPI payments are being replaced by Google Play Billing.
+    throw Exception('Manual UPI payments are currently disabled. Please use Diamonds to unlock content.');
+    
+    /*
     final snapshot = await firestore.collection('payment_methods').limit(1).get();
     if (snapshot.docs.isNotEmpty) {
-      // Matching the exact firestore field from requirements: 'upi id' vs 'upi_id'
-      // Taking a guess it might be 'upi_id' based on standard conventions, but user image showed 'upi id : "user@upi"'.
-      // We will look for keys. Let's use 'upi id' or 'upi_id'
       final data = snapshot.docs.first.data();
       return data['upi id'] ?? data['upi_id'] ?? (throw Exception('UPI ID not configured in database'));
     }
     throw Exception('Payment methods collection is empty');
+    */
   }
 
   @override
@@ -120,37 +180,8 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     required String wallpaperTitle,
     String? screenshotUrl,
   }) async {
-    final cleanTxnId = txnId.trim().toUpperCase();
-
-    // ── Duplicate UTR check ─────────────────────────────────────────────────
-    // Query pending_purchases to see if this UTR was already submitted
-    final existing = await firestore
-        .collection('pending_purchases')
-        .where('txnId', isEqualTo: cleanTxnId)
-        .limit(1)
-        .get();
-
-    if (existing.docs.isNotEmpty) {
-      throw Exception(
-        'This UTR/Transaction ID has already been used. '  
-        'Please enter a valid, unique Transaction ID from your UPI app.',
-      );
-    }
-
-    // ── Save pending purchase record for manual verification ────────────────
-    await firestore.collection('pending_purchases').add({
-      'userId': userId,
-      'wallpaperId': wallpaperId,
-      'wallpaperTitle': wallpaperTitle,
-      'amount': amount,
-      'txnId': cleanTxnId,
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-      if (screenshotUrl != null) 'screenshotUrl': screenshotUrl,
-    });
-
-    // ── Optimistically unlock the wallpaper for the user ────────────────────
-    await unlockPremiumWallpaper(userId, wallpaperId, amount);
+    // ── Disabled for Play Store Safety ──────────────────────────────────────
+    throw Exception('Manual payments are currently disabled. Please use the Diamond system or wait for the upcoming Google Play Billing update.');
   }
 
   @override
@@ -161,62 +192,22 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     required String txnId,
     String? screenshotUrl,
   }) async {
-    final cleanTxnId = txnId.trim().toUpperCase();
-    final bool isLifetime = months == 9999;
+    // ── Disabled for Play Store Safety ──────────────────────────────────────
+    throw Exception('Manual subscriptions are currently disabled. Official Google Play Subscriptions are coming soon!');
+  }
 
-    final existing = await firestore
-        .collection('pending_purchases')
-        .where('txnId', isEqualTo: cleanTxnId)
-        .limit(1)
-        .get();
-
-    if (existing.docs.isNotEmpty) {
-      throw Exception(
-        'This UTR/Transaction ID has already been used. '
-        'Please enter a valid, unique Transaction ID from your UPI app.',
-      );
-    }
-
-    await firestore.collection('pending_purchases').add({
-      'userId': userId,
-      'type': 'subscription',
-      'planType': isLifetime ? 'lifetime' : 'recurring',
-      'months': isLifetime ? 0 : months,
-      'amount': amount,
-      'txnId': cleanTxnId,
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-      if (screenshotUrl != null) 'screenshotUrl': screenshotUrl,
-    });
-
-    final userRef = firestore.collection('users').doc(userId);
-    await firestore.runTransaction((transaction) async {
-      final userSnapshot = await transaction.get(userRef);
-      if (!userSnapshot.exists) throw Exception('User not found');
-
-      final currentSpent = (userSnapshot.data()?['total_spent'] ?? 0.0).toDouble();
-      final now = DateTime.now();
-
-      DateTime newExpiry;
-      if (isLifetime) {
-        // Lifetime: set expiry 100 years in the future as a sentinel
-        newExpiry = DateTime(now.year + 100, now.month, now.day);
-      } else {
-        // Standard recurring: add months on top of existing expiry if still active
-        final oldExpiry =
-            (userSnapshot.data()?['subscription_expiry'] as Timestamp?)?.toDate();
-        final baseDate =
-            (oldExpiry != null && oldExpiry.isAfter(now)) ? oldExpiry : now;
-        newExpiry = DateTime(baseDate.year, baseDate.month + months, baseDate.day);
-      }
-
-      transaction.update(userRef, {
-        'total_spent': currentSpent + amount,
-        'is_subscribed': true,
-        'subscription_expiry': Timestamp.fromDate(newExpiry),
-        if (isLifetime) 'plan_type': 'lifetime',
-      });
-    });
+  @override
+  Future<void> submitDiamondPackRequest({
+    required String userId,
+    required String packId,
+    required String packLabel,
+    required double amount,
+    required int diamondsGranted,
+    required String txnId,
+    String? screenshotUrl,
+  }) async {
+    // ── Disabled for Play Store Safety ──────────────────────────────────────
+    throw Exception('Manual diamond purchases are currently disabled. Please use the Ad rewards to earn more diamonds!');
   }
 
   @override
@@ -548,10 +539,13 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   }
 
   @override
-  Future<void> updateWallpaper(String id, String newTitle, String newCategory) async {
+  Future<void> updateWallpaper(String id, {required String newTitle, required String newCategory, required bool isPremium, required int diamondCost, required List<String> tags}) async {
     await firestore.collection('wallpapers').doc(id).update({
       'title': newTitle,
       'category': newCategory,
+      'is_premium': isPremium,
+      'diamond_cost': diamondCost,
+      'tags': tags,
     });
   }
 

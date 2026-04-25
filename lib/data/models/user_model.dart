@@ -15,6 +15,7 @@ class UserModel extends UserEntity {
     super.subscriptionExpiry,
     super.diamonds = 0,
     super.streak = 0,
+    super.appVersion,
     super.adsWatchedToday = 0,
   });
 
@@ -32,6 +33,7 @@ class UserModel extends UserEntity {
       subscriptionExpiry: (json['subscription_expiry'] as Timestamp?)?.toDate(),
       diamonds: json['diamonds'] ?? 0,
       streak: json['streak'] ?? 0,
+      appVersion: json['app_version'] as String?,
       adsWatchedToday: json['adsWatchedToday'] ?? 0,
     );
   }
@@ -47,6 +49,7 @@ class UserModel extends UserEntity {
       'activity_score': activityScore,
       'is_subscribed': isSubscribed,
       if (subscriptionExpiry != null) 'subscription_expiry': Timestamp.fromDate(subscriptionExpiry!),
+      if (appVersion != null) 'app_version': appVersion,
     };
   }
 }

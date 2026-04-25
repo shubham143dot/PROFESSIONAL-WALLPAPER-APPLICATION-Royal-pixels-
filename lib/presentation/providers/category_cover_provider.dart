@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Provides a map of lowercase categoryName to its coverUrl
 final categoryCoverProvider = StreamProvider<Map<String, String>>((ref) {
-  return FirebaseFirestore.instance.collection('category_covers').snapshots().map((snapshot) {
+  return FirebaseFirestore.instance
+      .collection('category_covers')
+      .snapshots()
+      .map((snapshot) {
     final Map<String, String> covers = {};
     for (var doc in snapshot.docs) {
       if (doc.data().containsKey('coverUrl')) {
@@ -11,5 +14,9 @@ final categoryCoverProvider = StreamProvider<Map<String, String>>((ref) {
       }
     }
     return covers;
+  }).handleError((error) {
+    // Silently catch permission-denied or other Firestore errors
+    // so it doesn't crash the widget tree.
+    return <String, String>{};
   });
 });

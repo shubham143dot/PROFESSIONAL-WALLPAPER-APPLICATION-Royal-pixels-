@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/constants/animation_constants.dart';
 import '../../../domain/entities/wallpaper_entity.dart';
 import '../../widgets/wallpaper_card.dart';
 import '../../widgets/wallpaper_long_press_preview.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/haptic_provider.dart';
 
-class CategoryPage extends StatelessWidget {
+class CategoryPage extends ConsumerWidget {
   final String categoryName;
   final List<WallpaperEntity> wallpapers;
 
@@ -17,7 +21,10 @@ class CategoryPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userState = ref.watch(authProvider);
+    final isAdmin = userState.user?.email == 'subhamsoudeep@gmail.com';
+
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
@@ -26,6 +33,16 @@ class CategoryPage extends StatelessWidget {
         leading: BackButton(
           onPressed: () => context.pop(),
         ),
+        actions: [
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.edit_note_rounded, color: Colors.amber),
+              onPressed: () {
+                ref.read(hapticProvider.notifier).lightImpact();
+                context.push('/rename-category', extra: categoryName);
+              },
+            ),
+        ],
       ),
       body: wallpapers.isEmpty 
           ? const Center(child: Text('No Wallpapers Found', style: TextStyle(color: Colors.white)))
@@ -37,6 +54,8 @@ class CategoryPage extends StatelessWidget {
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
               itemCount: wallpapers.length,
+              cacheExtent: 1500,
+              addRepaintBoundaries: true,
               itemBuilder: (context, index) {
                 final wp = wallpapers[index];
                 final heights = [200.0, 260.0, 180.0, 240.0, 220.0];
@@ -50,13 +69,13 @@ class CategoryPage extends StatelessWidget {
                     onLongPress: () => showWallpaperLongPressPreview(context, wp),
                   ),
                 )
-                    .animate(delay: (index * 40).ms)
-                    .fade(duration: 350.ms, curve: Curves.easeOut)
+                    .animate(delay: (index * AppAnimations.staggeringDelay.inMilliseconds).ms)
+                    .fade(duration: 600.ms, curve: Curves.easeOut)
                     .slideY(
-                        begin: 0.08,
+                        begin: AppAnimations.cardSlideOffset,
                         end: 0,
-                        duration: 350.ms,
-                        curve: Curves.easeOutQuart);
+                        duration: AppAnimations.smoothEntrance,
+                        curve: AppAnimations.easeOutExpo);
               },
             ),
     );

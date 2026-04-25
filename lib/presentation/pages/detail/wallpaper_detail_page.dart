@@ -1,32 +1,40 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
-import 'package:palette_generator/palette_generator.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:palette_generator_master/palette_generator_master.dart';
 import 'package:wallpaper_manager_plus/wallpaper_manager_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:image_cropper/image_cropper.dart';
+import 'package:sensors_plus/sensors_plus.dart';
+import '../../providers/parallax_provider.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/royal_snack_bar.dart';
 import '../../../domain/entities/diamond_data.dart';
 import '../../../domain/entities/wallpaper_entity.dart';
 import '../../../domain/repositories/payment_repository.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/diamond_provider.dart';
 import '../../providers/wallpaper_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../../../domain/entities/notification_type.dart';
+
 import '../../widgets/diamond_loader.dart';
-import '../payment/payment_bottom_sheet.dart';
 import '../../../core/utils/image_filter_utils.dart';
-import 'package:go_router/go_router.dart';
 import '../../providers/favorites_provider.dart';
 import '../../../core/ads/ad_helper.dart';
+import '../../providers/haptic_provider.dart';
+import '../../providers/download_provider.dart';
+
+import '../../../core/widgets/login_required_sheet.dart';
+import '../../../core/utils/safe_tap.dart';
 
 class WallpaperDetailPage extends ConsumerStatefulWidget {
   final WallpaperEntity wallpaper;
@@ -50,9 +58,16 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
   late final StreamSubscription<dynamic> _clockTimer;
   DateTime _now = DateTime.now();
 
+  final ValueNotifier<Offset> _tiltOffset = ValueNotifier(Offset.zero);
+  StreamSubscription? _accelSub;
+
   @override
   void initState() {
     super.initState();
+    
+    // 1. Initial status check for parallax
+    _initParallax();
+    
     // Delay expensive render effects (like blur) until Hero transition completes
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) setState(() => _isHeroTransitionFinished = true);
@@ -61,8 +76,8 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     _clockTimer = Stream.periodic(const Duration(seconds: 1)).listen((_) {
       if (mounted) setState(() => _now = DateTime.now());
     });
-    // For special and premium wallpapers, check if already unlocked
-    if (widget.wallpaper.isSpecial || widget.wallpaper.isPremium) {
+    // For premium wallpapers, check if already unlocked
+    if (widget.wallpaper.isPremium) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _checkIfAlreadyUnlocked();
       });
@@ -70,20 +85,55 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     _extractColor();
   }
 
+  Future<void> _initParallax() async {
+    // 1. Check if hardware supports it
+    final isSupported = await ref.read(parallaxSupportProvider.future);
+    if (!isSupported) {
+      if (kDebugMode) print('Parallax: Hardware not supported on this device.');
+      return;
+    }
+
+    // 2. Check if user enabled it in settings
+    final isEnabled = ref.read(parallaxProvider);
+    if (!isEnabled) return;
+
+    // 3. Start listening to sensors
+    // We prioritize Accelerometer for absolute tilt as it's more stable for parallax
+    try {
+      _accelSub = accelerometerEventStream().listen(
+        (event) {
+          if (!mounted) return;
+          // Normalize g-force to -1.0 to 1.0 range
+          // x is horizontal tilt, y is vertical tilt
+          final tx = (event.x / 9.8).clamp(-1.0, 1.0);
+          final ty = (event.y / 9.8).clamp(-1.0, 1.0);
+          _tiltOffset.value = Offset(tx, ty);
+        },
+        onError: (e) {
+          if (kDebugMode) print('Parallax: Accelerometer Stream Error: $e');
+        },
+        cancelOnError: true,
+      );
+    } catch (e) {
+      if (kDebugMode) print('Parallax: Failed to initialize sensors: $e');
+    }
+  }
+
   @override
   void dispose() {
     _clockTimer.cancel();
+    _accelSub?.cancel();
+    _tiltOffset.dispose();
     super.dispose();
   }
 
   Future<void> _extractColor() async {
-    if (widget.wallpaper.isSpecial) return; // Special always golden
     try {
       final imageProvider = ResizeImage(
         CachedNetworkImageProvider(widget.wallpaper.optimizedUrl),
         width: 64, // Dramatically reduces extraction time and memory
       );
-      final palette = await PaletteGenerator.fromImageProvider(
+      final palette = await PaletteGeneratorMaster.fromImageProvider(
         imageProvider,
         size: const Size(64, 64),
         maximumColorCount: 5,
@@ -99,9 +149,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     }
   }
 
-  Color get _primaryColor => widget.wallpaper.isSpecial 
-      ? Colors.amber 
-      : (_vibrantColor ?? _dominantColor ?? Colors.amber);
+  Color get _primaryColor => _vibrantColor ?? _dominantColor ?? Colors.amber;
 
   /// Silently checks Firestore to see if user has already paid for this wallpaper.
   /// If yes, automatically removes the blur & lock UI.
@@ -122,28 +170,6 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
         _isUnlocked = isUnlocked;
       }),
     );
-  }
-
-  Future<void> _buyPremium() async {
-    final user = ref.read(authProvider).user;
-    if (user == null) {
-      RoyalSnackBar.show(context, 'Please login to unlock this wallpaper',
-          type: SnackBarType.info);
-      return;
-    }
-
-    // Open the QR payment bottom sheet
-    final paid = await showPaymentBottomSheet(
-      context,
-      wallpaperId: widget.wallpaper.id,
-      wallpaperTitle: widget.wallpaper.title,
-      amount: widget.wallpaper.price,
-    );
-
-    if (paid && mounted) {
-      RoyalSnackBar.show(context, 'Payment confirmed! Wallpaper unlocked.');
-      setState(() => _isUnlocked = true);
-    }
   }
 
   Future<void> _deleteWallpaperAction() async {
@@ -181,111 +207,318 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
   }
 
   Future<void> _editWallpaperAction() async {
+    // ── Local state for the dialog (StatefulBuilder) ──
     final titleController = TextEditingController(text: widget.wallpaper.title);
     final categoryController = TextEditingController(text: widget.wallpaper.category);
+    final diamondCostController = TextEditingController(
+      text: widget.wallpaper.diamondCost > 0
+          ? widget.wallpaper.diamondCost.toString()
+          : '100',
+    );
+    bool dialogIsPremium = widget.wallpaper.isPremium;
+    bool dialogIsUltraHD = widget.wallpaper.isUltraHD;
+    bool dialogIsEditorsChoice = widget.wallpaper.isEditorsChoice;
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bg2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Edit Wallpaper', style: TextStyle(color: AppColors.textPrimary)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Title',
-                labelStyle: TextStyle(color: AppColors.textSecondary),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.glassBorder)),
-                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.amber)),
-              ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: AppColors.bg1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    const Icon(Icons.admin_panel_settings_rounded,
+                        color: AppColors.goldMid, size: 22),
+                    const SizedBox(width: 10),
+                    const Text('Edit Wallpaper',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Title
+                _EditField(
+                  controller: titleController,
+                  label: 'Title',
+                  icon: Icons.title_rounded,
+                ),
+                const SizedBox(height: 12),
+
+                // Category
+                _EditField(
+                  controller: categoryController,
+                  label: 'Category',
+                  icon: Icons.category_rounded,
+                ),
+                const SizedBox(height: 20),
+
+                // Section: Content Type
+                _sectionLabel('Content Type'),
+                const SizedBox(height: 8),
+
+                // Premium toggle
+                _DialogSwitch(
+                  icon: Icons.workspace_premium,
+                  iconColor: AppColors.goldMid,
+                  label: 'Premium',
+                  subtitle: 'Requires PRO subscription or 💎 to unlock',
+                  value: dialogIsPremium,
+                  activeColor: AppColors.goldMid,
+                  onChanged: (v) => setDialogState(() {
+                    dialogIsPremium = v;
+                    if (!v) {
+                      // Reset cost when un-premiuming
+                      diamondCostController.text = '0';
+                    } else {
+                      if (diamondCostController.text == '0') {
+                        diamondCostController.text = '100';
+                      }
+                    }
+                  }),
+                ),
+
+                // Diamond cost — only when premium is on
+                if (dialogIsPremium) ...[  
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withAlpha(15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.amber.withAlpha(60)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text('💎', style: TextStyle(fontSize: 20)),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Diamond Cost',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600)),
+                              Text('How many 💎 required to unlock',
+                                  style: TextStyle(
+                                      color: Colors.white38, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          width: 70,
+                          child: TextField(
+                            controller: diamondCostController,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                color: Colors.amber,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 8),
+                              filled: true,
+                              fillColor: Colors.amber.withAlpha(20),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: Colors.amber)),
+                              enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: Colors.amber, width: 0.8)),
+                              focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: Colors.amber, width: 2)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+                _sectionLabel('Tags'),
+                const SizedBox(height: 8),
+
+                // Ultra HD toggle
+                _DialogSwitch(
+                  icon: Icons.hd_rounded,
+                  iconColor: const Color(0xFF22D3EE),
+                  label: 'Ultra HD / 4K',
+                  subtitle: 'Shows cyan 4K badge on card',
+                  value: dialogIsUltraHD,
+                  activeColor: const Color(0xFF22D3EE),
+                  onChanged: (v) => setDialogState(() => dialogIsUltraHD = v),
+                ),
+                const SizedBox(height: 8),
+
+                // Editor's Choice toggle
+                _DialogSwitch(
+                  icon: Icons.star_rounded,
+                  iconColor: const Color(0xFFFBBF24),
+                  label: "Editor's Choice",
+                  subtitle: 'Shows amber ★ PICK badge on card',
+                  value: dialogIsEditorsChoice,
+                  activeColor: const Color(0xFFFBBF24),
+                  onChanged: (v) =>
+                      setDialogState(() => dialogIsEditorsChoice = v),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textMuted,
+                          side: const BorderSide(color: AppColors.glassBorder),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.goldMid,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Save',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: categoryController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Category',
-                labelStyle: TextStyle(color: AppColors.textSecondary),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.glassBorder)),
-                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.amber)),
-              ),
-            ),
-          ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.goldMid),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Save', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
 
     if (result == true && mounted) {
       final newTitle = titleController.text.trim();
       final newCategory = categoryController.text.trim();
+      final newDiamondCost =
+          int.tryParse(diamondCostController.text.trim()) ?? 100;
+
+      // Rebuild tags: keep non-meta tags, then add fresh meta tags
+      final baseTags = widget.wallpaper.tags
+          .where((t) =>
+              t != 'ultra_hd' &&
+              t != 'editors_choice')
+          .toList();
+      if (dialogIsUltraHD) baseTags.add('ultra_hd');
+      if (dialogIsEditorsChoice) baseTags.add('editors_choice');
 
       if (newTitle.isNotEmpty && newCategory.isNotEmpty) {
         await ref.read(wallpaperProvider.notifier).updateWallpaper(
               widget.wallpaper.id,
-              newTitle,
-              newCategory,
+              newTitle: newTitle,
+              newCategory: newCategory,
+              isPremium: dialogIsPremium,
+              diamondCost: dialogIsPremium ? newDiamondCost : 0,
+              tags: baseTags,
             );
         if (mounted) {
-          RoyalSnackBar.show(context, 'Wallpaper updated successfully');
+          RoyalSnackBar.show(context, 'Wallpaper updated ✅');
         }
       }
     }
   }
 
   Future<void> _downloadWallpaper() async {
-    final isFree = !widget.wallpaper.isSpecial && !widget.wallpaper.isPremium;
-    final user = ref.read(authProvider).user;
-    if (isFree) {
-      if (mounted) {
-        RoyalSnackBar.show(context, 'Loading Ad...', type: SnackBarType.info);
-      }
-      AdHelper.showRewardedAd(onCompleted: () async {
-        await _performDownload();
-        // +5 diamonds for free section download (80/day cap, once per wallpaper per day)
-        if (user != null) {
-          final result = await ref
-              .read(diamondProvider.notifier)
-              .addSmallReward(user.uid, widget.wallpaper.id);
-          if (mounted && !result.granted) {
-            final msg = result.denyReason ==
-                    SmallRewardDenyReason.wallpaperAlreadyRewarded
-                ? 'Already earned reward for this wallpaper today'
-                : 'Daily reward cap reached (80/day). Come back tomorrow!';
-            RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+    SafeTap.run('wp_download', () async {
+      final isFree = !widget.wallpaper.isPremium;
+      final user = ref.read(authProvider).user;
+      
+      if (isFree) {
+        final isPro = user?.isSubscribed ?? false;
+        
+        // 1. Increment click counter (only for free users)
+        if (!isPro) {
+          await AdHelper.incrementWallpaperActionClick();
+        }
+        
+        // 2. Check if we should show an ad (Random clicks + 2 min gap)
+        // Pass isPro to ensure ads are never shown for premium users
+        final shouldShowAd = await AdHelper.shouldShowWallpaperActionAd(isPro: isPro);
+        
+        if (shouldShowAd) {
+          if (mounted) {
+            RoyalSnackBar.show(context, 'Loading Ad...', type: SnackBarType.info);
+          }
+          
+          AdHelper.showWallpaperActionAd(onCompleted: (earnedReward) async {
+            // Perform download regardless of ad skip
+            await _performDownload();
+            
+            if (user != null) {
+              if (earnedReward) {
+                // Only grant diamond if ad was NOT skipped
+                final result = await ref
+                    .read(diamondProvider.notifier)
+                    .addSmallReward(user.uid, widget.wallpaper.id);
+                if (mounted && !result.granted) {
+                  final msg = result.denyReason ==
+                          SmallRewardDenyReason.wallpaperAlreadyRewarded
+                      ? 'Already earned reward for this wallpaper today'
+                      : 'Daily reward cap reached (80/day). Come back tomorrow!';
+                  RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+                }
+              } else {
+                if (mounted) {
+                  RoyalSnackBar.show(context, 'Ad skipped – No diamonds earned. 💎 0', type: SnackBarType.info);
+                }
+              }
+            }
+          });
+        } else {
+          // No ad shown (either not enough clicks, on cooldown, or user is PRO)
+          await _performDownload();
+          if (user != null) {
+            // Pro members and users who didn't get an ad still get the reward
+            await ref
+                .read(diamondProvider.notifier)
+                .addSmallReward(user.uid, widget.wallpaper.id);
           }
         }
-      });
-    } else {
-      await _performDownload();
-      // +5 diamonds per unique wallpaper/day, 80 combined cap
-      if (user != null) {
-        final result = await ref
-            .read(diamondProvider.notifier)
-            .addSmallReward(user.uid, widget.wallpaper.id);
-        if (mounted && !result.granted) {
-          final msg = result.denyReason ==
-                  SmallRewardDenyReason.wallpaperAlreadyRewarded
-              ? 'Already earned reward for this wallpaper today'
-              : 'Daily reward cap reached (80/day). Come back tomorrow!';
-          RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+      } else {
+        // Premium wallpaper (no ad required, cost already paid or sub active)
+        await _performDownload();
+        if (user != null) {
+          await ref
+              .read(diamondProvider.notifier)
+              .addSmallReward(user.uid, widget.wallpaper.id);
         }
       }
-    }
+    });
   }
 
   Future<void> _performDownload() async {
@@ -310,7 +543,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       }
 
       final response = await http.get(
-        Uri.parse(widget.wallpaper.optimizedUrl),
+        Uri.parse(widget.wallpaper.fullQualityUrl),
         headers: {'User-Agent': 'RoyalPixels/1.0'},
       );
 
@@ -329,20 +562,22 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       final tempFile = File(
           '${tempDir.path}/rp_download_${widget.wallpaper.id}_${DateTime.now().millisecondsSinceEpoch}.jpg');
       await tempFile.writeAsBytes(processedBytes);
-      await Gal.putImage(tempFile.path, album: 'Royal Pixels');
+      await Gal.putImage(tempFile.path, album: AppConstants.appName);
       // Clean up the temp file after saving
       tempFile.deleteSync();
 
-      final prefs = await SharedPreferences.getInstance();
-      final ids = prefs.getStringList('downloaded_wallpaper_ids') ?? [];
-      if (!ids.contains(widget.wallpaper.id)) {
-        ids.add(widget.wallpaper.id);
-        await prefs.setStringList('downloaded_wallpaper_ids', ids);
-      }
+      // Save to global state and SharedPreferences
+      await ref.read(downloadProvider.notifier).addDownload(widget.wallpaper.id);
 
       if (mounted) {
         RoyalSnackBar.show(context, 'Saved to Gallery! 💎 +5');
+        ref.read(notificationProvider.notifier).addNotification(
+          title: 'Download Successful',
+          message: '"${widget.wallpaper.title}" has been saved to your gallery.',
+          type: NotificationType.download,
+        );
       }
+
     } catch (e) {
       if (mounted) {
         RoyalSnackBar.show(context, 'Download failed: ${e.toString()}',
@@ -351,59 +586,59 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     }
   }
 
-  Future<void> _setWallpaper() async {
-    final choice = await showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bg2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Set as Wallpaper',
-          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _dialogOption(ctx, Icons.home_outlined, 'Home Screen', WallpaperManagerPlus.homeScreen),
-            const SizedBox(height: 8),
-            _dialogOption(ctx, Icons.lock_outline, 'Lock Screen', WallpaperManagerPlus.lockScreen),
-            const SizedBox(height: 8),
-            _dialogOption(ctx, Icons.phonelink_outlined, 'Both', WallpaperManagerPlus.bothScreens),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-          ),
-        ],
-      ),
-    );
+  Future<void> _setWallpaper([int choice = WallpaperManagerPlus.bothScreens]) async {
+    SafeTap.run('wp_set', () async {
+      if (!mounted) return;
 
-    if (choice == null || !mounted) return;
-
-    final isFree = !widget.wallpaper.isSpecial && !widget.wallpaper.isPremium;
+    final isFree = !widget.wallpaper.isPremium;
     final user = ref.read(authProvider).user;
     if (isFree) {
-      if (mounted) {
-        RoyalSnackBar.show(context, 'Loading Ad...', type: SnackBarType.info);
+      final isPro = user?.isSubscribed ?? false;
+
+      // 1. Increment click counter (only for free users)
+      if (!isPro) {
+        await AdHelper.incrementWallpaperActionClick();
       }
-      AdHelper.showRewardedAd(onCompleted: () async {
+      
+      // 2. Check if we should show an ad (Random clicks + 2 min gap)
+      final shouldShowAd = await AdHelper.shouldShowWallpaperActionAd(isPro: isPro);
+      
+      if (shouldShowAd) {
+        if (mounted) {
+          RoyalSnackBar.show(context, 'Loading Ad...', type: SnackBarType.info);
+        }
+        AdHelper.showWallpaperActionAd(onCompleted: (earnedReward) async {
+          await _performSetWallpaper(choice);
+          
+          if (user != null) {
+            if (earnedReward) {
+              // Only grant diamond if ad was NOT skipped
+              final result = await ref
+                  .read(diamondProvider.notifier)
+                  .addSmallReward(user.uid, widget.wallpaper.id);
+              if (mounted && !result.granted) {
+                final msg = result.denyReason ==
+                        SmallRewardDenyReason.wallpaperAlreadyRewarded
+                    ? 'Already earned reward for this wallpaper today'
+                    : 'Daily reward cap reached (80/day). Come back tomorrow!';
+                RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+              }
+            } else {
+              if (mounted) {
+                RoyalSnackBar.show(context, 'Ad skipped – No diamonds earned. 💎 0', type: SnackBarType.info);
+              }
+            }
+          }
+        });
+      } else {
+        // No ad shown (either not enough clicks, on cooldown, or user is PRO)
         await _performSetWallpaper(choice);
-        // +5 diamonds for free section set-as (80/day cap, once per wallpaper per day)
         if (user != null) {
-          final result = await ref
+          await ref
               .read(diamondProvider.notifier)
               .addSmallReward(user.uid, widget.wallpaper.id);
-          if (mounted && !result.granted) {
-            final msg = result.denyReason ==
-                    SmallRewardDenyReason.wallpaperAlreadyRewarded
-                ? 'Already earned reward for this wallpaper today'
-                : 'Daily reward cap reached (80/day). Come back tomorrow!';
-            RoyalSnackBar.show(context, msg, type: SnackBarType.info);
-          }
         }
-      });
+      }
     } else {
       await _performSetWallpaper(choice);
       // +5 diamonds per unique wallpaper/day, 80 combined cap
@@ -420,6 +655,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
         }
       }
     }
+    });
   }
 
   Future<void> _performSetWallpaper(int choice) async {
@@ -430,7 +666,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       }
 
       final response = await http.get(
-        Uri.parse(widget.wallpaper.optimizedUrl),
+        Uri.parse(widget.wallpaper.fullQualityUrl),
         headers: {'User-Agent': 'RoyalPixels/1.0'},
       );
 
@@ -443,23 +679,22 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
           await ImageFilterUtils.applyFilterToBytes(bytes, _currentFilter);
 
       final tempDir = await getTemporaryDirectory();
-      final tempFile =
-          File('${tempDir.path}/rp_wallpaper_${widget.wallpaper.id}.jpg');
+      final tempFile = File('${tempDir.path}/rp_wallpaper_${widget.wallpaper.id}.jpg');
       await tempFile.writeAsBytes(processedBytes);
       
-      final File? croppedFile = await _cropWallpaper(tempFile.path);
-      if (croppedFile == null) {
-        if (mounted) {
-          RoyalSnackBar.show(context, 'Adjustment cancelled', type: SnackBarType.info);
-        }
-        return;
-      }
-
-      await WallpaperManagerPlus().setWallpaper(croppedFile, choice);
+      if (!mounted) return;
+      // Instant Apply: bypass crop and let the OS handle center-cropping
+      await WallpaperManagerPlus().setWallpaper(tempFile, choice);
 
       if (mounted) {
         RoyalSnackBar.show(context, 'Wallpaper set successfully!');
+        ref.read(notificationProvider.notifier).addNotification(
+          title: 'Wallpaper Applied',
+          message: '"${widget.wallpaper.title}" is now your active wallpaper.',
+          type: NotificationType.update, // Categorized as update
+        );
       }
+
     } catch (e) {
       if (mounted) {
         RoyalSnackBar.show(
@@ -469,54 +704,6 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     } finally {
       if (mounted) setState(() => _isSetting = false);
     }
-  }
-
-  Future<File?> _cropWallpaper(String sourcePath) async {
-    final croppedFile = await ImageCropper().cropImage(
-      sourcePath: sourcePath,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Adjust Wallpaper',
-          toolbarColor: Colors.black,
-          toolbarWidgetColor: Colors.amber,
-          backgroundColor: Colors.black,
-          activeControlsWidgetColor: Colors.amber,
-          dimmedLayerColor: Colors.black54,
-          // Start in free (original = no locked ratio) mode
-          initAspectRatio: CropAspectRatioPreset.original,
-          // Unlock aspect ratio so user can freely resize/scale
-          lockAspectRatio: false,
-          // Show all presets — "Original" is the freestyle freeform mode
-          aspectRatioPresets: [
-            CropAspectRatioPreset.original,
-            CropAspectRatioPreset.square,
-            CropAspectRatioPreset.ratio16x9,
-            CropAspectRatioPreset.ratio4x3,
-            CropAspectRatioPreset.ratio3x2,
-          ],
-          showCropGrid: true,
-        ),
-        IOSUiSettings(
-          title: 'Adjust Wallpaper',
-          cancelButtonTitle: 'Cancel',
-          doneButtonTitle: 'Set',
-          // Allow free resizing on iOS
-          aspectRatioLockEnabled: false,
-          resetAspectRatioEnabled: true,
-          aspectRatioPresets: [
-            CropAspectRatioPreset.original,
-            CropAspectRatioPreset.square,
-            CropAspectRatioPreset.ratio16x9,
-            CropAspectRatioPreset.ratio4x3,
-            CropAspectRatioPreset.ratio3x2,
-          ],
-        ),
-      ],
-    );
-    if (croppedFile != null) {
-      return File(croppedFile.path);
-    }
-    return null;
   }
 
   Widget _dialogOption(BuildContext ctx, IconData icon, String label, int value) {
@@ -582,11 +769,48 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     );
   }
 
+  void _showSetWallpaperOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
+            child: Container(
+              color: const Color(0xFF1E1E1E).withAlpha(150),
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Set Wallpaper', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  _dialogOption(ctx, Icons.home, 'Home Screen', WallpaperManagerPlus.homeScreen),
+                  const SizedBox(height: 8),
+                  _dialogOption(ctx, Icons.lock, 'Lock Screen', WallpaperManagerPlus.lockScreen),
+                  const SizedBox(height: 8),
+                  _dialogOption(ctx, Icons.phone_android, 'Both Screens', WallpaperManagerPlus.bothScreens),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ).then((value) {
+      if (value != null && value is int) {
+        _setWallpaper(value);
+      }
+    });
+  }
+
   Widget _filterOption(WallpaperFilter filter, String label, IconData icon) {
     final isSelected = _currentFilter == filter;
     return GestureDetector(
       onTap: () {
-        HapticFeedback.selectionClick();
+        ref.read(hapticProvider.notifier).selectionClick();
         setState(() => _currentFilter = filter);
         Navigator.pop(context);
       },
@@ -615,7 +839,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     final isPremiumUnlocked = user?.isSubscribed ?? false;
-    final isPremiumAndLocked = widget.wallpaper.isPremium && !widget.wallpaper.isSpecial && !isPremiumUnlocked && !_isUnlocked;
+    final isPremiumAndLocked = widget.wallpaper.isPremium && !isPremiumUnlocked && !_isUnlocked;
     
     final favorites = ref.watch(favoritesProvider);
     final isFavorite = favorites.contains(widget.wallpaper.id);
@@ -629,7 +853,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            HapticFeedback.selectionClick();
+            ref.read(hapticProvider.notifier).selectionClick();
             Navigator.of(context).pop();
           },
         ),
@@ -644,15 +868,14 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
               onPressed: _deleteWallpaperAction,
             ),
           ],
-          if (!widget.wallpaper.isSpecial || _isUnlocked) ...[
-            IconButton(
+          IconButton(
               icon: const Icon(Icons.auto_fix_high, color: Colors.white),
               onPressed: _showFilterBottomSheet,
             ),
             IconButton(
               icon: Icon(_showPreview ? Icons.visibility_off : Icons.visibility, color: Colors.white),
               onPressed: () {
-                HapticFeedback.lightImpact();
+                ref.read(hapticProvider.notifier).lightImpact();
                 setState(() => _showPreview = !_showPreview);
               },
             ),
@@ -662,31 +885,78 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                 color: isFavorite ? Colors.redAccent : Colors.white,
               ),
               onPressed: () {
-                HapticFeedback.lightImpact();
-                ref.read(favoritesProvider.notifier).toggleFavorite(widget.wallpaper.id);
+                ref.read(hapticProvider.notifier).lightImpact();
+                final isGuest = ref.read(authProvider).isGuest;
+                if (isGuest) {
+                  showLoginRequiredSheet(context,
+                      reason: LoginRequiredReason.favorites);
+                  return;
+                }
+                ref
+                    .read(favoritesProvider.notifier)
+                    .toggleFavorite(widget.wallpaper.id);
                 if (!isFavorite) {
-                  RoyalSnackBar.show(context, 'Added to favorites!', type: SnackBarType.info);
+                  RoyalSnackBar.show(context, 'Added to favorites!',
+                      type: SnackBarType.info);
                 }
               },
             ),
-          ],
         ],
       ),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Hero(
-            tag: 'wallpaper_${widget.wallpaper.id}',
-            child: widget.wallpaper.optimizedUrl.isEmpty
-                ? _buildBrokenImagePlaceholder('No image URL stored in database')
-                : ColorFiltered(
+          GestureDetector(
+            onDoubleTap: () {
+              ref.read(hapticProvider.notifier).lightImpact();
+              final isGuest = ref.read(authProvider).isGuest;
+              if (isGuest) {
+                showLoginRequiredSheet(context,
+                    reason: LoginRequiredReason.favorites);
+                return;
+              }
+              final isFavorite = ref.read(favoritesProvider).contains(widget.wallpaper.id);
+              ref.read(favoritesProvider.notifier).toggleFavorite(widget.wallpaper.id);
+              if (!isFavorite) {
+                RoyalSnackBar.show(context, 'Added to favorites!', type: SnackBarType.info);
+              }
+            },
+            onLongPress: () {
+              ref.read(hapticProvider.notifier).mediumImpact();
+              _showSetWallpaperOptions();
+            },
+            child: Hero(
+              tag: 'wallpaper_${widget.wallpaper.id}',
+              child: ValueListenableBuilder<Offset>(
+                valueListenable: _tiltOffset,
+                builder: (context, tilt, child) {
+                  final isParallaxEnabled = ref.watch(parallaxProvider);
+                  final activeTilt = isParallaxEnabled ? tilt : Offset.zero;
+                  return AnimatedScale(
+                    scale: isParallaxEnabled ? 1.20 : 1.0,
+                    duration: const Duration(milliseconds: 250),
+                    child: AnimatedSlide(
+                      offset: Offset(-activeTilt.dx * 0.09, activeTilt.dy * 0.09),
+                      duration: const Duration(milliseconds: 150),
+                      child: child!,
+                    ),
+                  );
+                },
+                child: widget.wallpaper.optimizedUrl.isEmpty
+                    ? _buildBrokenImagePlaceholder('No image URL stored in database')
+                    : ColorFiltered(
                     colorFilter: ColorFilter.matrix(
                       ImageFilterUtils.getMatrixForFilter(_currentFilter),
                     ),
                     child: CachedNetworkImage(
                       imageUrl: widget.wallpaper.optimizedUrl,
+                      // Stable cache key — shared with grid card so the Hero transition
+                      // reuses already-cached bytes and never shows a blank frame.
+                      cacheKey: widget.wallpaper.cacheKey,
                       fit: BoxFit.cover,
                       memCacheHeight: 1600, // Limits maximum RAM allocation for 4k wallpapers
+                      fadeInDuration: const Duration(milliseconds: 400),
+                      fadeOutDuration: const Duration(milliseconds: 200),
                       placeholder: (context, url) => Container(
                         color: _dominantColor?.withAlpha(80) ?? Colors.grey[900],
                         child: Center(
@@ -694,18 +964,21 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                         ),
                       ),
                       errorWidget: (context, url, error) {
-                        debugPrint('Image load error for url: $url\nError: $error');
+                        if (kDebugMode) {
+                          debugPrint('Image load error for url: $url\nError: $error');
+                        }
                         return _buildBrokenImagePlaceholder(
                           'Could not load image.\nCheck your internet connection\nor re-seed the wallpaper URL in Firestore.',
                         );
                       },
                     ),
                   ),
+              ),
+            ),
           ),
           
-          // Blur if special and not yet unlocked OR premium and not yet unlocked
-          if ((widget.wallpaper.isSpecial && !_isUnlocked && !_isCheckingUnlock && _isHeroTransitionFinished) ||
-              (isPremiumAndLocked && _isHeroTransitionFinished))
+          // Blur if premium and not yet unlocked
+          if (isPremiumAndLocked && _isHeroTransitionFinished)
             TweenAnimationBuilder<double>(
               tween: Tween<double>(begin: 0.0, end: 1.0),
               duration: const Duration(milliseconds: 300),
@@ -802,7 +1075,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
             right: 20,
             child: Column(
               children: [
-                if (widget.wallpaper.isSpecial && _isCheckingUnlock) ...[
+                if (_isCheckingUnlock) ...[
                   // Silently checking unlock status — show small spinner
                   const SizedBox(
                     width: 28,
@@ -813,193 +1086,6 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                   const Text(
                     'Checking access...',
                     style: TextStyle(color: Colors.white54, fontSize: 13),
-                  ),
-                ] else if (widget.wallpaper.isSpecial && !_isUnlocked) ...[
-                  // ── Premium gate ────────────────────────────────────
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                      child: Container(
-                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-                        decoration: BoxDecoration(
-                          color: AppColors.bg0.withAlpha(180),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppColors.glassBorder),
-                        ),
-                        child: Column(
-                          children: [
-                            ShaderMask(
-                              shaderCallback: (b) =>
-                                  AppColors.goldGradient.createShader(b),
-                              child: const Icon(Icons.lock_rounded,
-                                  color: Colors.white, size: 40),
-                            ),
-                            const SizedBox(height: 10),
-                            const Text('Special Wallpaper',
-                                style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            ShaderMask(
-                              shaderCallback: (b) =>
-                                  AppColors.goldGradient.createShader(b),
-                              child: Text(
-                                '₹${widget.wallpaper.price.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w900),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            // Subscription button removed from Special Gate because Special Wallpapers
-                            // are not unlocked by subscription.
-                            
-                            // Individual purchase button
-                            GestureDetector(
-                              onTap: _buyPremium,
-                              child: Container(
-                                width: double.infinity,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                  border: Border.all(color: Colors.white24),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.qr_code,
-                                        color: Colors.white, size: 20),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Unlock for ₹${widget.wallpaper.price.toStringAsFixed(0)}',
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            // 💎 Diamond unlock button (Special = 300)
-                            Builder(builder: (context) {
-                              final diamonds = ref.watch(diamondProvider).diamonds;
-                              final canAfford = diamonds >= 300;
-                              return GestureDetector(
-                                onTap: canAfford
-                                    ? () async {
-                                        final user = ref.read(authProvider).user;
-                                        if (user == null) return;
-                                        final messenger = ScaffoldMessenger.of(context);
-                                        final success = await ref
-                                            .read(diamondProvider.notifier)
-                                            .spendDiamonds(user.uid, widget.wallpaper.id, 300);
-                                        if (success && mounted) {
-                                          setState(() => _isUnlocked = true);
-                                          RoyalSnackBar.showOnMessenger(messenger, '💎 Wallpaper unlocked!');
-                                        }
-                                      }
-                                    : () => RoyalSnackBar.show(
-                                          context,
-                                          'Need 300 💎 — you have $diamonds',
-                                          type: SnackBarType.info,
-                                        ),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 13),
-                                  decoration: BoxDecoration(
-                                    color: canAfford
-                                        ? AppColors.goldMid.withAlpha(30)
-                                        : AppColors.bg2,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: canAfford
-                                          ? AppColors.goldMid.withAlpha(120)
-                                          : AppColors.glassBorder,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Text('💎', style: TextStyle(fontSize: 18)),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        canAfford
-                                            ? 'Unlock with 300 Diamonds'
-                                            : 'Need 300 💎 (you have $diamonds)',
-                                        style: TextStyle(
-                                          color: canAfford
-                                              ? AppColors.goldLight
-                                              : AppColors.textMuted,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }),
-
-                            const SizedBox(height: 10),
-
-                            // 📺 Watch ad to unlock (special)
-                            GestureDetector(
-                              onTap: () {
-                                final user = ref.read(authProvider).user;
-                                if (user == null) return;
-                                RoyalSnackBar.show(context, 'Loading Ad...', type: SnackBarType.info);
-                                final messenger = ScaffoldMessenger.of(context);
-                                AdHelper.showRewardedAd(onCompleted: () async {
-                                  await ref
-                                      .read(diamondProvider.notifier)
-                                      .addAdReward(user.uid);
-                                  if (mounted) {
-                                    setState(() => _isUnlocked = true);
-                                    RoyalSnackBar.showOnMessenger(messenger, '📺 Ad watched — wallpaper unlocked!');
-                                  }
-                                });
-                              },
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 13),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accentPurple.withAlpha(20),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                      color: AppColors.accentPurple.withAlpha(100)),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.play_circle_fill_rounded,
-                                        color: Colors.purpleAccent, size: 20),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Watch Ad → Unlock Free',
-                                      style: TextStyle(
-                                        color: Colors.purpleAccent,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ),
                 ] else if (isPremiumAndLocked) ...[
                   // ── Premium gate ────────────────────────────────────
@@ -1030,68 +1116,45 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                                     fontWeight: FontWeight.w700)),
                             const SizedBox(height: 16),
                             
-                            // Subscription button
-                            GestureDetector(
-                              onTap: () {
-                                context.push('/subscription');
-                              },
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                decoration: BoxDecoration(
-                                  gradient: AppColors.goldGradient,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFFFF8C00).withValues(alpha: 0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.workspace_premium, color: Colors.black, size: 20),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Subscribe to Unlock',
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
 
-                            const SizedBox(height: 10),
-
-                            // 💎 Diamond unlock button (Premium = 100)
+                            // 💎 Diamond unlock button (dynamic cost)
                             Builder(builder: (context) {
+                              final cost = widget.wallpaper.diamondCost > 0
+                                  ? widget.wallpaper.diamondCost
+                                  : 100;
                               final diamonds = ref.watch(diamondProvider).diamonds;
-                              final canAfford = diamonds >= 100;
+                              final canAfford = diamonds >= cost;
                               return GestureDetector(
-                                onTap: canAfford
-                                    ? () async {
-                                        final user = ref.read(authProvider).user;
-                                        if (user == null) return;
-                                        final messenger = ScaffoldMessenger.of(context);
-                                        final success = await ref
-                                            .read(diamondProvider.notifier)
-                                            .spendDiamonds(user.uid, widget.wallpaper.id, 100);
-                                        if (success && mounted) {
-                                          setState(() => _isUnlocked = true);
-                                          RoyalSnackBar.showOnMessenger(messenger, '💎 Wallpaper unlocked!');
-                                        }
-                                      }
-                                    : () => RoyalSnackBar.show(
-                                          context,
-                                          'Need 100 💎 — you have $diamonds',
-                                          type: SnackBarType.info,
-                                        ),
+                                onTap: () async {
+                                  final authState = ref.read(authProvider);
+                                  if (authState.isGuest) {
+                                    showLoginRequiredSheet(context,
+                                        reason: LoginRequiredReason.diamonds);
+                                    return;
+                                  }
+
+                                  if (canAfford) {
+                                    final user = authState.user;
+                                    if (user == null) return;
+                                    final messenger =
+                                        ScaffoldMessenger.of(context);
+                                    final success = await ref
+                                        .read(diamondProvider.notifier)
+                                        .spendDiamonds(user.uid,
+                                            widget.wallpaper.id, cost);
+                                    if (success && mounted) {
+                                      setState(() => _isUnlocked = true);
+                                      RoyalSnackBar.showOnMessenger(messenger,
+                                          '💎 Wallpaper unlocked!');
+                                    }
+                                  } else {
+                                    RoyalSnackBar.show(
+                                      context,
+                                      'Need $cost 💎 — you have $diamonds',
+                                      type: SnackBarType.info,
+                                    );
+                                  }
+                                },
                                 child: Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.symmetric(vertical: 13),
@@ -1113,8 +1176,8 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                                       const SizedBox(width: 8),
                                       Text(
                                         canAfford
-                                            ? 'Unlock with 100 Diamonds'
-                                            : 'Need 100 💎 (you have $diamonds)',
+                                            ? 'Unlock with $cost Diamonds'
+                                            : 'Need $cost 💎 (you have $diamonds)',
                                         style: TextStyle(
                                           color: canAfford
                                               ? AppColors.goldLight
@@ -1209,13 +1272,13 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                         ),
                       )
                     : _buildPillButton(
-                        Icons.wallpaper_rounded, 'Set', _setWallpaper),
+                        Icons.wallpaper_rounded, 'Set', _showSetWallpaperOptions),
               ),
               const SizedBox(width: 10),
               // Filter icon button
               GestureDetector(
                 onTap: () {
-                  HapticFeedback.lightImpact();
+                  ref.read(hapticProvider.notifier).lightImpact();
                   _showFilterBottomSheet();
                 },
                 child: Container(
@@ -1252,7 +1315,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: () {
-        HapticFeedback.mediumImpact();
+        ref.read(hapticProvider.notifier).mediumImpact();
         onTap();
       },
       child: Container(
@@ -1291,5 +1354,131 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     const months = ['', 'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'];
     return months[month];
+  }
+}
+
+// ─── Helper: section label ────────────────────────────────────────────────────
+Widget _sectionLabel(String text) => Padding(
+      padding: const EdgeInsets.only(left: 2),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.textMuted,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.1,
+        ),
+      ),
+    );
+
+// ─── Helper: styled text field for the edit dialog ───────────────────────────
+class _EditField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+
+  const _EditField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white, fontSize: 15),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        prefixIcon: Icon(icon, color: AppColors.textMuted, size: 18),
+        filled: true,
+        fillColor: AppColors.bg2,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.glassBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.glassBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.goldMid, width: 1.5),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Helper: compact animated switch row for the edit dialog ─────────────────
+class _DialogSwitch extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String subtitle;
+  final bool value;
+  final Color activeColor;
+  final ValueChanged<bool> onChanged;
+
+  const _DialogSwitch({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.activeColor,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: value ? activeColor.withAlpha(18) : AppColors.bg2,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: value ? activeColor.withAlpha(70) : AppColors.glassBorder,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: iconColor.withAlpha(28),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 17),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                Text(subtitle,
+                    style: const TextStyle(
+                        color: Colors.white38, fontSize: 10)),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            activeThumbColor: activeColor,
+            onChanged: onChanged,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ],
+      ),
+    );
   }
 }

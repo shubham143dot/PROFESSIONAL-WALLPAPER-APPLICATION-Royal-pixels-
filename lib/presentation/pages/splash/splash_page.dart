@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/services/update_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CINEMATIC SPLASH PAGE
@@ -65,7 +68,8 @@ class _SplashPageState extends ConsumerState<SplashPage>
   final List<_Particle> _particles = [];
   final _rng = math.Random(42);
 
-  static const _totalDuration = Duration(milliseconds: 4200);
+  static const _totalDuration = Duration(milliseconds: 2800);
+
 
   @override
   void initState() {
@@ -204,8 +208,10 @@ class _SplashPageState extends ConsumerState<SplashPage>
         onAccept: () async {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('has_accepted_privacy_policy', true);
-          if (mounted) {
+          if (context.mounted) {
             Navigator.pop(context);
+          }
+          if (mounted) {
             _master.forward();
           }
         },
@@ -218,12 +224,57 @@ class _SplashPageState extends ConsumerState<SplashPage>
 
   Future<void> _navigate() async {
     if (!mounted) return;
+
+    // ── Update check (Firestore backend) ────────────────────────────────
+    final result = await UpdateService.checkForUpdate();
+
+    if (!mounted) return;
+
+    if (result.type == UpdateType.forced) {
+      // Force update: block the app permanently, no dismiss.
+      _showUpdateDialog(result, isForced: true);
+      return; // Do NOT navigate to home/login
+    }
+
+    if (result.type == UpdateType.optional) {
+      // Soft update: show dialog, user can skip.
+      _showUpdateDialog(result, isForced: false);
+      // Navigate even if user has not dismissed yet — they see the dialog on top.
+    }
+
+    // No update or optional → go to home / login as usual
     final authState = ref.read(authProvider);
-    if (authState.user != null) {
+    if (authState.user != null || authState.isGuest) {
       context.go('/home');
     } else {
       context.go('/login');
     }
+  }
+
+  void _showUpdateDialog(UpdateCheckResult result, {required bool isForced}) {
+    showDialog(
+      context: context,
+      barrierDismissible: !isForced, // force = cannot close by tapping outside
+      builder: (ctx) => _UpdateDialog(
+        result: result,
+        isForced: isForced,
+        onUpdate: () async {
+          final url = Uri.tryParse(result.storeUrl);
+          if (url != null && url.hasScheme) {
+            try {
+              await launchUrl(url, mode: LaunchMode.externalApplication);
+            } catch (e) {
+              if (kDebugMode) debugPrint('[UpdateDialog] Could not open store: $e');
+            }
+          }
+        },
+        onSkip: isForced
+            ? null // forced update: no skip button
+            : () {
+                Navigator.of(ctx).pop();
+              },
+      ),
+    );
   }
 
   @override
@@ -669,7 +720,7 @@ class _PrivacyPolicyDialog extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Welcome to Royal Pixels! Before you proceed, please review and accept our Privacy Policy to understand how we handle your data and ensure a secure experience.',
+              'Welcome to ${AppConstants.appName}! Before you proceed, please review and accept our Privacy Policy to understand how we handle your data and ensure a secure experience.',
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(
                 color: Colors.white70,
@@ -681,8 +732,12 @@ class _PrivacyPolicyDialog extends StatelessWidget {
             InkWell(
               onTap: () async {
                 final url = Uri.parse('https://sites.google.com/view/royal-pixels-privacy/home');
-                if (await canLaunchUrl(url)) {
+                try {
                   await launchUrl(url, mode: LaunchMode.externalApplication);
+                } catch (e) {
+                  if (kDebugMode) {
+                    debugPrint('Could not launch $url');
+                  }
                 }
               },
               borderRadius: BorderRadius.circular(8),
@@ -751,6 +806,199 @@ class _PrivacyPolicyDialog extends StatelessWidget {
         ),
       ),
     ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UPDATE DIALOG
+// ─────────────────────────────────────────────────────────────────────────────
+class _UpdateDialog extends StatelessWidget {
+  final UpdateCheckResult result;
+  final bool isForced;
+  final VoidCallback onUpdate;
+  final VoidCallback? onSkip;
+
+  const _UpdateDialog({
+    required this.result,
+    required this.isForced,
+    required this.onUpdate,
+    this.onSkip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      // Prevent back-button dismissal on forced update
+      canPop: !isForced,
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141420),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isForced
+                  ? const Color(0xFFD4A017).withValues(alpha: 0.5)
+                  : Colors.white.withValues(alpha: 0.08),
+              width: isForced ? 1.5 : 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isForced
+                    ? const Color(0xFFD4A017).withValues(alpha: 0.18)
+                    : Colors.black.withValues(alpha: 0.5),
+                blurRadius: 24,
+                spreadRadius: 4,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isForced
+                      ? const Color(0xFFD4A017).withValues(alpha: 0.15)
+                      : Colors.blueAccent.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isForced ? Icons.system_update_rounded : Icons.new_releases_rounded,
+                  color: isForced ? const Color(0xFFD4A017) : Colors.blueAccent,
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Title
+              Text(
+                isForced ? 'Update Required' : 'Update Available',
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Version tag
+              if (result.latestVersionName.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4A017).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFFD4A017).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    'v${result.latestVersionName}',
+                    style: GoogleFonts.outfit(
+                      color: const Color(0xFFD4A017),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 14),
+
+              // Subtitle
+              Text(
+                isForced
+                    ? 'This version is no longer supported. Please update to continue using ${AppConstants.appName}.'
+                    : 'A new version of ${AppConstants.appName} is available with exciting improvements.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  color: Colors.white60,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+
+              // Release notes
+              if (result.releaseNotes.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+                  ),
+                  child: Text(
+                    result.releaseNotes,
+                    style: GoogleFonts.outfit(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      height: 1.6,
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 24),
+
+              // Buttons
+              Row(
+                children: [
+                  if (onSkip != null) ...[
+                    Expanded(
+                      child: TextButton(
+                        onPressed: onSkip,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Later',
+                          style: GoogleFonts.outfit(
+                            color: Colors.white38,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    flex: onSkip != null ? 2 : 1,
+                    child: ElevatedButton(
+                      onPressed: onUpdate,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4A017),
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        'Update Now',
+                        style: GoogleFonts.outfit(
+                          color: Colors.black,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

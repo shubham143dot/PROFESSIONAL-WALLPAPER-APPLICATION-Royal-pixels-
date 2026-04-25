@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/utils/safe_tap.dart';
+
 import '../../../core/di/service_locator.dart';
 import '../../../domain/usecases/rename_category_usecase.dart';
 import '../../providers/wallpaper_provider.dart';
 
 class RenameCategoryPage extends ConsumerStatefulWidget {
-  const RenameCategoryPage({super.key});
+  final String? initialCategory;
+  const RenameCategoryPage({super.key, this.initialCategory});
 
   @override
   ConsumerState<RenameCategoryPage> createState() => _RenameCategoryPageState();
@@ -20,57 +23,53 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
   String? _selectedCategory;
   bool _isRenaming = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategory = widget.initialCategory;
+  }
+
   void _rename() async {
-    if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category.')),
-      );
-      return;
-    }
-
-    final newName = _newCategoryController.text.trim();
-    if (newName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a new category name.')),
-      );
-      return;
-    }
-
-    if (_existingCategories.contains(newName)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This category name already exists.')),
-      );
-      return;
-    }
-
-    setState(() => _isRenaming = true);
-
-    try {
-      final renameUseCase = sl<RenameCategoryUseCase>();
-      final result = await renameUseCase(_selectedCategory!, newName);
-
-      result.fold(
-        (failure) => throw Exception(failure.message),
-        (_) {
-          // Success! 
-          ref.read(wallpaperProvider.notifier).loadWallpapers();
-          
-          if (!mounted) return;
+    SafeTap.run('admin_rename_category', () async {
+      final newName = _newCategoryController.text.trim();
+      if (_selectedCategory == null || newName.isEmpty) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Category renamed successfully to $newName! 🚀')),
+            const SnackBar(content: Text('Please select a category and enter a new name!')),
           );
-          context.pop();
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        }
+        return;
       }
-    } finally {
-      if (mounted) setState(() => _isRenaming = false);
-    }
+      
+      setState(() => _isRenaming = true);
+
+      try {
+        final renameUseCase = sl<RenameCategoryUseCase>();
+        final result = await renameUseCase(_selectedCategory!, newName);
+
+        result.fold(
+          (failure) => throw Exception(failure.message),
+          (_) {
+            // Success! 
+            ref.read(wallpaperProvider.notifier).loadWallpapers();
+            
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Category renamed successfully to $newName! 🚀')),
+            );
+            context.pop();
+          },
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isRenaming = false);
+      }
+    });
   }
 
   @override
@@ -86,15 +85,24 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
       ...wallpaperState.freeWallpapers,
       ...wallpaperState.premiumWallpapers,
     ];
-    final Set<String> catSet = {};
+    final Map<String, String> catMap = {};
     for (var wp in allWallpapers) {
-      if (wp.category.trim().isNotEmpty) {
-        catSet.add(wp.category.trim());
+      String cat = wp.category.trim();
+      if (cat.isEmpty) cat = wp.autoCategory.trim();
+      if (cat.isEmpty) continue;
+      
+      final lowerKey = cat.toLowerCase();
+      if (!catMap.containsKey(lowerKey)) {
+        catMap[lowerKey] = cat;
       } else {
-        catSet.add(wp.autoCategory);
+        // Prefer capitalized versions over lowercase ones
+        final existing = catMap[lowerKey]!;
+        if (existing.isNotEmpty && existing[0].toLowerCase() == existing[0] && cat.isNotEmpty && cat[0].toUpperCase() == cat[0]) {
+          catMap[lowerKey] = cat;
+        }
       }
     }
-    _existingCategories = catSet.toList()..sort();
+    _existingCategories = catMap.values.toList()..sort();
     
     List<String> dropDownItems = [..._existingCategories];
 

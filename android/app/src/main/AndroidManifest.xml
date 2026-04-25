@@ -1,26 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <!-- Android 13+ (API 33+) granular media permissions -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-    <!-- Android 14+ (API 34) required to delete/modify gallery files -->
-    <uses-permission android:name="android.permission.WRITE_MEDIA_IMAGES"/>
-    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION"/>
     <!-- Required for setting device wallpaper -->
     <uses-permission android:name="android.permission.SET_WALLPAPER"/>
-    <!-- Required for image_picker camera source -->
-    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <!-- Required for voice/mic search -->
+
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Required by speech_to_text for reliable audio routing -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
+    <!-- Required for Android 13+ notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Required for persistent notifications after reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
         android:label="Royal Pixels"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -48,9 +46,14 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Notification Channel for FCM -->
         <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="royal_pixels_channel" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"
             android:screenOrientation="portrait"

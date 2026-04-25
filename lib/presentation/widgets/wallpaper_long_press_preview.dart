@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
@@ -9,6 +8,8 @@ import '../../domain/entities/wallpaper_entity.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/diamond_provider.dart';
 import '../../core/utils/royal_snack_bar.dart';
+import '../providers/haptic_provider.dart';
+
 
 // ─── Public entry-point ───────────────────────────────────────────────────────
 
@@ -119,8 +120,9 @@ class _WallpaperLongPressOverlayState
   }
 
   void _onToggleFavorite() {
-    HapticFeedback.lightImpact();
+    ref.read(hapticProvider.notifier).lightImpact();
     ref.read(favoritesProvider.notifier).toggleFavorite(widget.wallpaper.id);
+
     final isFav = ref.read(favoritesProvider).contains(widget.wallpaper.id);
     RoyalSnackBar.show(
       context,
@@ -154,24 +156,15 @@ class _WallpaperLongPressOverlayState
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isPremium = widget.wallpaper.isPremium;
-    final isSpecial = widget.wallpaper.isSpecial;
+    final isUltraHD = widget.wallpaper.isUltraHD;
+    final isEditorsChoice = widget.wallpaper.isEditorsChoice;
     final favorites = ref.watch(favoritesProvider);
     final isFavorite = favorites.contains(widget.wallpaper.id);
     final diamonds = ref.watch(diamondProvider).diamonds;
 
-    // Tier colours
-    final Color tierColor = isSpecial
-        ? AppColors.accentPurple
-        : isPremium
-            ? AppColors.goldMid
-            : const Color(0xFF3B82F6);
-
-    final LinearGradient tierGradient = isSpecial
-        ? AppColors.specialGradient
-        : isPremium
-            ? AppColors.goldGradient
-            : const LinearGradient(
-                colors: [Color(0xFF60A5FA), Color(0xFF2563EB)]);
+    // Tier colour for premium glow
+    const Color tierColor = AppColors.goldMid;
+    const LinearGradient tierGradient = AppColors.goldGradient;
 
     return AnimatedBuilder(
       animation: _ctrl,
@@ -215,7 +208,7 @@ class _WallpaperLongPressOverlayState
                               BorderRadius.circular(_radius.value),
                           boxShadow: [
                             BoxShadow(
-                              color: tierColor.withValues(alpha: 0.45),
+                              color: tierColor.withValues(alpha: isPremium ? 0.45 : 0.18),
                               blurRadius: 40,
                               spreadRadius: 4,
                               offset: const Offset(0, 12),
@@ -275,8 +268,8 @@ class _WallpaperLongPressOverlayState
                                     if (widget.wallpaper.category.isNotEmpty)
                                       Text(
                                         widget.wallpaper.category.toUpperCase(),
-                                        style: TextStyle(
-                                          color: tierColor.withValues(alpha: 0.9),
+                                        style: const TextStyle(
+                                          color: AppColors.goldLight,
                                           fontSize: 9,
                                           fontWeight: FontWeight.w800,
                                           letterSpacing: 1.2,
@@ -300,14 +293,50 @@ class _WallpaperLongPressOverlayState
                                 ),
                               ),
 
-                              // Tier badge (top-right)
+                              // Tier badges stack (top-right)
                               Positioned(
                                 top: 12,
                                 right: 12,
-                                child: _TierBadge(
-                                  isSpecial: isSpecial,
-                                  isPremium: isPremium,
-                                  gradient: tierGradient,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isPremium)
+                                      _OverlayBadge(
+                                        gradient: AppColors.goldGradient,
+                                        glowColor: AppColors.goldMid,
+                                        icon: Icons.lock_rounded,
+                                        iconColor: Colors.black,
+                                        label: 'PRO',
+                                        labelColor: Colors.black,
+                                      ),
+                                    if (isUltraHD) ...[
+                                      if (isPremium) const SizedBox(height: 4),
+                                      const _OverlayBadge(
+                                        gradient: LinearGradient(
+                                          colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
+                                        ),
+                                        glowColor: Color(0xFF22D3EE),
+                                        icon: Icons.hd_rounded,
+                                        iconColor: Colors.white,
+                                        label: '4K',
+                                        labelColor: Colors.white,
+                                      ),
+                                    ],
+                                    if (isEditorsChoice) ...[
+                                      if (isPremium || isUltraHD) const SizedBox(height: 4),
+                                      const _OverlayBadge(
+                                        gradient: LinearGradient(
+                                          colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
+                                        ),
+                                        glowColor: Color(0xFFFBBF24),
+                                        icon: Icons.star_rounded,
+                                        iconColor: Colors.black,
+                                        label: 'PICK',
+                                        labelColor: Colors.black,
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
 
@@ -380,23 +409,27 @@ class _WallpaperLongPressOverlayState
   }
 }
 
-// ─── Tier badge ───────────────────────────────────────────────────────────────
+// ─── Overlay badge (used inside the preview card) ─────────────────────────────
 
-class _TierBadge extends StatelessWidget {
-  final bool isSpecial;
-  final bool isPremium;
+class _OverlayBadge extends StatelessWidget {
   final LinearGradient gradient;
+  final Color glowColor;
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final Color labelColor;
 
-  const _TierBadge({
-    required this.isSpecial,
-    required this.isPremium,
+  const _OverlayBadge({
     required this.gradient,
+    required this.glowColor,
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.labelColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (!isSpecial && !isPremium) return const SizedBox.shrink();
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
@@ -404,8 +437,7 @@ class _TierBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: (isSpecial ? AppColors.accentPurple : AppColors.goldMid)
-                .withValues(alpha: 0.5),
+            color: glowColor.withValues(alpha: 0.5),
             blurRadius: 12,
             offset: const Offset(0, 3),
           )
@@ -414,16 +446,12 @@ class _TierBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            isSpecial ? Icons.auto_awesome : Icons.lock_rounded,
-            color: isSpecial ? Colors.white : Colors.black,
-            size: 9,
-          ),
+          Icon(icon, color: iconColor, size: 9),
           const SizedBox(width: 3),
           Text(
-            isSpecial ? 'SPECIAL' : 'PRO',
+            label,
             style: TextStyle(
-              color: isSpecial ? Colors.white : Colors.black,
+              color: labelColor,
               fontSize: 9,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.6,
@@ -437,7 +465,8 @@ class _TierBadge extends StatelessWidget {
 
 // ─── Action panel ─────────────────────────────────────────────────────────────
 
-class _ActionPanel extends StatelessWidget {
+class _ActionPanel extends ConsumerWidget {
+
   final WallpaperEntity wallpaper;
   final bool isFavorite;
   final int diamonds;
@@ -463,9 +492,10 @@ class _ActionPanel extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+
     final bottomPad = MediaQuery.of(context).padding.bottom;
-    final showPremiumGate = wallpaper.isPremium || wallpaper.isSpecial;
+    final showPremiumGate = wallpaper.isPremium;
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -494,6 +524,36 @@ class _ActionPanel extends StatelessWidget {
               ),
               const SizedBox(height: 18),
 
+              // Tag chips row (Ultra HD + Editor's Choice)
+              if (wallpaper.isUltraHD || wallpaper.isEditorsChoice) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (wallpaper.isUltraHD)
+                      _TagChip(
+                        label: '4K Ultra HD',
+                        icon: Icons.hd_rounded,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
+                        ),
+                        textColor: Colors.white,
+                      ),
+                    if (wallpaper.isUltraHD && wallpaper.isEditorsChoice)
+                      const SizedBox(width: 8),
+                    if (wallpaper.isEditorsChoice)
+                      const _TagChip(
+                        label: "Editor's Pick",
+                        icon: Icons.star_rounded,
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
+                        ),
+                        textColor: Colors.black,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+              ],
+
               // Quick action row
               Row(
                 children: [
@@ -503,9 +563,10 @@ class _ActionPanel extends StatelessWidget {
                     gradient: const LinearGradient(
                         colors: [Color(0xFF34D399), Color(0xFF059669)]),
                     onTap: () {
-                      HapticFeedback.mediumImpact();
+                      ref.read(hapticProvider.notifier).mediumImpact();
                       onDownload();
                     },
+
                   ),
                   const SizedBox(width: 12),
                   _QuickAction(
@@ -514,9 +575,10 @@ class _ActionPanel extends StatelessWidget {
                     gradient: const LinearGradient(
                         colors: [Color(0xFF60A5FA), Color(0xFF2563EB)]),
                     onTap: () {
-                      HapticFeedback.mediumImpact();
+                      ref.read(hapticProvider.notifier).mediumImpact();
                       onSetWallpaper();
                     },
+
                   ),
                   const SizedBox(width: 12),
                   _QuickAction(
@@ -536,9 +598,10 @@ class _ActionPanel extends StatelessWidget {
                     labelColor: isFavorite ? Colors.white : Colors.white60,
                     hasBorder: !isFavorite,
                     onTap: () {
-                      HapticFeedback.lightImpact();
+                      ref.read(hapticProvider.notifier).lightImpact();
                       onToggleFavorite();
                     },
+
                   ),
                 ],
               ),
@@ -547,15 +610,15 @@ class _ActionPanel extends StatelessWidget {
               if (showPremiumGate) ...[
                 const SizedBox(height: 14),
                 _PremiumGateButton(
-                  isSpecial: wallpaper.isSpecial,
                   diamonds: diamonds,
-                  price: wallpaper.price,
+                  diamondCost: wallpaper.diamondCost > 0 ? wallpaper.diamondCost : 100,
                   gradient: tierGradient,
                   tierColor: tierColor,
                   onTap: () {
-                    HapticFeedback.mediumImpact();
+                    ref.read(hapticProvider.notifier).mediumImpact();
                     onUnlockPremium();
                   },
+
                 ),
               ],
 
@@ -579,6 +642,49 @@ class _ActionPanel extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Tag chip (ultra HD / editors choice info strip) ─────────────────────────
+
+class _TagChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final LinearGradient gradient;
+  final Color textColor;
+
+  const _TagChip({
+    required this.label,
+    required this.icon,
+    required this.gradient,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: textColor, size: 13),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -659,17 +765,15 @@ class _QuickAction extends StatelessWidget {
 // ─── Premium gate button ──────────────────────────────────────────────────────
 
 class _PremiumGateButton extends StatelessWidget {
-  final bool isSpecial;
   final int diamonds;
-  final double price;
+  final int diamondCost;
   final LinearGradient gradient;
   final Color tierColor;
   final VoidCallback onTap;
 
   const _PremiumGateButton({
-    required this.isSpecial,
     required this.diamonds,
-    required this.price,
+    required this.diamondCost,
     required this.gradient,
     required this.tierColor,
     required this.onTap,
@@ -677,7 +781,7 @@ class _PremiumGateButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int requiredDiamonds = isSpecial ? 70 : 30;
+    final int requiredDiamonds = diamondCost > 0 ? diamondCost : 100;
     final bool canAfford = diamonds >= requiredDiamonds;
 
     return GestureDetector(
@@ -708,10 +812,8 @@ class _PremiumGateButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              isSpecial ? Icons.auto_awesome : Icons.workspace_premium,
-              color: canAfford
-                  ? (isSpecial ? Colors.white : Colors.black)
-                  : tierColor,
+              Icons.workspace_premium,
+              color: canAfford ? Colors.black : tierColor,
               size: 18,
             ),
             const SizedBox(width: 8),
@@ -720,9 +822,7 @@ class _PremiumGateButton extends StatelessWidget {
                   ? 'Unlock with $requiredDiamonds 💎'
                   : 'Need $requiredDiamonds 💎 · View Details',
               style: TextStyle(
-                color: canAfford
-                    ? (isSpecial ? Colors.white : Colors.black)
-                    : AppColors.textSecondary,
+                color: canAfford ? Colors.black : AppColors.textSecondary,
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.3,

@@ -6,15 +6,16 @@ class WallpaperEntity extends Equatable {
   final String imageUrl;
   final String category;
   final bool isPremium;
-  final double price;
+  final int diamondCost;
   final List<String> tags;
   final String size;
+  final DateTime? createdAt;
 
-  bool get isSpecial {
-    return category.toLowerCase() == 'special' ||
-           autoCategory.toLowerCase() == 'special' ||
-           tags.any((t) => t.toLowerCase() == 'special');
-  }
+  /// True when the wallpaper is tagged with 'ultra_hd'
+  bool get isUltraHD => tags.any((t) => t.toLowerCase() == 'ultra_hd');
+
+  /// True when the wallpaper is tagged with 'editors_choice'
+  bool get isEditorsChoice => tags.any((t) => t.toLowerCase() == 'editors_choice');
 
   static String getOptimizedCloudinaryUrl(String url) {
     if (url.isEmpty || !url.contains('res.cloudinary.com')) return url;
@@ -35,7 +36,75 @@ class WallpaperEntity extends Equatable {
     return '$baseUrl$transformations$remainingPart';
   }
 
-  String get optimizedUrl => getOptimizedCloudinaryUrl(imageUrl);
+  /// Builds an ImageKit optimized preview URL (width-limited, webp, good quality).
+  static String getOptimizedImageKitUrl(String url, {int width = 1080}) {
+    if (url.isEmpty || !url.contains('ik.imagekit.io')) return url;
+    // Avoid double-transforming if a `tr` param already exists
+    if (url.contains('?tr=') || url.contains('&tr=')) return url;
+    return '$url?tr=w-$width,f-webp,q-85';
+  }
+
+  /// Optimized preview URL (compressed) — used for displaying in the UI.
+  /// For Cloudinary: w_1080, webp, auto quality.
+  /// For ImageKit: w_1080, webp, q-85.
+  /// For anything else: returns raw imageUrl.
+  String get optimizedUrl {
+    if (imageUrl.isEmpty) return '';
+    if (imageUrl.contains('res.cloudinary.com')) {
+      return getOptimizedCloudinaryUrl(imageUrl);
+    }
+    if (imageUrl.contains('ik.imagekit.io')) {
+      return getOptimizedImageKitUrl(imageUrl, width: 1080);
+    }
+    return imageUrl;
+  }
+
+  /// Full-quality original URL — used for downloads and set-wallpaper.
+  /// Always returns the raw, uncompressed imageUrl with zero transformations.
+  String get fullQualityUrl => imageUrl;
+
+  /// Stable cache key for CachedNetworkImage.
+  /// Always the raw imageUrl so the same image is never cached under multiple keys
+  /// (thumbnail vs optimized vs full) — prevents cache misses that cause images
+  /// to briefly vanish during scroll or on re-entry.
+  String get cacheKey => imageUrl;
+
+  /// Low-res extreme blurred version (for instant placeholders)
+  String get blurUrl {
+    if (imageUrl.isEmpty) return '';
+    if (imageUrl.contains('res.cloudinary.com')) {
+      const String uploadPath = '/image/upload/';
+      final int uploadIndex = imageUrl.indexOf(uploadPath);
+      if (uploadIndex == -1) return imageUrl;
+      final String baseUrl = imageUrl.substring(0, uploadIndex + uploadPath.length);
+      final String remainingPart = imageUrl.substring(uploadIndex + uploadPath.length);
+      // w_50 (tiny), e_blur:1000 (heavy blur), q_auto:low (mini size)
+      return '${baseUrl}w_50,e_blur:1000,f_webp,q_auto:low,fl_progressive/$remainingPart';
+    }
+    if (imageUrl.contains('ik.imagekit.io')) {
+      // Use a separate, stable blurUrl key (avoids collision with thumbnailUrl key)
+      if (imageUrl.contains('?tr=') || imageUrl.contains('&tr=')) return imageUrl;
+      return '$imageUrl?tr=w-50,bl-30,q-20,f-webp';
+    }
+    return imageUrl;
+  }
+
+  /// Thumbnail version for the grid view (400px width)
+  String get thumbnailUrl {
+    if (imageUrl.isEmpty) return '';
+    if (imageUrl.contains('res.cloudinary.com')) {
+      const String uploadPath = '/image/upload/';
+      final int uploadIndex = imageUrl.indexOf(uploadPath);
+      if (uploadIndex == -1) return imageUrl;
+      final String baseUrl = imageUrl.substring(0, uploadIndex + uploadPath.length);
+      final String remainingPart = imageUrl.substring(uploadIndex + uploadPath.length);
+      return '${baseUrl}w_400,f_webp,q_auto:good,fl_progressive/$remainingPart';
+    }
+    if (imageUrl.contains('ik.imagekit.io')) {
+      return getOptimizedImageKitUrl(imageUrl, width: 400);
+    }
+    return imageUrl;
+  }
 
   const WallpaperEntity({
     required this.id,
@@ -43,9 +112,10 @@ class WallpaperEntity extends Equatable {
     required this.imageUrl,
     required this.category,
     required this.isPremium,
-    required this.price,
+    required this.diamondCost,
     required this.tags,
     this.size = '',
+    this.createdAt,
   });
 
   @override
@@ -55,9 +125,10 @@ class WallpaperEntity extends Equatable {
         imageUrl,
         category,
         isPremium,
-        price,
+        diamondCost,
         tags,
         size,
+        createdAt,
       ];
 
   WallpaperEntity copyWith({
@@ -66,9 +137,10 @@ class WallpaperEntity extends Equatable {
     String? imageUrl,
     String? category,
     bool? isPremium,
-    double? price,
+    int? diamondCost,
     List<String>? tags,
     String? size,
+    DateTime? createdAt,
   }) {
     return WallpaperEntity(
       id: id ?? this.id,
@@ -76,9 +148,10 @@ class WallpaperEntity extends Equatable {
       imageUrl: imageUrl ?? this.imageUrl,
       category: category ?? this.category,
       isPremium: isPremium ?? this.isPremium,
-      price: price ?? this.price,
+      diamondCost: diamondCost ?? this.diamondCost,
       tags: tags ?? this.tags,
       size: size ?? this.size,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 

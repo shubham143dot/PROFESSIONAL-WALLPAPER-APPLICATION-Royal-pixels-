@@ -6,10 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../core/utils/cloudinary_upload.dart';
+import '../../../core/utils/imagekit_upload.dart';
 import '../../../domain/entities/wallpaper_entity.dart';
 import '../../../domain/usecases/add_wallpaper_usecase.dart';
 import '../../providers/wallpaper_provider.dart';
+import '../../../core/utils/safe_tap.dart';
 
 class UploadWallpaperPage extends ConsumerStatefulWidget {
   const UploadWallpaperPage({super.key});
@@ -21,11 +22,12 @@ class UploadWallpaperPage extends ConsumerStatefulWidget {
 class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
   final _titleController = TextEditingController();
   final _categoryController = TextEditingController();
-  final _priceController = TextEditingController(text: '10.0');
+  final _diamondCostController = TextEditingController(text: '100');
 
   File? _selectedImage;
   bool _isPremium = false;
-  bool _isSpecial = false;
+  bool _isUltraHD = false;
+  bool _isEditorsChoice = false;
   bool _isUploading = false;
   
   List<String> _existingCategories = [];
@@ -38,145 +40,133 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    // Do not compress image to prevent quality drop
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
-    );
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
-    }
+    SafeTap.run('admin_pick_image', () async {
+      final picker = ImagePicker();
+      final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
+    });
   }
 
-
-
   Future<void> _upload() async {
-    if (_selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an image first.')),
-      );
-      return;
-    }
-
-    final title = _titleController.text.trim();
-    if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please provide a title.')),
-      );
-      return;
-    }
-
-    // Check for duplicate wallpaper name
-    final wallpaperState = ref.read(wallpaperProvider);
-    final allWallpapers = [
-      ...wallpaperState.freeWallpapers,
-      ...wallpaperState.premiumWallpapers,
-    ];
-    
-    final isDuplicate = allWallpapers.any((wp) => wp.title.toLowerCase() == title.toLowerCase());
-    
-    if (isDuplicate) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A wallpaper with this name is already taken!')),
-      );
-      return;
-    }
-
-    setState(() => _isUploading = true);
-
-    try {
-      // 1. Upload to Cloudinary
-      final imageUrl = await CloudinaryUpload.uploadImage(
-        _selectedImage!,
-        isPremiumOrSpecial: _isPremium || _isSpecial,
-      );
-      
-      if (imageUrl == null) {
-        throw Exception('Failed to upload image to Cloudinary');
-      }
-
-      // 2. Save to Firestore
-      final double price = _isSpecial ? (double.tryParse(_priceController.text) ?? 10.0) : 0.0;
-      
-      String finalCategory = 'Trending';
-      if (_createNewCategory) {
-        finalCategory = _categoryController.text.trim().isEmpty ? 'Trending' : _categoryController.text.trim();
-      } else if (_selectedCategory != null && _selectedCategory != 'Create New Category') {
-        finalCategory = _selectedCategory!;
-      }
-
-      final tags = [finalCategory.toLowerCase()];
-      if (_isSpecial) {
-        tags.add('special');
-      }
-
-      final wallpaper = WallpaperEntity(
-        id: '', // Empty ID tells our datasource to auto-generate one
-        title: title,
-        imageUrl: imageUrl,
-        category: finalCategory,
-        isPremium: _isPremium,
-        price: price,
-        tags: tags,
-      );
-
-      final addUseCase = sl<AddWallpaperUseCase>();
-      final result = await addUseCase(wallpaper);
-
-      result.fold(
-        (failure) => throw Exception(failure.message),
-        (_) {
-          // Success! 
-          // Reload wallpapers so it reflects in the app instantly
-          ref.read(wallpaperProvider.notifier).loadWallpapers();
-          
-          if (!mounted) return;
+    SafeTap.run('admin_upload_submit', () async {
+      if (_selectedImage == null) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Wallpaper Uploaded Successfully! 🚀')),
+            const SnackBar(content: Text('Please select an image first!')),
           );
-          context.pop(); // Go back home
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        }
+        return;
       }
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
-    }
+
+      setState(() => _isUploading = true);
+
+      try {
+        // 1. Upload image (ImageKit first → Cloudinary fallback for free; Cloudinary premium for premium)
+        final imageUrl = await ImageKitUpload.uploadImage(
+          _selectedImage!,
+          isPremiumOrSpecial: _isPremium,
+        );
+        
+        if (imageUrl == null) {
+          throw Exception('Failed to upload image. Please check your connection and try again.');
+        }
+
+        // 2. Build category
+        String finalCategory = 'Trending';
+        if (_createNewCategory) {
+          finalCategory = _categoryController.text.trim().isEmpty ? 'Trending' : _categoryController.text.trim();
+        } else if (_selectedCategory != null && _selectedCategory != 'Create New Category') {
+          finalCategory = _selectedCategory!;
+        }
+        if (finalCategory.isNotEmpty) {
+          finalCategory = finalCategory[0].toUpperCase() + finalCategory.substring(1);
+        }
+
+        // 3. Build tags
+        final tags = [finalCategory.toLowerCase()];
+        if (_isUltraHD) tags.add('ultra_hd');
+        if (_isEditorsChoice) tags.add('editors_choice');
+
+        // 4. Save to Firestore
+        final wallpaper = WallpaperEntity(
+          id: '',
+          title: _titleController.text.trim(),
+          imageUrl: imageUrl,
+          category: finalCategory,
+          isPremium: _isPremium,
+          diamondCost: _isPremium ? (int.tryParse(_diamondCostController.text.trim()) ?? 100) : 0,
+          tags: tags,
+        );
+
+        final addUseCase = sl<AddWallpaperUseCase>();
+        final result = await addUseCase(wallpaper);
+
+        result.fold(
+          (failure) => throw Exception(failure.message),
+          (_) {
+            // Success! 
+            // Reload wallpapers so it reflects in the app instantly
+            ref.read(wallpaperProvider.notifier).loadWallpapers();
+            
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Wallpaper Uploaded Successfully! 🚀')),
+            );
+            context.pop(); // Go back home
+          },
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isUploading = false);
+      }
+    });
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _categoryController.dispose();
-    _priceController.dispose();
+    _diamondCostController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Dynamically derive categories so that if wallpapers load *after* the page is opened, the list updates.
+    // Dynamically derive categories
     final wallpaperState = ref.watch(wallpaperProvider);
     final allWallpapers = [
       ...wallpaperState.freeWallpapers,
       ...wallpaperState.premiumWallpapers,
     ];
-    final Set<String> catSet = {};
+    final Map<String, String> catMap = {};
     for (var wp in allWallpapers) {
-      if (wp.category.trim().isNotEmpty) {
-        catSet.add(wp.category.trim());
+      String cat = wp.category.trim();
+      if (cat.isEmpty) cat = wp.autoCategory.trim();
+      if (cat.isEmpty) continue;
+      
+      final lowerKey = cat.toLowerCase();
+      if (!catMap.containsKey(lowerKey)) {
+        catMap[lowerKey] = cat;
       } else {
-        catSet.add(wp.autoCategory);
+        // Prefer capitalized versions over lowercase ones
+        final existing = catMap[lowerKey]!;
+        if (existing.isNotEmpty && existing[0].toLowerCase() == existing[0] && cat.isNotEmpty && cat[0].toUpperCase() == cat[0]) {
+          catMap[lowerKey] = cat;
+        }
       }
     }
-    _existingCategories = catSet.toList()..sort();
+    _existingCategories = catMap.values.toList()..sort();
     
-    // Ensure _selectedCategory is always valid in the dropdown items list
     List<String> dropDownItems = [..._existingCategories];
     if (!dropDownItems.contains('Create New Category')) {
       dropDownItems.add('Create New Category');
@@ -196,7 +186,6 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
         backgroundColor: const Color(0xFF1E1E1E),
         title: const Text('Admin Upload', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.white),
-
       ),
       body: _isUploading
           ? const Center(
@@ -205,7 +194,7 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                 children: [
                   CircularProgressIndicator(color: Colors.amber),
                   SizedBox(height: 16),
-                  Text('Uploading to Cloudinary & Firebase...', style: TextStyle(color: Colors.white70)),
+                  Text('Uploading to ImageKit & Firebase...', style: TextStyle(color: Colors.white70)),
                 ],
               ),
             )
@@ -305,89 +294,127 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                   ],
                   
                   const SizedBox(height: 24),
+
+                  // ── Section: Content Type ────────────────────────────
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      'Content Type',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
                   
                   // Premium Toggle
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E1E),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.diamond, color: Colors.amber),
-                            SizedBox(width: 12),
-                            Text('Mark as Premium', style: TextStyle(color: Colors.white, fontSize: 16)),
-                          ],
-                        ),
-                        Switch(
-                          value: _isPremium,
-                          activeThumbColor: Colors.amber,
-                          onChanged: (val) {
-                            setState(() {
-                              _isPremium = val;
-                              if (val) _isSpecial = false; // mutually exclusive
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-                  
-                  // Special Toggle
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E1E),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.star, color: Colors.amber),
-                            SizedBox(width: 12),
-                            Text('Mark as Special', style: TextStyle(color: Colors.white, fontSize: 16)),
-                          ],
-                        ),
-                        Switch(
-                          value: _isSpecial,
-                          activeThumbColor: Colors.amber,
-                          onChanged: (val) {
-                            setState(() {
-                              _isSpecial = val;
-                              if (val) _isPremium = false; // mutually exclusive
-                            });
-                          },
-                        ),
-                      ],
-                    ),
+                  _AdminToggle(
+                    icon: Icons.workspace_premium,
+                    iconColor: Colors.amber,
+                    label: 'Mark as Premium',
+                    subtitle: 'Requires PRO subscription or custom 💎 to unlock',
+                    value: _isPremium,
+                    onChanged: (val) => setState(() => _isPremium = val),
                   ),
                   
-                  // Price Field (Only if Special)
-                  if (_isSpecial) ...[
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _priceController,
-                      style: const TextStyle(color: Colors.white),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: 'Price (₹)',
-                        labelStyle: const TextStyle(color: Colors.amber),
-                        filled: true,
-                        fillColor: const Color(0xFF1E1E1E),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        prefixIcon: const Icon(Icons.currency_rupee, color: Colors.amber),
+                  // Diamond cost input — only shown when Premium is ON
+                  if (_isPremium) ...[  
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withAlpha(18),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.amber.withAlpha(70)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withAlpha(30),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: Text('💎', style: TextStyle(fontSize: 18)),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Diamond Cost', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                                const Text('Diamonds required to unlock this wallpaper', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: 70,
+                            child: TextField(
+                              controller: _diamondCostController,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.w800, fontSize: 18),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                filled: true,
+                                fillColor: Colors.amber.withAlpha(20),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.amber)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.amber, width: 0.8)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.amber, width: 2)),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                   
+                  const SizedBox(height: 12),
+
+                  // ── Section: Tags ────────────────────────────────────
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4, bottom: 10),
+                    child: Text(
+                      'Tags',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+
+                  // Ultra HD Toggle
+                  _AdminToggle(
+                    icon: Icons.hd_rounded,
+                    iconColor: const Color(0xFF22D3EE),
+                    label: 'Ultra HD / 4K',
+                    subtitle: 'Shows a cyan "4K" badge on the wallpaper card',
+                    value: _isUltraHD,
+                    activeColor: const Color(0xFF22D3EE),
+                    onChanged: (val) => setState(() => _isUltraHD = val),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Editor's Choice Toggle
+                  _AdminToggle(
+                    icon: Icons.star_rounded,
+                    iconColor: const Color(0xFFFBBF24),
+                    label: "Editor's Choice",
+                    subtitle: 'Shows an amber "★ PICK" badge on the wallpaper card',
+                    value: _isEditorsChoice,
+                    activeColor: const Color(0xFFFBBF24),
+                    onChanged: (val) => setState(() => _isEditorsChoice = val),
+                  ),
+
                   const SizedBox(height: 48),
                   
                   // Upload Button
@@ -403,6 +430,74 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+// ── Reusable admin toggle row ────────────────────────────────────────────────
+
+class _AdminToggle extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String subtitle;
+  final bool value;
+  final Color activeColor;
+  final ValueChanged<bool> onChanged;
+
+  const _AdminToggle({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+    this.activeColor = Colors.amber,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: value
+            ? activeColor.withAlpha(20)
+            : const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: value ? activeColor.withAlpha(80) : Colors.white12,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: iconColor.withAlpha(30),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            activeThumbColor: activeColor,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 }

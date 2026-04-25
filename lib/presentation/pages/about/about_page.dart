@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -67,14 +69,19 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const SizedBox(height: 24),
+                    const _SectionLabel(label: 'LEGAL & POLICY'),
                     const SizedBox(height: 16),
                     _buildLegalCard(),
+                    const SizedBox(height: 12),
+                    _buildPrivacyPolicyButton(),
+                    const SizedBox(height: 32),
+                    const _SectionLabel(label: 'HELP & SUPPORT'),
                     const SizedBox(height: 16),
                     _buildContactSupportButton(),
-                    const SizedBox(height: 16),
-                    _buildPrivacyPolicyButton(),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 48),
                   ],
                 ),
               ),
@@ -189,7 +196,7 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                   ),
                   const SizedBox(height: 14),
                   const Text(
-                    'Royal Pixels',
+                    AppConstants.appName,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 28,
@@ -199,7 +206,7 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Version 1.0.0',
+                    'Version ${AppConstants.appVersion}',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 13,
@@ -325,7 +332,9 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
             await launchUrl(emailLaunchUri);
           }
         } catch (e) {
-          debugPrint('Could not launch email: $e');
+          if (kDebugMode) {
+            debugPrint('Could not launch email: $e');
+          }
         }
       },
       borderRadius: BorderRadius.circular(16),
@@ -390,8 +399,12 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
     return InkWell(
       onTap: () async {
         final url = Uri.parse('https://sites.google.com/view/royal-pixels-privacy/home');
-        if (await canLaunchUrl(url)) {
+        try {
           await launchUrl(url, mode: LaunchMode.externalApplication);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Could not launch $url');
+          }
         }
       },
       borderRadius: BorderRadius.circular(16),
@@ -468,83 +481,6 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _chipTag(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.35), width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 14),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-
-  Widget _devInfoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white38, size: 16),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 13),
-        ),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-
-  Widget _copyButton(String text) {
-    return GestureDetector(
-      onTap: () {
-        Clipboard.setData(ClipboardData(text: text));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Copied to clipboard!'),
-            backgroundColor: Colors.amber.shade800,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF64B5F6).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF64B5F6).withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.copy_rounded, color: Color(0xFF64B5F6), size: 15),
-            const SizedBox(width: 8),
-            Text(
-              'Copy copyright text',
-              style: const TextStyle(
-                color: Color(0xFF64B5F6),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -648,6 +584,29 @@ class _InfoCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Section label widget for grouping items ─────────────────────────────────
+class _SectionLabel extends StatelessWidget {
+  final String label;
+
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.goldMid,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.5,
         ),
       ),
     );

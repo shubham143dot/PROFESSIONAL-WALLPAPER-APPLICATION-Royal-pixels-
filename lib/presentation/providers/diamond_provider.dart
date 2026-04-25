@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/di/service_locator.dart';
 import '../../domain/entities/diamond_data.dart';
 import '../../domain/repositories/diamond_repository.dart';
+import '../../domain/entities/notification_type.dart';
+import 'notification_provider.dart';
+
 
 // ── Diamond state ──────────────────────────────────────────────────────────────
 class DiamondState {
@@ -101,6 +104,9 @@ class DiamondNotifier extends Notifier<DiamondState> {
     );
   }
 
+  /// Alias for [load] — used after diamond pack purchase to refresh balance.
+  Future<void> loadDiamonds(String userId) => load(userId);
+
   // ── Claim daily reward ────────────────────────────────────────────────────
   Future<DailyRewardResult?> claimDailyReward(String userId) async {
     final result = await _repo.claimDailyReward(userId);
@@ -115,6 +121,12 @@ class DiamondNotifier extends Notifier<DiamondState> {
           canClaimToday: false,
           clearReward: true,
         );
+        ref.read(notificationProvider.notifier).addNotification(
+          title: 'Daily Reward Claimed!',
+          message: 'You\'ve received ${reward.diamonds} diamonds for Day ${reward.day}. Keep the streak going!',
+          type: NotificationType.reward,
+        );
+
       },
     );
     return claimed;
@@ -133,6 +145,12 @@ class DiamondNotifier extends Notifier<DiamondState> {
           diamonds: newBalance,
           adsWatchedToday: state.adsWatchedToday + 1,
         );
+        ref.read(notificationProvider.notifier).addNotification(
+          title: 'Diamond Reward!',
+          message: 'You earned 10 diamonds bonus.',
+          type: NotificationType.reward,
+        );
+
       },
     );
     return success;
@@ -149,7 +167,13 @@ class DiamondNotifier extends Notifier<DiamondState> {
       (newBalance) {
         success = true;
         state = state.copyWith(diamonds: newBalance);
+        ref.read(notificationProvider.notifier).addNotification(
+          title: 'Wallpaper Unlocked!',
+          message: 'Successfully spent $cost diamonds to unlock a premium wallpaper.',
+          type: NotificationType.purchase,
+        );
       },
+
     );
     return success;
   }
@@ -177,7 +201,13 @@ class DiamondNotifier extends Notifier<DiamondState> {
             smallRewardEarnedToday:
                 state.smallRewardEarnedToday + DiamondData.smallRewardAmount,
           );
+          ref.read(notificationProvider.notifier).addNotification(
+            title: 'Gems Collected!',
+            message: 'You received 5 bonus diamonds for downloading/setting a wallpaper.',
+            type: NotificationType.reward,
+          );
         }
+
       },
     );
     return outcome;

@@ -6,6 +6,12 @@ admin.initializeApp({ credential: admin.credential.cert(sa) });
 const db = admin.firestore();
 
 async function removeAllWallpapers() {
+  const force = process.argv.includes('--force');
+  if (!force) {
+    console.log('⚠️  CRITICAL: This script will delete ALL wallpapers in the database.');
+    console.log('Use --force as a command line argument to proceed.');
+    process.exit(1);
+  }
   try {
     const snap = await db.collection('wallpapers').get();
     let toDelete = [];

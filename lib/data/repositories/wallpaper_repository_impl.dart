@@ -39,7 +39,7 @@ class WallpaperRepositoryImpl implements WallpaperRepository {
         imageUrl: wallpaper.imageUrl,
         category: wallpaper.category,
         isPremium: wallpaper.isPremium,
-        price: wallpaper.price,
+        diamondCost: wallpaper.diamondCost,
         tags: wallpaper.tags,
       );
       await remoteDataSource.addWallpaper(model);
@@ -60,9 +60,9 @@ class WallpaperRepositoryImpl implements WallpaperRepository {
   }
 
   @override
-  Future<Either<Failure, void>> updateWallpaper(String id, String newTitle, String newCategory) async {
+  Future<Either<Failure, void>> updateWallpaper(String id, {required String newTitle, required String newCategory, required bool isPremium, required int diamondCost, required List<String> tags}) async {
     try {
-      await remoteDataSource.updateWallpaper(id, newTitle, newCategory);
+      await remoteDataSource.updateWallpaper(id, newTitle: newTitle, newCategory: newCategory, isPremium: isPremium, diamondCost: diamondCost, tags: tags);
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));

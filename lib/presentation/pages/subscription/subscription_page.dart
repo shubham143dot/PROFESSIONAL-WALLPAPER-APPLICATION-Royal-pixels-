@@ -3,10 +3,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui';
 import '../../../core/theme/app_colors.dart';
-import '../payment/payment_bottom_sheet.dart';
 import '../../providers/auth_provider.dart';
-import '../../../core/di/service_locator.dart';
-import '../../../domain/repositories/payment_repository.dart';
+import '../../../core/widgets/login_required_sheet.dart';
 
 // ── Sentinel for Lifetime (admin sets expiry to this date) ──────────────────
 const int _kLifetimeMonths = 9999;
@@ -19,20 +17,7 @@ class SubscriptionPage extends ConsumerStatefulWidget {
 }
 
 class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
-  bool _isRefreshing = false;
 
-  /// After payment confirmed, refresh auth state so isSubscribed updates.
-  Future<void> _refreshSubscriptionStatus() async {
-    final user = ref.read(authProvider).user;
-    if (user == null) return;
-    setState(() => _isRefreshing = true);
-    final repo = sl<PaymentRepository>();
-    await repo.checkSubscriptionStatus(user.uid);
-    if (mounted) {
-      await ref.read(authProvider.notifier).refreshUser();
-    }
-    if (mounted) setState(() => _isRefreshing = false);
-  }
 
   Future<void> _onPlanTapped({
     required BuildContext context,
@@ -40,33 +25,32 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
     required double price,
     required String title,
   }) async {
-    final messenger = ScaffoldMessenger.of(context);
+    final authState = ref.read(authProvider);
+    if (authState.isGuest) {
+      showLoginRequiredSheet(context, reason: LoginRequiredReason.premium);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Pro Membership is temporarily closed for maintenance.'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+    /*
     final paid = await showPaymentBottomSheet(
       context,
-      wallpaperId: 'SUB_PLAN_${months == _kLifetimeMonths ? 'LIFETIME' : '${months}M'}',
-      wallpaperTitle: 'PRO – $title',
+      wallpaperId: 'subscription_$months',
       amount: price,
       isSubscription: true,
       subscriptionMonths: months,
+      wallpaperTitle: title, // Use title for the UI
     );
 
-    if (paid && mounted) {
+    if (paid == true) {
       await _refreshSubscriptionStatus();
-      if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              months == _kLifetimeMonths
-                  ? '🎉 Lifetime PRO unlocked! Enjoy all Premium wallpapers — forever!'
-                  : '🎉 You\'re now a PRO member! Enjoy all Premium wallpapers.',
-            ),
-            backgroundColor: Colors.green.shade700,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
     }
+    */
+
   }
 
   @override
@@ -119,7 +103,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
           ),
           SafeArea(
             child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
+              physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 // ── AppBar ────────────────────────────────────────────────
                 SliverAppBar(
@@ -131,20 +115,6 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                         color: Colors.white, size: 20),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
-                  centerTitle: true,
-                  title: ShaderMask(
-                    shaderCallback: (b) =>
-                        AppColors.goldGradient.createShader(b),
-                    child: const Text(
-                      'PRO MEMBERSHIP',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2.5,
-                      ),
-                    ),
-                  ),
                 ),
 
                 SliverToBoxAdapter(
@@ -153,10 +123,26 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 24),
 
                         // ── Hero Icon ──────────────────────────────────────
                         _buildHeroIcon(),
+                        const SizedBox(height: 16),
+
+                        // ── Page Title ─────────────────────────────────────
+                        ShaderMask(
+                          shaderCallback: (b) =>
+                              AppColors.goldGradient.createShader(b),
+                          child: const Text(
+                            'PRO MEMBERSHIP',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ).animate().fade(duration: 400.ms),
                         const SizedBox(height: 22),
 
                         // ── Main Title ────────────────────────────────────
@@ -193,13 +179,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
 
                         // ── Subscription Status Banner ─────────────────────
                         if (isSubscribed && expiry != null) ...[
-                          _buildActiveBanner(expiry, isLifetime)
-                              .animate()
-                              .fade(duration: 400.ms)
-                              .slideY(begin: -0.05, end: 0),
-                          const SizedBox(height: 24),
-                        ] else if (_isRefreshing) ...[
-                          const _RefreshingBanner(),
+                          _buildActiveBanner(expiry, isLifetime),
                           const SizedBox(height: 24),
                         ],
 
@@ -309,11 +289,42 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                               .fade(delay: 250.ms, duration: 400.ms),
                         ],
 
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 16),
+                        
+                        // ── Restore Purchase ──────────────────────────────
+                        TextButton(
+                          onPressed: () async {
+                            final isPro = await ref
+                                .read(authProvider.notifier)
+                                .restoreSubscription();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(isPro
+                                      ? 'Premium Status Restored! 👑'
+                                      : 'No active subscription found.'),
+                                  backgroundColor:
+                                      isPro ? Colors.green : Colors.orange,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
+                          child: Text(
+                            'Restore Purchase',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              fontSize: 13,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
 
                         // ── Fine print ─────────────────────────────────────
                         Text(
-                          'Payment via UPI. Subscription is activated\nmanually within a few hours of payment.\nContact support if not activated within 24h.',
+                          'Google Play Billing integration is coming soon.\nManual UPI payments are currently closed for maintenance.\nThank you for your patience!',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.28),
@@ -640,36 +651,6 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
       ][m];
 }
 
-// ─── Refreshing Banner ────────────────────────────────────────────────────────
-class _RefreshingBanner extends StatelessWidget {
-  const _RefreshingBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: Color(0xFFFFCC00)),
-          ),
-          SizedBox(width: 12),
-          Text('Refreshing subscription status…',
-              style: TextStyle(color: Colors.white54, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-}
 
 // ─── Plan Card ────────────────────────────────────────────────────────────────
 class _PlanCard extends StatelessWidget {

@@ -2,17 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../providers/download_provider.dart';
 import '../../providers/wallpaper_provider.dart';
 import '../../providers/favorites_provider.dart';
 import '../../widgets/wallpaper_card.dart';
 import '../../widgets/diamond_loader.dart';
-
-/// Provider that loads the list of downloaded wallpaper IDs from SharedPreferences.
-final myWallpaperIdsProvider = FutureProvider<List<String>>((ref) async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.getStringList('downloaded_wallpaper_ids') ?? [];
-});
+import '../../../core/utils/safe_tap.dart';
 
 class MyWallpapersPage extends ConsumerStatefulWidget {
   final bool embeddedMode;
@@ -23,7 +18,11 @@ class MyWallpapersPage extends ConsumerStatefulWidget {
   ConsumerState<MyWallpapersPage> createState() => _MyWallpapersPageState();
 }
 
-class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
+class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   bool _showFavorites = false;
 
   @override
@@ -31,10 +30,10 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
     super.initState();
     // Lock to favorites view when embedded in the Favorites tab
     _showFavorites = widget.showFavoritesOnly;
-    Future.microtask(() {
-      // Always re-read SharedPreferences so newly downloaded wallpapers appear
-      // immediately without requiring an app restart.
-      ref.invalidate(myWallpaperIdsProvider);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Trigger refresh of downloads from SharedPreferences
+      ref.read(downloadProvider.notifier).loadDownloads();
 
       // Trigger wallpaper loading once when the page opens, not reactively in build.
       final state = ref.read(wallpaperProvider);
@@ -262,14 +261,8 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
       // ── 1. Delete from device gallery (MediaStore) ──────────────────────────
       await _deleteFromGallery(wallpaperId);
 
-      // ── 2. Remove from SharedPreferences ─────────────────────────────────
-      final prefs = await SharedPreferences.getInstance();
-      final ids = prefs.getStringList('downloaded_wallpaper_ids') ?? [];
-      ids.remove(wallpaperId);
-      await prefs.setStringList('downloaded_wallpaper_ids', ids);
-
-      // ── 3. Refresh the list UI ────────────────────────────────────────────
-      ref.invalidate(myWallpaperIdsProvider);
+      // ── 2. Remove from global state ──────────────────────────────────────────
+      ref.read(downloadProvider.notifier).removeDownload(wallpaperId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -342,159 +335,163 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for KeepAlive
     final wallpaperState = ref.watch(wallpaperProvider);
-    final myIdsAsync = ref.watch(myWallpaperIdsProvider);
+    final myIds = ref.watch(downloadProvider);
+    final targetIds = _showFavorites ? ref.watch(favoritesProvider) : myIds;
+
+    final content = (targetIds.isEmpty)
+        ? _buildEmptyState()
+        : (wallpaperState.isLoading)
+            ? const Center(child: DiamondLoader())
+            : () {
+                // Get all wallpapers loaded in the provider
+                final allWallpapers = [
+                  ...wallpaperState.freeWallpapers,
+                  ...wallpaperState.premiumWallpapers,
+                ];
+
+                // Match saved IDs against loaded wallpapers
+                final myWallpapers =
+                    allWallpapers.where((w) => targetIds.contains(w.id)).toList();
+
+                // Loaded but no match found (e.g. wallpapers deleted from DB)
+                if (myWallpapers.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                return Column(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        widget.embeddedMode ? (MediaQuery.of(context).padding.top + 64) : 12,
+                        16,
+                        2,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _showFavorites ? Icons.favorite : Icons.download_done,
+                            color: Colors.amber, 
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${myWallpapers.length} wallpaper${myWallpapers.length != 1 ? 's' : ''} ${_showFavorites ? 'favorited' : 'saved'}',
+                            style: const TextStyle(color: Colors.white70, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: GridView.builder(
+                        padding: EdgeInsets.fromLTRB(
+                          12, 
+                          4, 
+                          12, 
+                          widget.embeddedMode ? (MediaQuery.of(context).padding.bottom + 80) : 12
+                        ),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.65,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                        itemCount: myWallpapers.length,
+                        itemBuilder: (context, index) {
+                          final wp = myWallpapers[index];
+                          return Stack(
+                            children: [
+                              Positioned.fill(
+                                child: WallpaperCard(
+                                  wallpaper: wp,
+                                  onTap: () => context.push('/detail', extra: wp),
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    SafeTap.run('my_wp_action_${wp.id}', () {
+                                      if (_showFavorites) {
+                                        _removeFromFavorites(wp.id, wp.title);
+                                      } else {
+                                        _deleteWallpaper(wp.id, wp.title);
+                                      }
+                                    });
+                                  },
+                                  child: Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withAlpha(160),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: _showFavorites
+                                            ? Colors.pinkAccent.withAlpha(180)
+                                            : Colors.redAccent.withAlpha(180),
+                                        width: 1.2,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      _showFavorites
+                                          ? Icons.heart_broken_rounded
+                                          : Icons.delete_outline_rounded,
+                                      color: _showFavorites
+                                          ? Colors.pinkAccent
+                                          : Colors.redAccent,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              }();
+
+    if (widget.embeddedMode) {
+      return Container(
+        color: const Color(0xFF121212),
+        child: content,
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
-        leading: widget.embeddedMode
-            ? null
-            : IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => context.pop(),
-              ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.pop(),
+        ),
         title: Text(
           _showFavorites ? 'Favorite Wallpapers' : 'My Wallpapers',
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
-          // Only show the toggle when NOT locked to favorites-only mode
           if (!widget.showFavoritesOnly)
-          IconButton(
-            icon: Icon(
-              _showFavorites ? Icons.favorite : Icons.favorite_border,
-              color: Colors.amber,
+            IconButton(
+              icon: Icon(
+                _showFavorites ? Icons.favorite : Icons.favorite_border,
+                color: Colors.amber,
+              ),
+              onPressed: () {
+                SafeTap.run('toggle_fav_view', () {
+                  setState(() => _showFavorites = !_showFavorites);
+                });
+              },
             ),
-            onPressed: () {
-              setState(() => _showFavorites = !_showFavorites);
-            },
-          ),
         ],
       ),
-      body: myIdsAsync.when(
-        loading: () =>
-            const Center(child: DiamondLoader()),
-        error: (e, _) => Center(
-          child: Text('Error: $e', style: const TextStyle(color: Colors.white)),
-        ),
-        data: (myIds) {
-          final targetIds = _showFavorites ? ref.watch(favoritesProvider) : myIds;
-
-          if (targetIds.isEmpty) {
-            return _buildEmptyState();
-          }
-
-          // Still loading wallpapers from Firestore — show spinner once
-          if (wallpaperState.isLoading) {
-            return const Center(
-              child: DiamondLoader(),
-            );
-          }
-
-          // Get all wallpapers loaded in the provider
-          final allWallpapers = [
-            ...wallpaperState.freeWallpapers,
-            ...wallpaperState.premiumWallpapers,
-          ];
-
-          // Match saved IDs against loaded wallpapers
-          final myWallpapers =
-              allWallpapers.where((w) => targetIds.contains(w.id)).toList();
-
-          // Loaded but no match found (e.g. wallpapers deleted from DB)
-          if (myWallpapers.isEmpty) {
-            return _buildEmptyState();
-          }
-
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      _showFavorites ? Icons.favorite : Icons.download_done,
-                      color: Colors.amber, 
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${myWallpapers.length} wallpaper${myWallpapers.length != 1 ? 's' : ''} ${_showFavorites ? 'favorited' : 'saved'}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: GridView.builder(
-                  padding: EdgeInsets.fromLTRB(12, 12, 12, widget.embeddedMode ? 100 : 12),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.65,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: myWallpapers.length,
-                  itemBuilder: (context, index) {
-                    final wp = myWallpapers[index];
-                    return Stack(
-                      children: [
-                        // Full-size wallpaper card
-                        Positioned.fill(
-                          child: WallpaperCard(
-                            wallpaper: wp,
-                            onTap: () => context.push('/detail', extra: wp),
-                          ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: GestureDetector(
-                            onTap: () {
-                              if (_showFavorites) {
-                                _removeFromFavorites(wp.id, wp.title);
-                              } else {
-                                _deleteWallpaper(wp.id, wp.title);
-                              }
-                            },
-                            child: Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withAlpha(160),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: _showFavorites
-                                      ? Colors.pinkAccent.withAlpha(180)
-                                      : Colors.redAccent.withAlpha(180),
-                                  width: 1.2,
-                                ),
-                              ),
-                              child: Icon(
-                                _showFavorites
-                                    ? Icons.heart_broken_rounded
-                                    : Icons.delete_outline_rounded,
-                                color: _showFavorites
-                                    ? Colors.pinkAccent
-                                    : Colors.redAccent,
-                                size: 18,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+      body: content,
     );
   }
 

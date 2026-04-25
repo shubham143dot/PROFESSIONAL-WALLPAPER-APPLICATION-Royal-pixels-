@@ -156,4 +156,31 @@ class PaymentRepositoryImpl implements PaymentRepository {
       return Left(ServerFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> submitDiamondPackPayment({
+    required String userId,
+    required String packId,
+    required String packLabel,
+    required double amount,
+    required int diamondsGranted,
+    required String txnId,
+    String? screenshotUrl,
+  }) async {
+    try {
+      await remoteDataSource.submitDiamondPackRequest(
+        userId: userId,
+        packId: packId,
+        packLabel: packLabel,
+        amount: amount,
+        diamondsGranted: diamondsGranted,
+        txnId: txnId,
+        screenshotUrl: screenshotUrl,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 }
+

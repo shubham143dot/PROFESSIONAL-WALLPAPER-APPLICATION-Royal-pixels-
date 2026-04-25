@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
@@ -9,8 +10,9 @@ import '../../widgets/diamond_loader.dart';
 import '../../../core/theme/app_colors.dart';
 class WallpaperSearchDelegate extends SearchDelegate<WallpaperEntity?> {
   final List<WallpaperEntity> allWallpapers;
+  final bool isPro;
 
-  WallpaperSearchDelegate(this.allWallpapers);
+  WallpaperSearchDelegate(this.allWallpapers, {this.isPro = false});
 
   @override
   String get searchFieldLabel => 'Search wallpapers...';
@@ -364,7 +366,9 @@ class _MicSheetState extends State<_MicSheet>
         pauseFor: const Duration(seconds: 4),
       );
     } catch (e) {
-      debugPrint('STT listen error: $e');
+      if (kDebugMode) {
+        debugPrint('STT listen error: $e');
+      }
       if (mounted) setState(() => _listening = false);
     }
   }

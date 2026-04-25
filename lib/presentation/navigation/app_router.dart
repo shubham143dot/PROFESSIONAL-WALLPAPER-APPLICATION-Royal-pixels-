@@ -14,6 +14,10 @@ import '../pages/upload/upload_category_cover_page.dart';
 import '../pages/upload/rename_category_page.dart';
 import '../pages/subscription/subscription_page.dart';
 import '../pages/diamond/diamond_store_page.dart';
+import '../pages/notifications/notifications_page.dart';
+
+
+import '../../core/constants/animation_constants.dart';
 
 CustomTransitionPage buildPageWithDefaultTransition<T>({
   required BuildContext context, 
@@ -23,8 +27,25 @@ CustomTransitionPage buildPageWithDefaultTransition<T>({
   return CustomTransitionPage<T>(
     key: state.pageKey,
     child: child,
-    transitionsBuilder: (context, animation, secondaryAnimation, child) => 
-        FadeTransition(opacity: animation, child: child),
+    transitionDuration: AppAnimations.premiumTransition,
+    reverseTransitionDuration: AppAnimations.premiumTransition,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curvedAnimation = CurvedAnimation(
+        parent: animation,
+        curve: AppAnimations.premiumCurve,
+        reverseCurve: AppAnimations.premiumCurve.flipped,
+      );
+      return FadeTransition(
+        opacity: curvedAnimation,
+        child: ScaleTransition(
+          scale: Tween<double>(
+            begin: AppAnimations.pageScaleBegin, 
+            end: 1.0
+          ).animate(curvedAnimation),
+          child: child,
+        ),
+      );
+    },
   );
 }
 
@@ -142,11 +163,14 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/rename-category',
       name: 'rename-category',
-      pageBuilder: (context, state) => buildPageWithDefaultTransition(
-        context: context, 
-        state: state, 
-        child: const RenameCategoryPage()
-      ),
+      pageBuilder: (context, state) {
+        final initialCategory = state.extra as String?;
+        return buildPageWithDefaultTransition(
+          context: context, 
+          state: state, 
+          child: RenameCategoryPage(initialCategory: initialCategory)
+        );
+      },
     ),
     GoRoute(
       path: '/diamonds',
@@ -157,5 +181,15 @@ final GoRouter appRouter = GoRouter(
         child: const DiamondStorePage(),
       ),
     ),
+    GoRoute(
+      path: '/notifications',
+      name: 'notifications',
+      pageBuilder: (context, state) => buildPageWithDefaultTransition(
+        context: context,
+        state: state,
+        child: const NotificationsPage(),
+      ),
+    ),
   ],
 );
+

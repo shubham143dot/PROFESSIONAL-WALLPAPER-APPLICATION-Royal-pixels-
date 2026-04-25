@@ -6,6 +6,7 @@
     "seed": "node seed_wallpapers.js"
   },
   "dependencies": {
+    "cloudinary": "^2.9.0",
     "firebase-admin": "^12.7.0"
   }
 }

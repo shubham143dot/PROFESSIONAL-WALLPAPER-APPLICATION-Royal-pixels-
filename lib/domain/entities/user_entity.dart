@@ -15,6 +15,7 @@ class UserEntity extends Equatable {
   // ── Diamond System fields ─────────────────────────────────────────────────
   final int diamonds;
   final int streak;
+  final String? appVersion;
   final int adsWatchedToday;
 
   const UserEntity({
@@ -30,8 +31,43 @@ class UserEntity extends Equatable {
     this.subscriptionExpiry,
     this.diamonds = 0,
     this.streak = 0,
+    this.appVersion,
     this.adsWatchedToday = 0,
   });
+
+  UserEntity copyWith({
+    String? uid,
+    String? name,
+    String? email,
+    String? phoneNo,
+    DateTime? loginHistory,
+    int? ownedWallpaperCount,
+    double? totalSpent,
+    int? activityScore,
+    bool? isSubscribed,
+    DateTime? subscriptionExpiry,
+    int? diamonds,
+    int? streak,
+    String? appVersion,
+    int? adsWatchedToday,
+  }) {
+    return UserEntity(
+      uid: uid ?? this.uid,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phoneNo: phoneNo ?? this.phoneNo,
+      loginHistory: loginHistory ?? this.loginHistory,
+      ownedWallpaperCount: ownedWallpaperCount ?? this.ownedWallpaperCount,
+      totalSpent: totalSpent ?? this.totalSpent,
+      activityScore: activityScore ?? this.activityScore,
+      isSubscribed: isSubscribed ?? this.isSubscribed,
+      subscriptionExpiry: subscriptionExpiry ?? this.subscriptionExpiry,
+      diamonds: diamonds ?? this.diamonds,
+      streak: streak ?? this.streak,
+      appVersion: appVersion ?? this.appVersion,
+      adsWatchedToday: adsWatchedToday ?? this.adsWatchedToday,
+    );
+  }
 
   @override
   List<Object?> get props => [
@@ -47,6 +83,7 @@ class UserEntity extends Equatable {
         subscriptionExpiry,
         diamonds,
         streak,
+        appVersion,
         adsWatchedToday,
       ];
 }

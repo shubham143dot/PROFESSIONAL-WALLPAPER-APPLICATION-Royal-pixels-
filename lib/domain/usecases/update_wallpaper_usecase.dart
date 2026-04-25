@@ -7,7 +7,21 @@ class UpdateWallpaperUseCase {
 
   UpdateWallpaperUseCase(this.repository);
 
-  Future<Either<Failure, void>> call(String id, String newTitle, String newCategory) async {
-    return await repository.updateWallpaper(id, newTitle, newCategory);
+  Future<Either<Failure, void>> call(
+    String id, {
+    required String newTitle,
+    required String newCategory,
+    required bool isPremium,
+    required int diamondCost,
+    required List<String> tags,
+  }) async {
+    return await repository.updateWallpaper(
+      id,
+      newTitle: newTitle,
+      newCategory: newCategory,
+      isPremium: isPremium,
+      diamondCost: diamondCost,
+      tags: tags,
+    );
   }
 }

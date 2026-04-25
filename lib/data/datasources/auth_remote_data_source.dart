@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
+import '../../core/constants/app_constants.dart';
+
 
 abstract class AuthRemoteDataSource {
   Future<UserModel> signInWithGoogle();
@@ -55,9 +57,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     
     UserModel userModel;
     if (userDoc.exists) {
-      // Update login history
+      // Update login history and version
       await firestore.collection('users').doc(user.uid).update({
         'login_history': FieldValue.serverTimestamp(),
+        'app_version': AppConstants.appVersion,
       });
       userModel = UserModel.fromFirestore(userDoc.data()!, user.uid);
     } else {
@@ -69,10 +72,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         phoneNo: user.phoneNumber,
         loginHistory: DateTime.now(),
         ownedWallpaperCount: 0,
+        appVersion: AppConstants.appVersion,
       );
       await firestore.collection('users').doc(user.uid).set({
         ...userModel.toFirestore(),
         'login_history': FieldValue.serverTimestamp(),
+        'app_version': AppConstants.appVersion,
       });
     }
 
