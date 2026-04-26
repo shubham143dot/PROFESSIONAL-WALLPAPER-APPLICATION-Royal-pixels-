@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 buildscript {
     repositories {
         google()
@@ -31,8 +33,6 @@ subprojects {
     afterEvaluate {
         if (project.hasProperty("android")) {
             val android = project.extensions.getByName("android")
-
-
             try {
                 val compileOptions = android.javaClass.getMethod("getCompileOptions").invoke(android)
                 compileOptions.javaClass.getMethod("setSourceCompatibility", org.gradle.api.JavaVersion::class.java)
@@ -41,21 +41,22 @@ subprojects {
                     .invoke(compileOptions, org.gradle.api.JavaVersion.VERSION_17)
             } catch (e: Exception) {}
         }
+
+        tasks.configureEach {
+            if (this.javaClass.name.contains("KotlinCompile")) {
+                try {
+                    val kotlinOptions = this.javaClass.getMethod("getKotlinOptions").invoke(this)
+                    kotlinOptions.javaClass.getMethod("setJvmTarget", String::class.java)
+                        .invoke(kotlinOptions, "17")
+                } catch (e: Exception) {}
+            }
+        }
     }
 
     // Force JVM 17 for Java compilation
-    project.tasks.withType<JavaCompile>().configureEach {
+    tasks.withType<JavaCompile>().configureEach {
         sourceCompatibility = "17"
         targetCompatibility = "17"
-    }
-
-    // Force JVM 17 for Kotlin compilation (Clean Type-Safe Way)
-    plugins.withId("kotlin-android") {
-        project.tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-            compilerOptions {
-                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-            }
-        }
     }
 }
 

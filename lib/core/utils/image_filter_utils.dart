@@ -78,7 +78,7 @@ class ImageFilterUtils {
           // To calculate perceived luminance: 0.299*R + 0.587*G + 0.114*B
           num luminance = 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
           if (luminance < 40) {
-            // Turn pixel completely black to save AMOLED battery
+            // Turn pixel completely black for deep AMOLED blacks
             p.r = 0;
             p.g = 0;
             p.b = 0;

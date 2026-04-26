@@ -25,6 +25,9 @@ class AppColors {
   /// Mid gold — primary buttons, active states, progress
   static const Color goldMid = Color(0xFFD4A017);
 
+  /// Primary color alias
+  static const Color primary = goldMid;
+
   /// Deep gold — borders, badge outlines, icons on gold surfaces
   static const Color goldDeep = Color(0xFF9B7000);
 
@@ -61,6 +64,13 @@ class AppColors {
   static const Color accentPink        = Color(0xFFDB2777);
   static const LinearGradient specialGradient = LinearGradient(
     colors: [Color(0xFF7C3AED), Color(0xFFDB2777)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  /// Trending gradient — fiery orange/red for trending items
+  static const LinearGradient trendingGradient = LinearGradient(
+    colors: [Color(0xFFFF8C00), Color(0xFFFF2D00)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

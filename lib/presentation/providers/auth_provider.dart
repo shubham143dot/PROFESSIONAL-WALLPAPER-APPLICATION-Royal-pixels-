@@ -86,6 +86,7 @@ class AuthNotifier extends Notifier<AuthState> {
             uid: currentUser.uid,
             name: currentUser.displayName ?? 'User',
             email: currentUser.email ?? '',
+            photoUrl: currentUser.photoURL,
             ownedWallpaperCount: 0,
             appVersion: AppConstants.appVersion,
           ),
@@ -152,12 +153,26 @@ class AuthNotifier extends Notifier<AuthState> {
       // --- 1. Merge favorites ---
       final guestFavs = prefs.getStringList('favorite_wallpaper_ids') ?? [];
       if (guestFavs.isNotEmpty) {
-        // Write to Firestore so favorites sync across devices
         final firestore = sl<FirebaseFirestore>();
-        await firestore.collection('users').doc(user.uid).set(
-          {'favorites': FieldValue.arrayUnion(guestFavs)},
+        final batch = firestore.batch();
+        
+        // Write to user doc
+        batch.set(
+          firestore.collection('users').doc(user.uid),
+          {'liked_wallpapers': FieldValue.arrayUnion(guestFavs)},
           SetOptions(merge: true),
         );
+        
+        // Also update the global like_count for each wallpaper in the batch
+        // Note: Batch limit is 500, we expect guestFavs to be much smaller usually.
+        for (var id in guestFavs) {
+          batch.update(
+            firestore.collection('wallpapers').doc(id),
+            {'like_count': FieldValue.increment(1)},
+          );
+        }
+        
+        await batch.commit();
       }
 
       // --- 2. Merge streak —  use the higher value ---

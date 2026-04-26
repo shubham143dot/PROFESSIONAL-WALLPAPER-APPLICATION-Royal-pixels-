@@ -1,0 +1,18 @@
+const admin = require('firebase-admin');
+const path = require('path');
+const sa = require(path.join(__dirname, 'service_account.json'));
+admin.initializeApp({ credential: admin.credential.cert(sa) });
+const db = admin.firestore();
+
+async function listSubcollections() {
+  const snap = await db.collection('wallpapers').limit(10).get();
+  for (const doc of snap.docs) {
+    const subcols = await doc.ref.listCollections();
+    if (subcols.length > 0) {
+      console.log(`Document: ${doc.id}`);
+      subcols.forEach(c => console.log(`  Subcollection: ${c.id}`));
+    }
+  }
+  process.exit(0);
+}
+listSubcollections();

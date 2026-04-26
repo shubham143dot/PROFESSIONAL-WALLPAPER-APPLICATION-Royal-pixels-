@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/wallpaper_entity.dart';
-import '../providers/favorites_provider.dart';
+import '../providers/likes_provider.dart';
 import '../providers/diamond_provider.dart';
 import '../../core/utils/royal_snack_bar.dart';
 import '../providers/haptic_provider.dart';
+import '../providers/auth_provider.dart';
+import '../../../core/widgets/login_required_sheet.dart';
 
 
 // ─── Public entry-point ───────────────────────────────────────────────────────
@@ -108,7 +110,9 @@ class _WallpaperLongPressOverlayState
     if (_dismissed) return;
     _dismissed = true;
     await _ctrl.reverse();
-    if (mounted) Navigator.of(context).pop();
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -121,13 +125,18 @@ class _WallpaperLongPressOverlayState
 
   void _onToggleFavorite() {
     ref.read(hapticProvider.notifier).lightImpact();
-    ref.read(favoritesProvider.notifier).toggleFavorite(widget.wallpaper.id);
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated) {
+      showLoginRequiredSheet(context, reason: LoginRequiredReason.favorites);
+      return;
+    }
+    ref.read(likesNotifierProvider.notifier).toggleLike(widget.wallpaper.id);
 
-    final isFav = ref.read(favoritesProvider).contains(widget.wallpaper.id);
+    final isLikedNow = ref.read(likesProvider).contains(widget.wallpaper.id);
     RoyalSnackBar.show(
       context,
-      isFav ? 'Added to Favorites ❤️' : 'Removed from Favorites',
-      type: isFav ? SnackBarType.success : SnackBarType.info,
+      isLikedNow ? 'Added to Favorites ❤️' : 'Removed from Favorites',
+      type: isLikedNow ? SnackBarType.success : SnackBarType.info,
     );
   }
 
@@ -158,8 +167,8 @@ class _WallpaperLongPressOverlayState
     final isPremium = widget.wallpaper.isPremium;
     final isUltraHD = widget.wallpaper.isUltraHD;
     final isEditorsChoice = widget.wallpaper.isEditorsChoice;
-    final favorites = ref.watch(favoritesProvider);
-    final isFavorite = favorites.contains(widget.wallpaper.id);
+    final likedIds = ref.watch(likesProvider);
+    final isLiked = likedIds.contains(widget.wallpaper.id);
     final diamonds = ref.watch(diamondProvider).diamonds;
 
     // Tier colour for premium glow
@@ -388,7 +397,7 @@ class _WallpaperLongPressOverlayState
                     opacity: _panelFade.value,
                     child: _ActionPanel(
                       wallpaper: widget.wallpaper,
-                      isFavorite: isFavorite,
+                      isFavorite: isLiked,
                       diamonds: diamonds,
                       tierGradient: tierGradient,
                       tierColor: tierColor,
@@ -397,6 +406,12 @@ class _WallpaperLongPressOverlayState
                       onToggleFavorite: _onToggleFavorite,
                       onUnlockPremium: _onUnlockPremium,
                       onDismiss: _dismiss,
+                      onGoToFeed: () async {
+                        await _dismiss();
+                        if (context.mounted) {
+                          context.push('/social-feed', extra: widget.wallpaper.id);
+                        }
+                      },
                     ),
                   ),
                 ),
@@ -477,6 +492,7 @@ class _ActionPanel extends ConsumerWidget {
   final VoidCallback onToggleFavorite;
   final VoidCallback onUnlockPremium;
   final VoidCallback onDismiss;
+  final VoidCallback onGoToFeed;
 
   const _ActionPanel({
     required this.wallpaper,
@@ -489,6 +505,7 @@ class _ActionPanel extends ConsumerWidget {
     required this.onToggleFavorite,
     required this.onUnlockPremium,
     required this.onDismiss,
+    required this.onGoToFeed,
   });
 
   @override
@@ -558,29 +575,38 @@ class _ActionPanel extends ConsumerWidget {
               Row(
                 children: [
                   _QuickAction(
+                    icon: Icons.movie_filter_rounded,
+                    label: 'Feed',
+                    gradient: const LinearGradient(
+                        colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)]),
+                    onTap: () {
+                      ref.read(hapticProvider.notifier).mediumImpact();
+                      onGoToFeed();
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _QuickAction(
                     icon: Icons.download_rounded,
-                    label: 'Download',
+                    label: 'Save',
                     gradient: const LinearGradient(
                         colors: [Color(0xFF34D399), Color(0xFF059669)]),
                     onTap: () {
                       ref.read(hapticProvider.notifier).mediumImpact();
                       onDownload();
                     },
-
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   _QuickAction(
                     icon: Icons.wallpaper_rounded,
-                    label: 'Set Wallpaper',
+                    label: 'Set',
                     gradient: const LinearGradient(
                         colors: [Color(0xFF60A5FA), Color(0xFF2563EB)]),
                     onTap: () {
                       ref.read(hapticProvider.notifier).mediumImpact();
                       onSetWallpaper();
                     },
-
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   _QuickAction(
                     icon: isFavorite
                         ? Icons.favorite_rounded

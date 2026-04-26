@@ -28,10 +28,17 @@ import '../../providers/notification_provider.dart';
 import '../../providers/haptic_provider.dart';
 import '../../widgets/haptic_settings_sheet.dart';
 import '../../providers/parallax_provider.dart';
+import '../../widgets/trending_section.dart';
+import '../../providers/trending_provider.dart';
+import '../../widgets/weather_banner.dart';
+import '../../widgets/festival_banner.dart';
+import '../../providers/settings_provider.dart';
+import '../social_feed/social_feed_page.dart';
+import '../../../core/services/wallpaper_scheduler.dart';
 
 
 // ─── Filter enum ─────────────────────────────────────────────────────────────
-enum WallpaperFilter { all, free, premium, editorsChoice, ultraHD }
+enum WallpaperFilter { all, newlyAdded, free, premium, editorsChoice, ultraHD }
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -101,19 +108,46 @@ class _HomePageState extends ConsumerState<HomePage>
   // ── Apply filter to full wallpaper list ────────────────────────────────────
   List<WallpaperEntity> _filteredWallpapers(WallpaperState state) {
     final all = [...state.freeWallpapers, ...state.premiumWallpapers];
+    final settings = ref.watch(settingsProvider);
+    var filtered = all;
+
     switch (_filter) {
       case WallpaperFilter.free:
-        return state.freeWallpapers;
+        filtered = state.freeWallpapers;
+        break;
       case WallpaperFilter.premium:
-        return state.premiumWallpapers;
+        filtered = state.premiumWallpapers;
+        break;
       case WallpaperFilter.editorsChoice:
-        return all.where((wp) => wp.isEditorsChoice).toList();
+        filtered = all.where((wp) => wp.isEditorsChoice).toList();
+        break;
       case WallpaperFilter.ultraHD:
-        return all.where((wp) => wp.isUltraHD).toList();
+        filtered = all.where((wp) => wp.isUltraHD).toList();
+        break;
+      case WallpaperFilter.newlyAdded:
+        final now = DateTime.now();
+        var recent = all.where((wp) => wp.createdAt != null && now.difference(wp.createdAt!).inHours <= 24).toList();
+        if (recent.isEmpty && all.isNotEmpty) {
+          final sorted = List<WallpaperEntity>.from(all)
+            ..sort((a, b) => (b.createdAt ?? DateTime(2000)).compareTo(a.createdAt ?? DateTime(2000)));
+          recent = sorted.take(15).toList();
+        }
+        filtered = recent;
+        break;
       case WallpaperFilter.all:
-        return all;
+        filtered = all;
+        break;
     }
+
+    if (settings.isAmoledMode) {
+      return filtered.where((wp) => 
+        wp.tags.any((t) => t.toLowerCase() == 'amoled' || t.toLowerCase() == 'dark')
+      ).toList();
+    }
+    return filtered;
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -177,22 +211,15 @@ class _HomePageState extends ConsumerState<HomePage>
         children: [
           // Tab 0: Home wallpaper grid
           _buildHomeTab(wallpaperState),
-          // Tab 1: Categories
+          // Tab 1: Social Feed (Reels)
+          const SocialFeedPage(),
+          // Tab 2: Categories
           const CategoriesListPage(embeddedMode: true),
-          // Tab 2: My Wallpapers (downloaded)
+          // Tab 3: Favorites (only favorites)
+          const MyWallpapersPage(embeddedMode: true, showFavoritesOnly: true),
+          // Tab 4: My Wallpapers (downloaded)
           const MyWallpapersPage(embeddedMode: true),
-          // Tab 3: Favorites (gated for guests)
-          userState.isGuest
-              ? _buildGuestLockedTab(
-                  icon: Icons.favorite_rounded,
-                  title: 'Save Your Favorites',
-                  subtitle:
-                      'Sign in to save and sync your favorite wallpapers across all your devices.',
-                  reason: LoginRequiredReason.favorites,
-                )
-              : const MyWallpapersPage(
-                  embeddedMode: true, showFavoritesOnly: true),
-          // Tab 4: Profile
+          // Tab 5: Profile
           userState.isGuest
               ? _buildGuestProfileTab()
               : _buildProfileTab(userState),
@@ -205,9 +232,10 @@ class _HomePageState extends ConsumerState<HomePage>
   Widget _buildBottomNav(AuthState userState, double bottomPadding) {
     final items = [
       _NavItem(Icons.home_rounded, Icons.home_outlined, 'Home'),
+      _NavItem(Icons.local_fire_department_rounded, Icons.local_fire_department_outlined, 'Feed'),
       _NavItem(Icons.grid_view_rounded, Icons.grid_view_outlined, 'Categories'),
-      _NavItem(Icons.download_done_rounded, Icons.download_outlined, 'My Saved'),
-      _NavItem(Icons.favorite_rounded, Icons.favorite_border_rounded, 'Favorites'),
+      _NavItem(Icons.favorite_rounded, Icons.favorite_outline_rounded, 'Favorites'),
+      _NavItem(Icons.download_done_rounded, Icons.download_outlined, 'Saved'),
       _NavItem(Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
     ];
 
@@ -314,23 +342,117 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
 
-  // ── Home tab: filter chips + wallpaper grid ────────────────────────────────
   Widget _buildHomeTab(WallpaperState wallpaperState) {
+    final trendingAsync = ref.watch(trendingProvider);
     final filtered = _filteredWallpapers(wallpaperState);
-    return Column(
-      children: [
-        // Filter chips strip
-        _buildFilterStrip(wallpaperState),
-        _buildColorSwatches(),
-        const SizedBox(height: 12),
-        // Grid
-        Expanded(
-          child: wallpaperState.isLoading
-              ? _buildSkeleton()
-              : filtered.isEmpty
-                  ? _buildEmptyState()
-                  : _buildGrid(filtered),
+    final showTrending = _filter == WallpaperFilter.all && !wallpaperState.isLoading;
+
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        // ── Filter chips strip (pinned-like via padding top) ──────────────
+        SliverToBoxAdapter(child: _buildFilterStrip(wallpaperState)),
+
+        // ── Weather Reactive Banner ─────────────────────────────────────
+        const SliverToBoxAdapter(child: FestivalBanner()),
+        const SliverToBoxAdapter(child: WeatherBanner()),
+
+
+
+        // ── Trending section (only on 'All' / default view) ──────────────
+        if (showTrending)
+          SliverToBoxAdapter(
+            child: trendingAsync.when(
+              data: (trending) => trending.isEmpty
+                  ? const SizedBox.shrink()
+                  : TrendingSection(
+                      wallpapers: trending,
+                      onTap: (wp) {
+                        precacheImage(
+                            CachedNetworkImageProvider(wp.optimizedUrl),
+                            context);
+                        context.push('/detail', extra: wp);
+                      },
+                    ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+          ),
+
+        // ── Section divider label ─────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+            child: Row(
+              children: [
+                const Text(
+                  'ALL WALLPAPERS',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${filtered.length}',
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
+
+        // ── Main wallpaper grid ───────────────────────────────────────────
+        if (wallpaperState.isLoading)
+          SliverToBoxAdapter(child: _buildSkeleton())
+        else
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+                16, 0, 16, 110 + MediaQuery.of(context).padding.bottom),
+            sliver: SliverMasonryGrid.count(
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childCount: filtered.length,
+              itemBuilder: (context, index) {
+                final wp = filtered[index];
+                final heights = [200.0, 260.0, 180.0, 240.0, 220.0];
+                final h = heights[index % heights.length];
+                return SizedBox(
+                  height: h,
+                  child: WallpaperCard(
+                    key: ValueKey(wp.id),
+                    wallpaper: wp,
+                    onTap: () {
+                      precacheImage(
+                          CachedNetworkImageProvider(wp.optimizedUrl),
+                          context);
+                      context.push('/detail', extra: wp);
+                    },
+                    onLongPress: () =>
+                        showWallpaperLongPressPreview(context, wp),
+                  ),
+                )
+                    .animate(
+                      delay: (index * AppAnimations.staggeringDelay
+                              .inMilliseconds)
+                          .ms,
+                    )
+                    .fade(duration: 600.ms, curve: Curves.easeOut)
+                    .slideY(
+                        begin: AppAnimations.cardSlideOffset,
+                        end: 0,
+                        duration: AppAnimations.smoothEntrance,
+                        curve: AppAnimations.easeOutExpo);
+              },
+            ),
+          ),
       ],
     );
   }
@@ -340,6 +462,14 @@ class _HomePageState extends ConsumerState<HomePage>
     final all = [...state.freeWallpapers, ...state.premiumWallpapers];
     final filters = [
       (WallpaperFilter.all,    Icons.auto_awesome_mosaic_outlined, 'All',          all.length),
+      (WallpaperFilter.newlyAdded, Icons.new_releases_rounded,     'New',          () {
+        final now = DateTime.now();
+        var recent = all.where((wp) => wp.createdAt != null && now.difference(wp.createdAt!).inHours <= 24).toList();
+        if (recent.isEmpty && all.isNotEmpty) {
+          return (all.length > 15) ? 15 : all.length;
+        }
+        return recent.length;
+      }()),
       (WallpaperFilter.free,   Icons.wallpaper_outlined,           'Free',         state.freeWallpapers.length),
       (WallpaperFilter.premium, Icons.diamond_outlined,            'Premium',      state.premiumWallpapers.length),
       (WallpaperFilter.editorsChoice, Icons.star_rounded,          "Editor's",    all.where((w) => w.isEditorsChoice).length),
@@ -370,6 +500,11 @@ class _HomePageState extends ConsumerState<HomePage>
               chipColor = const Color(0xFF22D3EE);
               chipGradient = isActive
                   ? const LinearGradient(colors: [Color(0xFF22D3EE), Color(0xFF0E7490)])
+                  : null;
+            } else if (f.$1 == WallpaperFilter.newlyAdded) {
+              chipColor = const Color(0xFFF43F5E); // Rose color for new items
+              chipGradient = isActive
+                  ? const LinearGradient(colors: [Color(0xFFF43F5E), Color(0xFFBE123C)])
                   : null;
             } else {
               chipColor = AppColors.goldMid;
@@ -466,73 +601,6 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  // ── Color Swatches ─────────────────────────────────────────────────────────
-  Widget _buildColorSwatches() {
-    final colors = [
-      ('Black', Colors.black),
-      ('White', Colors.white),
-      ('Blue', Colors.blue),
-      ('Purple', Colors.purple),
-      ('Red', Colors.redAccent),
-      ('Green', Colors.green),
-      ('Pink', Colors.pinkAccent),
-      ('Yellow', Colors.amber),
-      ('Orange', Colors.orange),
-      ('Teal', Colors.teal),
-    ];
-
-    return SizedBox(
-      height: 40,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        physics: const BouncingScrollPhysics(),
-        itemCount: colors.length,
-        itemBuilder: (context, index) {
-          final colorData = colors[index];
-          return GestureDetector(
-            onTap: () {
-              ref.read(hapticProvider.notifier).lightImpact();
-              SafeTap.run('color_search_${colorData.$1}', () {
-                final wallpaperState = ref.read(wallpaperProvider);
-                final allWallpapers = [
-                  ...wallpaperState.freeWallpapers,
-                  ...wallpaperState.premiumWallpapers,
-                ];
-                final isPro = ref.read(authProvider).user?.isSubscribed ?? false;
-                
-                showSearch(
-                  context: context,
-                  query: colorData.$1.toLowerCase(),
-                  delegate: WallpaperSearchDelegate(allWallpapers, isPro: isPro),
-                );
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.only(right: 14),
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: colorData.$2,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withAlpha(colorData.$2 == Colors.black ? 80 : 30),
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: colorData.$2.withAlpha(80),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 
   // ── Skeleton ───────────────────────────────────────────────────────────────
   Widget _buildSkeleton() {
@@ -555,187 +623,6 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  // ── Grid ───────────────────────────────────────────────────────────────────
-  Widget _buildGrid(List<WallpaperEntity> wallpapers) {
-    return MasonryGridView.builder(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 110 + MediaQuery.of(context).padding.bottom),
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      gridDelegate:
-          const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2),
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      itemCount: wallpapers.length,
-      cacheExtent: 1500,
-      addRepaintBoundaries: true,
-      itemBuilder: (context, index) {
-        final wp = wallpapers[index];
-        final heights = [200.0, 260.0, 180.0, 240.0, 220.0];
-        final h = heights[index % heights.length];
-        return SizedBox(
-          height: h,
-          child: WallpaperCard(
-            key: ValueKey(wp.id),
-            wallpaper: wp,
-            onTap: () {
-              // Pre-load full image for detail page
-              precacheImage(CachedNetworkImageProvider(wp.optimizedUrl), context);
-              context.push('/detail', extra: wp);
-            },
-            onLongPress: () => showWallpaperLongPressPreview(context, wp),
-          ),
-        )
-            .animate(
-              delay: (index * AppAnimations.staggeringDelay.inMilliseconds).ms,
-            )
-            .fade(duration: 600.ms, curve: Curves.easeOut)
-            .slideY(
-                begin: AppAnimations.cardSlideOffset,
-                end: 0,
-                duration: AppAnimations.smoothEntrance,
-                curve: AppAnimations.easeOutExpo);
-      },
-    );
-  }
-
-  // ── Empty state ────────────────────────────────────────────────────────────
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ShaderMask(
-            shaderCallback: (b) =>
-                AppColors.goldGradient.createShader(b),
-            child: const Icon(Icons.photo_library_outlined,
-                size: 64, color: Colors.white),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No wallpapers here yet',
-            style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Try a different filter',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-          ),
-        ],
-      )
-          .animate()
-          .fade(duration: 500.ms)
-          .scale(begin: const Offset(0.9, 0.9), duration: 500.ms),
-    );
-  }
-
-  // ── Guest: locked tab placeholder ─────────────────────────────────────────
-  Widget _buildGuestLockedTab({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required LoginRequiredReason reason,
-  }) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: AppColors.goldGradient,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.goldMid.withAlpha(80),
-                    blurRadius: 24,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Icon(icon, color: Colors.black, size: 38),
-            )
-                .animate()
-                .scale(
-                    begin: const Offset(0.7, 0.7),
-                    duration: 500.ms,
-                    curve: Curves.elasticOut)
-                .fade(duration: 300.ms),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-              ),
-              textAlign: TextAlign.center,
-            ).animate().fade(delay: 100.ms, duration: 400.ms),
-            const SizedBox(height: 10),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-                height: 1.55,
-              ),
-              textAlign: TextAlign.center,
-            ).animate().fade(delay: 150.ms, duration: 400.ms),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: GestureDetector(
-              onTap: () {
-                ref.read(hapticProvider.notifier).lightImpact();
-                showLoginRequiredSheet(context, reason: reason);
-              },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.goldGradient,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.goldMid.withAlpha(80),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Image.asset(
-                          'assets/google_logo.png',
-                          width: 20,
-                          height: 20,
-                        ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'Sign In with Google',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                ),
-              ),
-            ).animate().fade(delay: 200.ms, duration: 400.ms),
-          ],
-        ),
-      ),
-    );
-  }
 
   // ── Guest profile tab ──────────────────────────────────────────────────────
   Widget _buildGuestProfileTab() {
@@ -749,22 +636,22 @@ class _HomePageState extends ConsumerState<HomePage>
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                  20, MediaQuery.of(context).padding.top + 80, 20, 100),
+                  20, MediaQuery.of(context).padding.top + 70, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ── Guest identity card ─────────────────────────────
                   Container(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                     decoration: BoxDecoration(
                       color: AppColors.bg1,
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: BorderRadius.circular(30),
                       border: Border.all(color: AppColors.glassBorder, width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withAlpha(100),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
+                          color: Colors.black.withAlpha(120),
+                          blurRadius: 25,
+                          offset: const Offset(0, 12),
                         ),
                       ],
                     ),
@@ -773,17 +660,17 @@ class _HomePageState extends ConsumerState<HomePage>
                         Row(
                           children: [
                             Container(
-                              width: 76,
-                              height: 76,
+                              width: 78,
+                              height: 78,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: AppColors.bg2,
-                                border: Border.all(color: AppColors.glassBorder, width: 2),
+                                color: AppColors.bg2.withAlpha(150),
+                                border: Border.all(color: AppColors.glassBorder, width: 1.5),
                               ),
                               child: const Icon(Icons.person_outline_rounded,
-                                  color: AppColors.textMuted, size: 38),
+                                  color: AppColors.textMuted, size: 36),
                             ),
-                            const SizedBox(width: 20),
+                            const SizedBox(width: 18),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -794,22 +681,22 @@ class _HomePageState extends ConsumerState<HomePage>
                                       color: AppColors.textPrimary,
                                       fontSize: 20,
                                       fontWeight: FontWeight.w900,
-                                      letterSpacing: -0.5,
+                                      letterSpacing: -0.6,
                                     ),
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 6),
                                   // Identity hint bar
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
                                       color: AppColors.bg2.withAlpha(150),
                                       borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: AppColors.glassBorder, width: 0.8),
+                                      border: Border.all(color: AppColors.glassBorder.withAlpha(100), width: 0.8),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.info_outline_rounded, size: 12, color: AppColors.textMuted),
+                                        const Icon(Icons.info_outline_rounded, size: 12, color: AppColors.goldMid),
                                         const SizedBox(width: 6),
                                         Text(
                                           'Sign in to sync your data',
@@ -825,30 +712,13 @@ class _HomePageState extends ConsumerState<HomePage>
                                 ],
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: AppColors.bg2,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.glassBorder),
-                              ),
-                              child: const Text(
-                                'GUEST',
-                                style: TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 24),
                         Divider(color: AppColors.divider.withAlpha(50), height: 1),
                         const SizedBox(height: 20),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             _buildStatItem('Diamonds', '0', Icons.diamond_rounded, AppColors.textMuted),
                             _buildStatItem('Streak', '${streak}d', Icons.local_fire_department_rounded, Colors.orangeAccent),
@@ -859,7 +729,7 @@ class _HomePageState extends ConsumerState<HomePage>
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   // ── Daily streak card (Interactive) ──────────────────
                   const _ProfileGroupLabel(label: 'DAILY REWARDS'),
@@ -868,23 +738,53 @@ class _HomePageState extends ConsumerState<HomePage>
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: AppColors.bg1,
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(30),
                       border: Border.all(color: AppColors.goldMid.withAlpha(40), width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(80),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const Text('🔥', style: TextStyle(fontSize: 22)),
-                            const SizedBox(width: 12),
-                            Text(
-                              '$streak Day Streak',
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.orangeAccent.withAlpha(20),
+                                shape: BoxShape.circle,
                               ),
+                              child: const Text('🔥', style: TextStyle(fontSize: 18)),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '$streak Day Streak',
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.4,
+                                  ),
+                                ),
+                                Text(
+                                  streakState.canClaimToday 
+                                      ? 'Ready to claim today\'s reward!' 
+                                      : 'Come back tomorrow for more',
+                                  style: TextStyle(
+                                    color: AppColors.textMuted.withAlpha(180),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                             const Spacer(),
                             if (streakState.canClaimToday)
@@ -894,16 +794,23 @@ class _HomePageState extends ConsumerState<HomePage>
                                   await ref.read(guestStreakProvider.notifier).claimStreak();
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                   decoration: BoxDecoration(
                                     gradient: AppColors.goldGradient,
                                     borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.goldMid.withAlpha(50),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
                                   child: const Text(
-                                    'CHECK IN',
+                                    'CLAIM',
                                     style: TextStyle(
                                       color: Colors.black,
-                                      fontSize: 11,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.w900,
                                     ),
                                   ),
@@ -911,7 +818,7 @@ class _HomePageState extends ConsumerState<HomePage>
                               ),
                           ],
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: List.generate(7, (i) {
@@ -920,14 +827,14 @@ class _HomePageState extends ConsumerState<HomePage>
                             return Column(
                               children: [
                                 Container(
-                                  width: 38,
-                                  height: 38,
+                                  width: 36,
+                                  height: 36,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     gradient: isCollected ? AppColors.goldGradient : null,
-                                    color: isCollected ? null : AppColors.bg2,
+                                    color: isCollected ? null : AppColors.bg2.withAlpha(150),
                                     border: Border.all(
-                                      color: isCollected ? Colors.transparent : AppColors.glassBorder,
+                                      color: isCollected ? Colors.transparent : AppColors.glassBorder.withAlpha(120),
                                       width: 1,
                                     ),
                                   ),
@@ -936,13 +843,13 @@ class _HomePageState extends ConsumerState<HomePage>
                                       '$day',
                                       style: TextStyle(
                                         color: isCollected ? Colors.black : AppColors.textMuted,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
                                       ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 8),
                                 Text(day == 7 ? '🎁' : '💎', style: const TextStyle(fontSize: 10)),
                               ],
                             );
@@ -954,59 +861,32 @@ class _HomePageState extends ConsumerState<HomePage>
 
                   const SizedBox(height: 32),
 
-                  // ── Sign In CTA ────────────────────────────────────
-                  const _ProfileGroupLabel(label: 'ACCOUNT'),
+                  // ── Grouped Actions ────────────────────────────────
+                  const _ProfileGroupLabel(label: 'ACCOUNT & APP'),
                   const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () {
-                      ref.read(hapticProvider.notifier).lightImpact();
-                      showLoginRequiredSheet(context, reason: LoginRequiredReason.general);
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      decoration: BoxDecoration(
-                        gradient: AppColors.goldGradient,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.goldMid.withAlpha(80),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
+                  _ProfileGroupWrapper(
+                    children: [
+                      _ProfileMenuTile(
+                        icon: Icons.login_rounded,
+                        label: 'Sign In with Google',
+                        subtitle: 'Sync your favorites and progress',
+                        isGold: true,
+                        useCardStyle: false,
+                        onTap: () {
+                          ref.read(hapticProvider.notifier).lightImpact();
+                          showLoginRequiredSheet(context, reason: LoginRequiredReason.general);
+                        },
                       ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Image.asset(
-                              'assets/google_logo.png',
-                              width: 22,
-                              height: 22,
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Sign In with Google',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ),
+                      _ProfileMenuTile(
+                        icon: Icons.info_outline_rounded,
+                        label: 'About Royal Pixels',
+                        subtitle: 'Version ${AppConstants.appVersion}',
+                        useCardStyle: false,
+                        onTap: () => context.push('/about'),
+                      ),
+                    ],
                   ),
-
-                  const SizedBox(height: 16),
-
-                  _ProfileMenuTile(
-                    icon: Icons.info_outline_rounded,
-                    label: 'About Royal Pixels',
-                    subtitle: 'Version ${AppConstants.appVersion}',
-                    onTap: () => context.push('/about'),
-                  ),
+                  const SizedBox(height: 120),
                 ],
               ),
             ),
@@ -1027,34 +907,28 @@ class _HomePageState extends ConsumerState<HomePage>
         SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-                20, MediaQuery.of(context).padding.top + 80, 20, 0),
+                20, MediaQuery.of(context).padding.top + 64, 20, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── User identity card ───────────────────────────────
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                   decoration: BoxDecoration(
                     color: AppColors.bg1,
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(30),
                     border: Border.all(
                       color: isSubscribed 
-                          ? AppColors.goldMid.withAlpha(60) 
+                          ? AppColors.goldMid.withAlpha(80) 
                           : AppColors.glassBorder, 
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withAlpha(100),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+                        color: Colors.black.withAlpha(120),
+                        blurRadius: 25,
+                        offset: const Offset(0, 12),
                       ),
-                      if (isSubscribed)
-                        BoxShadow(
-                          color: AppColors.goldMid.withAlpha(20),
-                          blurRadius: 30,
-                          spreadRadius: -5,
-                        ),
                     ],
                   ),
                   child: Column(
@@ -1066,49 +940,78 @@ class _HomePageState extends ConsumerState<HomePage>
                             alignment: Alignment.center,
                             children: [
                               Container(
-                                width: 76,
-                                height: 76,
+                                width: 78,
+                                height: 78,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   gradient: isSubscribed 
                                       ? AppColors.goldRingGradient 
                                       : LinearGradient(colors: [AppColors.bg3, AppColors.bg2]),
+                                  boxShadow: isSubscribed ? [
+                                    BoxShadow(color: AppColors.goldMid.withAlpha(50), blurRadius: 10)
+                                  ] : null,
                                 ),
                               ),
                               Container(
-                                width: 70,
-                                height: 70,
+                                width: 72,
+                                height: 72,
                                 decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: AppColors.bg1,
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    (user?.name ?? 'G')[0].toUpperCase(),
-                                    style: TextStyle(
-                                      color: isSubscribed ? AppColors.goldLight : AppColors.textPrimary,
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
+                                child: ClipOval(
+                                  child: (user?.photoUrl != null && user!.photoUrl!.isNotEmpty)
+                                      ? CachedNetworkImage(
+                                          imageUrl: user.photoUrl!,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) => Container(
+                                            color: AppColors.bg2,
+                                            child: const Center(
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: AppColors.goldMid,
+                                              ),
+                                            ),
+                                          ),
+                                          errorWidget: (context, url, error) => Center(
+                                            child: Text(
+                                              (user.name.isNotEmpty ? user.name : 'G')[0].toUpperCase(),
+                                              style: TextStyle(
+                                                color: isSubscribed ? AppColors.goldLight : AppColors.textPrimary,
+                                                fontSize: 28,
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : Center(
+                                          child: Text(
+                                            (user?.name ?? 'G')[0].toUpperCase(),
+                                            style: TextStyle(
+                                              color: isSubscribed ? AppColors.goldLight : AppColors.textPrimary,
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ),
                                 ),
                               ),
                               if (isSubscribed)
                                 Positioned(
-                                  bottom: 0,
-                                  right: 0,
+                                  bottom: 2,
+                                  right: 2,
                                   child: Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: const BoxDecoration(
                                       color: AppColors.goldMid,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.check_rounded, color: Colors.black, size: 12),
+                                    child: const Icon(Icons.check_rounded, color: Colors.black, size: 10),
                                   ),
                                 ),
                             ],
                           ),
-                          const SizedBox(width: 20),
+                          const SizedBox(width: 18),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1122,7 +1025,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                           color: AppColors.textPrimary,
                                           fontSize: 20,
                                           fontWeight: FontWeight.w900,
-                                          letterSpacing: -0.5,
+                                          letterSpacing: -0.6,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -1148,14 +1051,14 @@ class _HomePageState extends ConsumerState<HomePage>
                                     ],
                                   ],
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 6),
                                 // Gmail account bar
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: AppColors.bg2.withAlpha(180),
+                                    color: AppColors.bg2.withAlpha(150),
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: AppColors.glassBorder, width: 0.8),
+                                    border: Border.all(color: AppColors.glassBorder.withAlpha(100), width: 0.8),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -1167,7 +1070,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                           user?.email ?? 'guest@royalpixels.app',
                                           style: const TextStyle(
                                             color: AppColors.textSecondary,
-                                            fontSize: 12,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.w600,
                                           ),
                                           maxLines: 1,
@@ -1189,7 +1092,7 @@ class _HomePageState extends ConsumerState<HomePage>
                       
                       // ── Stats row ───────────────────────────────────
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _buildStatItem('Diamonds', '${user?.diamonds ?? 0}', Icons.diamond_rounded, AppColors.goldMid),
                           _buildStatItem('Streak', '${user?.streak ?? 0}d', Icons.local_fire_department_rounded, Colors.orangeAccent),
@@ -1199,72 +1102,65 @@ class _HomePageState extends ConsumerState<HomePage>
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
 
                 // ── Membership Group ─────────────────────────────────
                 const _ProfileGroupLabel(label: 'MEMBERSHIP & WALLET'),
                 const SizedBox(height: 12),
-                Opacity(
-                  opacity: 0.5,
-                  child: _ProfileMenuTile(
-                    icon: Icons.workspace_premium_rounded,
-                    label: isSubscribed ? 'PRO Membership' : 'Upgrade to PRO',
-                    subtitle: isSubscribed
-                        ? 'Enjoy all exclusive features'
-                        : null,
-                    isGold: false,
-                    trailingWidget: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.bg2,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.glassBorder),
-                      ),
-                      child: Text(
-                        isSubscribed ? 'ACTIVE' : 'COMING SOON',
-                        style: const TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
+                _ProfileGroupWrapper(
+                  children: [
+                    _ProfileMenuTile(
+                      icon: Icons.workspace_premium_rounded,
+                      label: isSubscribed ? 'PRO Membership' : 'Upgrade to PRO',
+                      subtitle: isSubscribed
+                          ? 'Enjoy all exclusive features'
+                          : null,
+                      isGold: isSubscribed,
+                      useCardStyle: false,
+                      trailingWidget: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.bg2.withAlpha(180),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.glassBorder),
+                        ),
+                        child: Text(
+                          isSubscribed ? 'ACTIVE' : 'COMING SOON',
+                          style: TextStyle(
+                            color: isSubscribed ? AppColors.goldLight : AppColors.textMuted,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
+                      onTap: null,
                     ),
-                    onTap: null,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                Consumer(
-                  builder: (context, ref, _) {
-                    return Opacity(
-                      opacity: 0.5,
-                      child: _ProfileMenuTile(
-                        icon: Icons.account_balance_wallet_rounded,
-                        label: 'Diamond Store',
-                        isGold: false,
-                        trailingWidget: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.bg2,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.glassBorder),
-                          ),
-                          child: const Text(
-                            'COMING SOON',
-                            style: TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                            ),
+                    _ProfileMenuTile(
+                      icon: Icons.account_balance_wallet_rounded,
+                      label: 'Diamond Store',
+                      useCardStyle: false,
+                      trailingWidget: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.bg2.withAlpha(180),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.glassBorder),
+                        ),
+                        child: const Text(
+                          'COMING SOON',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
-                        onTap: null,
                       ),
-                    );
-                  },
+                      onTap: null,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
 
                 // ── App Settings Group ───────────────────────────────
                 const _ProfileGroupLabel(label: 'PREFERENCES'),
@@ -1273,135 +1169,150 @@ class _HomePageState extends ConsumerState<HomePage>
                 Consumer(
                   builder: (context, ref, _) {
                     final hapticSupported = ref.watch(hapticSupportProvider).value ?? true;
-                    return _ProfileMenuTile(
-                      icon: Icons.vibration_rounded,
-                      label: 'Haptic Feedback',
-                      subtitle: !hapticSupported 
-                          ? 'Not Supported' 
-                          : 'Current: ${ref.watch(hapticProvider).label}',
-                      onTap: () {
-                        showModalBottomSheet(
-                          context: context,
-                          backgroundColor: Colors.transparent,
-                          isScrollControlled: true,
-                          builder: (context) => const HapticSettingsSheet(),
-                        );
-                      },
-                    );
-                  }
-                ),
-                const SizedBox(height: 12),
-                
-                Consumer(
-                  builder: (context, ref, _) {
                     final parallaxSupported = ref.watch(parallaxSupportProvider).value ?? true;
                     final isParallaxEnabled = ref.watch(parallaxProvider);
-                    
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    final settings = ref.watch(settingsProvider);
+
+                    return _ProfileGroupWrapper(
                       children: [
+                        _ProfileMenuTile(
+                          icon: Icons.vibration_rounded,
+                          label: 'Haptic Feedback',
+                          subtitle: !hapticSupported 
+                              ? 'Not Supported' 
+                              : 'Current: ${ref.watch(hapticProvider).label}',
+                          useCardStyle: false,
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              backgroundColor: Colors.transparent,
+                              isScrollControlled: true,
+                              builder: (context) => const HapticSettingsSheet(),
+                            );
+                          },
+                        ),
                         _ProfileMenuTile(
                           icon: Icons.threed_rotation_rounded,
                           label: 'Gyroscope Effect',
                           subtitle: !parallaxSupported 
-                              ? 'Not Supported on this device' 
+                              ? 'Not Supported' 
                               : (isParallaxEnabled ? 'Enabled' : 'Disabled'),
+                          useCardStyle: false,
                           onTap: !parallaxSupported ? null : () {
                             ref.read(parallaxProvider.notifier).toggle();
                           },
                         ),
-                        if (!parallaxSupported)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16, top: 8, right: 16),
-                            child: Row(
-                              children: [
-                                Icon(Icons.info_outline_rounded, color: Colors.amber.withAlpha(150), size: 14),
-                                const SizedBox(width: 8),
-                                const Expanded(
-                                  child: Text(
-                                    'Note: This feature requires a Gyroscope or Accelerometer sensor which was not detected on your device.',
-                                    style: TextStyle(color: AppColors.textMuted, fontSize: 11, height: 1.4),
-                                  ),
-                                ),
-                              ],
-                            ),
+                        _ProfileMenuTile(
+                          icon: Icons.brightness_medium_rounded,
+                          label: 'AMOLED Mode',
+                          subtitle: settings.isAmoledMode ? 'Prioritize dark' : 'Disabled',
+                          useCardStyle: false,
+                          trailingWidget: Switch(
+                            value: settings.isAmoledMode,
+                            onChanged: (_) {
+                              ref.read(hapticProvider.notifier).lightImpact();
+                              ref.read(settingsProvider.notifier).toggleAmoledMode();
+                            },
+                            activeThumbColor: Colors.amber,
                           ),
+                        ),
+                        _ProfileMenuTile(
+                          icon: Icons.auto_mode_rounded,
+                          label: 'Auto Daily Wallpaper',
+                          subtitle: settings.isAutoDailyWallpaper ? 'Enabled' : 'Disabled',
+                          useCardStyle: false,
+                          trailingWidget: Switch(
+                            value: settings.isAutoDailyWallpaper,
+                            onChanged: (_) async {
+                              ref.read(hapticProvider.notifier).lightImpact();
+                              ref.read(settingsProvider.notifier).toggleAutoDailyWallpaper();
+                              if (!settings.isAutoDailyWallpaper) {
+                                await WallpaperScheduler.scheduleDailyTask();
+                              } else {
+                                await WallpaperScheduler.cancelDailyTask();
+                              }
+                            },
+                            activeThumbColor: Colors.amber,
+                          ),
+                        ),
+                        _ProfileMenuTile(
+                          icon: Icons.info_outline_rounded,
+                          label: 'About Royal Pixels',
+                          subtitle: 'Version ${AppConstants.appVersion}',
+                          useCardStyle: false,
+                          onTap: () => context.push('/about'),
+                        ),
                       ],
                     );
                   }
                 ),
-                const SizedBox(height: 12),
-                _ProfileMenuTile(
-                  icon: Icons.info_outline_rounded,
-                  label: 'About Royal Pixels',
-                  subtitle: 'Version ${AppConstants.appVersion}',
-                  onTap: () => context.push('/about'),
-                ),
 
                 // ── Admin section ────────────────────────────────────
                 if (user?.email == 'subhamsoudeep@gmail.com') ...[
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
                   const _ProfileGroupLabel(label: 'ADMIN CONTROL', color: AppColors.goldMid),
                   const SizedBox(height: 12),
-                  _ProfileMenuTile(
-                    icon: Icons.admin_panel_settings_rounded,
-                    label: 'Admin Upload',
-                    isGold: true,
-                    onTap: () => context.push('/upload'),
-                  ),
-                  const SizedBox(height: 12),
-                  _ProfileMenuTile(
-                    icon: user?.isSubscribed == true
-                        ? Icons.toggle_on_rounded
-                        : Icons.toggle_off_rounded,
-                    label: 'Toggle Premium UI',
-                    subtitle: user?.isSubscribed == true
-                        ? 'Currently: PREMIUM'
-                        : 'Currently: FREE',
-                    isGold: true,
-                    onTap: () {
-                      ref.read(authProvider.notifier).toggleAdminPremiumOverride();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(user?.isSubscribed == true
-                              ? 'Switched to FREE mode.'
-                              : 'Switched to PREMIUM mode.'),
-                          backgroundColor: AppColors.bg0,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _ProfileMenuTile(
-                    icon: Icons.edit_note_rounded,
-                    label: 'Rename Category',
-                    isGold: true,
-                    onTap: () => context.push('/rename-category'),
-                  ),
-                  const SizedBox(height: 12),
-                  _ProfileMenuTile(
-                    icon: Icons.category_rounded,
-                    label: 'Category Covers',
-                    isGold: true,
-                    onTap: () => context.push('/upload-category-cover'),
+                  _ProfileGroupWrapper(
+                    children: [
+                      _ProfileMenuTile(
+                        icon: Icons.admin_panel_settings_rounded,
+                        label: 'Admin Upload',
+                        isGold: true,
+                        useCardStyle: false,
+                        onTap: () => context.push('/upload'),
+                      ),
+                      _ProfileMenuTile(
+                        icon: user?.isSubscribed == true
+                            ? Icons.toggle_on_rounded
+                            : Icons.toggle_off_rounded,
+                        label: 'Toggle Premium UI',
+                        subtitle: user?.isSubscribed == true
+                            ? 'Currently: PREMIUM'
+                            : 'Currently: FREE',
+                        isGold: true,
+                        useCardStyle: false,
+                        onTap: () {
+                          ref.read(authProvider.notifier).toggleAdminPremiumOverride();
+                        },
+                      ),
+                      _ProfileMenuTile(
+                        icon: Icons.edit_note_rounded,
+                        label: 'Rename Category',
+                        isGold: true,
+                        useCardStyle: false,
+                        onTap: () => context.push('/rename-category'),
+                      ),
+                      _ProfileMenuTile(
+                        icon: Icons.category_rounded,
+                        label: 'Category Covers',
+                        isGold: true,
+                        useCardStyle: false,
+                        onTap: () => context.push('/upload-category-cover'),
+                      ),
+                    ],
                   ),
                 ],
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
                 const _ProfileGroupLabel(label: 'ACCOUNT'),
                 const SizedBox(height: 12),
 
                 // ── Logout ────────────────────────────────────────────
-                _ProfileMenuTile(
-                  icon: Icons.logout_rounded,
-                  label: 'Logout',
-                  isDanger: true,
-                  onTap: () async {
-                    await ref.read(authProvider.notifier).logout();
-                    if (mounted) context.go('/login');
-                  },
+                _ProfileGroupWrapper(
+                  children: [
+                    _ProfileMenuTile(
+                      icon: Icons.logout_rounded,
+                      label: 'Logout',
+                      isDanger: true,
+                      useCardStyle: false,
+                      onTap: () async {
+                        await ref.read(authProvider.notifier).logout();
+                        if (mounted) context.go('/login');
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 100),
+                const SizedBox(height: 120),
               ],
             ),
           ),
@@ -1411,35 +1322,36 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Widget _buildStatItem(String label, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withAlpha(20),
-            borderRadius: BorderRadius.circular(12),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.bg2.withAlpha(100),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.glassBorder, width: 0.8),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: AppColors.textMuted.withAlpha(180),
+              fontSize: 8,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+            ),
           ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1449,12 +1361,14 @@ class _HomePageState extends ConsumerState<HomePage>
       case 0:
         return 'Royal Pixels';
       case 1:
-        return 'Categories';
+        return 'Feed';
       case 2:
-        return 'My Saved';
+        return 'Categories';
       case 3:
         return 'Favorites';
       case 4:
+        return 'My Saved';
+      case 5:
         return 'Profile';
       default:
         return 'Royal Pixels';
@@ -1559,7 +1473,7 @@ class _HomePageState extends ConsumerState<HomePage>
     }
     
     // For other tabs, maybe just search or nothing
-    if (_navIndex == 1 || _navIndex == 2 || _navIndex == 3) {
+    if (_navIndex >= 1 && _navIndex <= 4) {
       return [
         IconButton(
           tooltip: 'Search',
@@ -1590,6 +1504,7 @@ class _ProfileMenuTile extends ConsumerWidget {
   final bool isDanger;
   final VoidCallback? onTap;
   final Widget? trailingWidget;
+  final bool useCardStyle;
 
   const _ProfileMenuTile({
     required this.icon,
@@ -1599,6 +1514,7 @@ class _ProfileMenuTile extends ConsumerWidget {
     this.isGold = false,
     this.isDanger = false,
     this.trailingWidget,
+    this.useCardStyle = true,
   });
 
   @override
@@ -1609,6 +1525,75 @@ class _ProfileMenuTile extends ConsumerWidget {
             ? AppColors.goldMid
             : AppColors.textSecondary;
 
+    final tileContent = Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: isDanger
+                ? Colors.red.withAlpha(25)
+                : isGold
+                    ? AppColors.goldMid.withAlpha(25)
+                    : AppColors.bg2.withAlpha(150),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isDanger
+                      ? Colors.redAccent
+                      : AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        trailingWidget ??
+            Icon(Icons.chevron_right_rounded,
+                color: AppColors.textMuted.withAlpha(150), size: 22),
+      ],
+    );
+
+    if (!useCardStyle) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap != null ? () {
+            ref.read(hapticProvider.notifier).lightImpact();
+            onTap!();
+          } : null,
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: tileContent,
+          ),
+        ),
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1618,68 +1603,18 @@ class _ProfileMenuTile extends ConsumerWidget {
         } : null,
         borderRadius: BorderRadius.circular(20),
         child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.bg1,
-            borderRadius: BorderRadius.circular(20),
+            color: AppColors.bg1.withAlpha(180),
+            borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: isGold
-                  ? AppColors.goldMid.withAlpha(50)
-                  : AppColors.glassBorder,
+                  ? AppColors.goldMid.withAlpha(80)
+                  : AppColors.glassBorder.withAlpha(120),
               width: 1,
             ),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: isDanger
-                      ? Colors.red.withAlpha(15)
-                      : isGold
-                          ? AppColors.goldMid.withAlpha(20)
-                          : AppColors.bg2,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: iconColor, size: 22),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: isDanger
-                            ? Colors.redAccent
-                            : AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        style: const TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              trailingWidget ??
-                  Icon(Icons.chevron_right_rounded,
-                      color: AppColors.textMuted.withAlpha(150), size: 22),
-            ],
-          ),
+          child: tileContent,
         ),
       ),
     );
@@ -1695,15 +1630,28 @@ class _ProfileGroupLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color ?? AppColors.textMuted,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.5,
-        ),
+      padding: const EdgeInsets.only(left: 4, bottom: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color ?? AppColors.goldMid.withAlpha(150),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: color ?? AppColors.textMuted.withAlpha(200),
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1725,6 +1673,45 @@ class _SkeletonCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           color: Colors.white,
         ),
+      ),
+    );
+  }
+}
+
+// ── Profile group wrapper ───────────────────────────────────────────────────
+class _ProfileGroupWrapper extends StatelessWidget {
+  final List<Widget> children;
+  const _ProfileGroupWrapper({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bg1.withAlpha(180),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.glassBorder.withAlpha(100), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(50),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: List.generate(children.length, (index) {
+          final isLast = index == children.length - 1;
+          return Column(
+            children: [
+              children[index],
+              if (!isLast)
+                Padding(
+                  padding: const EdgeInsets.only(left: 60, right: 16),
+                  child: Divider(color: AppColors.divider.withAlpha(50), height: 1),
+                ),
+            ],
+          );
+        }),
       ),
     );
   }

@@ -15,6 +15,8 @@ import '../pages/upload/rename_category_page.dart';
 import '../pages/subscription/subscription_page.dart';
 import '../pages/diamond/diamond_store_page.dart';
 import '../pages/notifications/notifications_page.dart';
+import '../pages/social_feed/social_feed_page.dart';
+import '../pages/detail/wallpaper_deeplink_page.dart';
 
 
 import '../../core/constants/animation_constants.dart';
@@ -190,6 +192,30 @@ final GoRouter appRouter = GoRouter(
         child: const NotificationsPage(),
       ),
     ),
+    GoRoute(
+      path: '/social-feed',
+      name: 'social-feed',
+      pageBuilder: (context, state) {
+        final initialWallpaperId = state.extra as String?;
+        return buildPageWithDefaultTransition(
+          context: context,
+          state: state,
+          child: SocialFeedPage(initialWallpaperId: initialWallpaperId),
+        );
+      },
+    ),
+
+    GoRoute(
+      path: '/wallpaper/:id',
+      name: 'wallpaper-by-id',
+      pageBuilder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return buildPageWithDefaultTransition(
+          context: context, 
+          state: state, 
+          child: WallpaperDeepLinkPage(wallpaperId: id),
+        );
+      },
+    ),
   ],
 );
-

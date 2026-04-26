@@ -1,6 +1,6 @@
 enum HapticLevel {
   off('Off', 'Completely disable haptic feedback'),
-  light('Light', 'Subtle, battery-friendly sensations'),
+  light('Light', 'Subtle, gentle sensations'),
   medium('Medium', 'A balanced, crisp response'),
   strong('Strong', 'Maximum feedback for every interaction');
 

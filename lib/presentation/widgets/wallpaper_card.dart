@@ -9,6 +9,8 @@ import '../../core/utils/safe_tap.dart';
 import 'dart:async';
 import 'package:sensors_plus/sensors_plus.dart';
 import '../providers/parallax_provider.dart';
+import '../providers/likes_provider.dart';
+import '../../../core/utils/royal_snack_bar.dart';
 
 
 class WallpaperCard extends ConsumerStatefulWidget {
@@ -198,9 +200,6 @@ class _WallpaperCardState extends ConsumerState<WallpaperCard>
                             )
                           : CachedNetworkImage(
                         imageUrl: widget.wallpaper.thumbnailUrl,
-                        // Stable cache key: all URL variants share the same cache entry.
-                        // Prevents images vanishing when switching between thumbnail/optimized URLs.
-                        cacheKey: widget.wallpaper.cacheKey,
                         fit: BoxFit.cover,
                         // Optimize memory cache for buttery smooth scrolling
                         memCacheHeight: 400,
@@ -315,6 +314,102 @@ class _WallpaperCardState extends ConsumerState<WallpaperCard>
                     ),
                   ),
 
+                  // ── Top-left view count badge ───────────────────────
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withAlpha(120),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white.withAlpha(30), width: 0.5),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.remove_red_eye_outlined, color: Colors.white70, size: 9),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatCount(widget.wallpaper.viewCount),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withAlpha(120),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white.withAlpha(30), width: 0.5),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.favorite_rounded, color: Colors.pinkAccent, size: 9),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatCount(widget.wallpaper.likeCount),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final likedIds = ref.watch(likesProvider);
+                              final isLiked = likedIds.contains(widget.wallpaper.id);
+                              
+                              return GestureDetector(
+                                onTap: () {
+                                  SafeTap.run('fav_card_${widget.wallpaper.id}', () {
+                                    ref.read(hapticProvider.notifier).lightImpact();
+                                    // Removed restrictive check: Allow guests to like locally.
+                                    // Testers and guests can now use the like feature.
+                                    ref.read(likesNotifierProvider.notifier).toggleLike(widget.wallpaper.id);
+                                    if (!isLiked) {
+                                      RoyalSnackBar.show(context, 'Added to favorites!', type: SnackBarType.info);
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withAlpha(120),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isLiked 
+                                          ? Colors.redAccent.withAlpha(100) 
+                                          : Colors.white.withAlpha(30), 
+                                      width: 0.5
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    isLiked ? Icons.favorite : Icons.favorite_border,
+                                    color: isLiked ? Colors.redAccent : Colors.white70,
+                                    size: 10,
+                                  ),
+                                ),
+                              );
+                            }
+                          ),
+                        ],
+                      ),
+                    ),
+
                   // ── Top-right badges stack ───────────────────────────
                   Positioned(
                     top: 8,
@@ -323,6 +418,7 @@ class _WallpaperCardState extends ConsumerState<WallpaperCard>
                       crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (_isNew) _buildNewBadge(),
                         // PRO badge (gold)
                         if (isPremium)
                           _WallpaperBadge(
@@ -373,6 +469,30 @@ class _WallpaperCardState extends ConsumerState<WallpaperCard>
         ),
       ),
     );
+  }
+
+  bool get _isNew {
+    if (widget.wallpaper.createdAt == null) return false;
+    final now = DateTime.now();
+    return now.difference(widget.wallpaper.createdAt!).inHours < 24;
+  }
+
+  Widget _buildNewBadge() {
+    return _WallpaperBadge(
+      gradient: const LinearGradient(
+        colors: [Color(0xFF10B981), Color(0xFF059669)],
+      ),
+      glowColor: const Color(0xFF10B981),
+      icon: Icons.new_releases_rounded,
+      iconColor: Colors.white,
+      label: 'NEW',
+      labelColor: Colors.white,
+    );
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
+    return count.toString();
   }
 }
 

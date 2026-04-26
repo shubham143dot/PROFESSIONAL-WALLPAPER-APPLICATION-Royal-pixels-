@@ -25,10 +25,11 @@ import '../../providers/diamond_provider.dart';
 import '../../providers/wallpaper_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../../domain/entities/notification_type.dart';
+import '../../../data/datasources/firestore_data_source.dart';
 
 import '../../widgets/diamond_loader.dart';
 import '../../../core/utils/image_filter_utils.dart';
-import '../../providers/favorites_provider.dart';
+import '../../providers/likes_provider.dart';
 import '../../../core/ads/ad_helper.dart';
 import '../../providers/haptic_provider.dart';
 import '../../providers/download_provider.dart';
@@ -83,6 +84,12 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       });
     }
     _extractColor();
+    // Fire-and-forget: increment view count after hero transition completes
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      final userId = ref.read(authProvider).user?.uid;
+      sl<FirestoreDataSource>().incrementViewCount(widget.wallpaper.id, userId: userId);
+    });
   }
 
   Future<void> _initParallax() async {
@@ -835,14 +842,15 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
 
 
 
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     final isPremiumUnlocked = user?.isSubscribed ?? false;
     final isPremiumAndLocked = widget.wallpaper.isPremium && !isPremiumUnlocked && !_isUnlocked;
     
-    final favorites = ref.watch(favoritesProvider);
-    final isFavorite = favorites.contains(widget.wallpaper.id);
+    final likedIds = ref.watch(likesProvider);
+    final isLiked = likedIds.contains(widget.wallpaper.id);
 
     return Scaffold(
       backgroundColor: _dominantColor?.withAlpha(40) ?? Colors.black,
@@ -881,21 +889,14 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
             ),
             IconButton(
               icon: Icon(
-                isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: isFavorite ? Colors.redAccent : Colors.white,
+                isLiked ? Icons.favorite : Icons.favorite_border,
+                color: isLiked ? Colors.redAccent : Colors.white,
               ),
               onPressed: () {
                 ref.read(hapticProvider.notifier).lightImpact();
-                final isGuest = ref.read(authProvider).isGuest;
-                if (isGuest) {
-                  showLoginRequiredSheet(context,
-                      reason: LoginRequiredReason.favorites);
-                  return;
-                }
-                ref
-                    .read(favoritesProvider.notifier)
-                    .toggleFavorite(widget.wallpaper.id);
-                if (!isFavorite) {
+                // Allow guests to like locally.
+                ref.read(likesNotifierProvider.notifier).toggleLike(widget.wallpaper.id);
+                if (!isLiked) {
                   RoyalSnackBar.show(context, 'Added to favorites!',
                       type: SnackBarType.info);
                 }
@@ -909,16 +910,12 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
           GestureDetector(
             onDoubleTap: () {
               ref.read(hapticProvider.notifier).lightImpact();
-              final isGuest = ref.read(authProvider).isGuest;
-              if (isGuest) {
-                showLoginRequiredSheet(context,
-                    reason: LoginRequiredReason.favorites);
-                return;
-              }
-              final isFavorite = ref.read(favoritesProvider).contains(widget.wallpaper.id);
-              ref.read(favoritesProvider.notifier).toggleFavorite(widget.wallpaper.id);
-              if (!isFavorite) {
-                RoyalSnackBar.show(context, 'Added to favorites!', type: SnackBarType.info);
+              // Allow guests to like locally.
+              final isLikedNow = ref.read(likesProvider).contains(widget.wallpaper.id);
+              ref.read(likesNotifierProvider.notifier).toggleLike(widget.wallpaper.id);
+              if (!isLikedNow) {
+                RoyalSnackBar.show(context, 'Added to favorites!',
+                    type: SnackBarType.info);
               }
             },
             onLongPress: () {
@@ -950,18 +947,24 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                     ),
                     child: CachedNetworkImage(
                       imageUrl: widget.wallpaper.optimizedUrl,
-                      // Stable cache key — shared with grid card so the Hero transition
-                      // reuses already-cached bytes and never shows a blank frame.
-                      cacheKey: widget.wallpaper.cacheKey,
                       fit: BoxFit.cover,
-                      memCacheHeight: 1600, // Limits maximum RAM allocation for 4k wallpapers
-                      fadeInDuration: const Duration(milliseconds: 400),
+                      memCacheHeight: 1200, // Reduced from 1600 for faster decoding
+                      fadeInDuration: const Duration(milliseconds: 300),
                       fadeOutDuration: const Duration(milliseconds: 200),
-                      placeholder: (context, url) => Container(
-                        color: _dominantColor?.withAlpha(80) ?? Colors.grey[900],
-                        child: Center(
-                          child: DiamondLoader(size: 30, color: _primaryColor,),
-                        ),
+                      placeholder: (context, url) => Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Show the already-cached thumbnail instantly as a placeholder
+                          CachedNetworkImage(
+                            imageUrl: widget.wallpaper.thumbnailUrl,
+                            fit: BoxFit.cover,
+                            memCacheHeight: 400,
+                          ),
+                          // Subtle overlay loader
+                          Center(
+                            child: DiamondLoader(size: 24, color: _primaryColor.withAlpha(150),),
+                          ),
+                        ],
                       ),
                       errorWidget: (context, url, error) {
                         if (kDebugMode) {
@@ -1197,6 +1200,33 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                     ),
                   ),
                 ] else if (!_showPreview) ...[
+                  // ── Quality Note ───────────────────────────────────
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withAlpha(100),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withAlpha(20)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.info_outline_rounded, color: AppColors.goldLight, size: 14),
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'This is a preview. High-quality original image is provided when you download or set as wallpaper.',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   // ── Action button row ───────────────────────────────
                   _buildActionRow(),
                 ]

@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/wallpaper_provider.dart';
-import '../../providers/favorites_provider.dart';
+import '../../providers/likes_provider.dart';
 import '../../widgets/wallpaper_card.dart';
 import '../../widgets/diamond_loader.dart';
 import '../../../core/utils/safe_tap.dart';
@@ -137,7 +137,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
     );
 
     if (confirmed == true && mounted) {
-      ref.read(favoritesProvider.notifier).toggleFavorite(wallpaperId);
+      ref.read(likesNotifierProvider.notifier).toggleLike(wallpaperId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -338,7 +338,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
     super.build(context); // Required for KeepAlive
     final wallpaperState = ref.watch(wallpaperProvider);
     final myIds = ref.watch(downloadProvider);
-    final targetIds = _showFavorites ? ref.watch(favoritesProvider) : myIds;
+    final targetIds = _showFavorites ? ref.watch(likesProvider) : myIds;
 
     final content = (targetIds.isEmpty)
         ? _buildEmptyState()

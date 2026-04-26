@@ -18,10 +18,13 @@ class UserEntity extends Equatable {
   final String? appVersion;
   final int adsWatchedToday;
 
+  final String? photoUrl;
+
   const UserEntity({
     required this.uid,
     required this.name,
     required this.email,
+    this.photoUrl,
     this.phoneNo,
     this.loginHistory,
     required this.ownedWallpaperCount,
@@ -39,6 +42,7 @@ class UserEntity extends Equatable {
     String? uid,
     String? name,
     String? email,
+    String? photoUrl,
     String? phoneNo,
     DateTime? loginHistory,
     int? ownedWallpaperCount,
@@ -55,6 +59,7 @@ class UserEntity extends Equatable {
       uid: uid ?? this.uid,
       name: name ?? this.name,
       email: email ?? this.email,
+      photoUrl: photoUrl ?? this.photoUrl,
       phoneNo: phoneNo ?? this.phoneNo,
       loginHistory: loginHistory ?? this.loginHistory,
       ownedWallpaperCount: ownedWallpaperCount ?? this.ownedWallpaperCount,
@@ -74,6 +79,7 @@ class UserEntity extends Equatable {
         uid,
         name,
         email,
+        photoUrl,
         phoneNo,
         loginHistory,
         ownedWallpaperCount,

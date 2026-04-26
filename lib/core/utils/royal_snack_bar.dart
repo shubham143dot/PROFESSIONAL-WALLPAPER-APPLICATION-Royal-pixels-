@@ -12,14 +12,20 @@ enum SnackBarType { success, error, info }
 /// ```
 class RoyalSnackBar {
   RoyalSnackBar._();
+  
+  /// Global key to show snackbars from anywhere (including providers)
+  static final GlobalKey<ScaffoldMessengerState> messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   static void show(
-    BuildContext context,
+    BuildContext? context,
     String message, {
     SnackBarType type = SnackBarType.success,
     Duration duration = const Duration(seconds: 3),
   }) {
-    _showOnState(ScaffoldMessenger.of(context), message, type: type, duration: duration);
+    final messenger = context != null ? ScaffoldMessenger.of(context) : messengerKey.currentState;
+    if (messenger != null) {
+      _showOnState(messenger, message, type: type, duration: duration);
+    }
   }
 
   /// Use this variant when you need to show a snackbar after an `await` —

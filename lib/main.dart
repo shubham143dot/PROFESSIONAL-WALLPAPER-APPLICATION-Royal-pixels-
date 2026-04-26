@@ -14,10 +14,13 @@ import 'package:royal_pixels/presentation/providers/auth_provider.dart';
 import 'package:royal_pixels/core/services/notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:royal_pixels/core/constants/app_constants.dart';
+
+import 'package:royal_pixels/core/services/wallpaper_scheduler.dart';
 
 
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:royal_pixels/core/constants/app_constants.dart';
+import 'package:royal_pixels/core/utils/royal_snack_bar.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +41,7 @@ void main() async {
     _initNotifications(),
     _initDisplayMode(),
     _initScreenProtector(),
+    WallpaperScheduler.init(),
   ]);
 
   runApp(
@@ -97,13 +101,27 @@ class RoyalPixelsApp extends ConsumerStatefulWidget {
   ConsumerState<RoyalPixelsApp> createState() => _RoyalPixelsAppState();
 }
 
-class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp> {
+class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyScreenshotPolicy(ref.read(authProvider));
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App resumed
+    }
   }
 
   void _applyScreenshotPolicy(AuthState authState) async {
@@ -133,6 +151,7 @@ class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp> {
     return MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: RoyalSnackBar.messengerKey,
       themeMode: ThemeMode.dark, // Enforce dark theme based on requirements
       theme: AppTheme.darkTheme,
       darkTheme: AppTheme.darkTheme,

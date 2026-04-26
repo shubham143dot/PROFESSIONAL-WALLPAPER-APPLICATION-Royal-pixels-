@@ -9,6 +9,7 @@ class UserModel extends UserEntity {
     super.phoneNo,
     super.loginHistory,
     required super.ownedWallpaperCount,
+    super.photoUrl,
     super.totalSpent = 0.0,
     super.activityScore = 0,
     super.isSubscribed = false,
@@ -24,6 +25,7 @@ class UserModel extends UserEntity {
       uid: uid,
       name: json['name'] ?? '',
       email: json['email'] ?? '',
+      photoUrl: json['photo_url'],
       phoneNo: json['phone_no'],
       loginHistory: (json['login_history'] as Timestamp?)?.toDate(),
       ownedWallpaperCount: json['owned_wallpaper'] ?? 0,
@@ -42,6 +44,7 @@ class UserModel extends UserEntity {
     return {
       'name': name,
       'email': email,
+      if (photoUrl != null) 'photo_url': photoUrl,
       if (phoneNo != null) 'phone_no': phoneNo,
       if (loginHistory != null) 'login_history': Timestamp.fromDate(loginHistory!),
       'owned_wallpaper': ownedWallpaperCount,

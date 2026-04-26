@@ -77,9 +77,9 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
         }
 
         // 2. Build category
-        String finalCategory = 'Trending';
+        String finalCategory = 'Feed';
         if (_createNewCategory) {
-          finalCategory = _categoryController.text.trim().isEmpty ? 'Trending' : _categoryController.text.trim();
+          finalCategory = _categoryController.text.trim().isEmpty ? 'Feed' : _categoryController.text.trim();
         } else if (_selectedCategory != null && _selectedCategory != 'Create New Category') {
           finalCategory = _selectedCategory!;
         }

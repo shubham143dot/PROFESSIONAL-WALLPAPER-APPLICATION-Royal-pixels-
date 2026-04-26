@@ -10,6 +10,10 @@ class WallpaperEntity extends Equatable {
   final List<String> tags;
   final String size;
   final DateTime? createdAt;
+  final int viewCount;
+  final int likeCount;
+  final int shareCount;
+  final bool isTrending;
 
   /// True when the wallpaper is tagged with 'ultra_hd'
   bool get isUltraHD => tags.any((t) => t.toLowerCase() == 'ultra_hd');
@@ -63,12 +67,6 @@ class WallpaperEntity extends Equatable {
   /// Always returns the raw, uncompressed imageUrl with zero transformations.
   String get fullQualityUrl => imageUrl;
 
-  /// Stable cache key for CachedNetworkImage.
-  /// Always the raw imageUrl so the same image is never cached under multiple keys
-  /// (thumbnail vs optimized vs full) — prevents cache misses that cause images
-  /// to briefly vanish during scroll or on re-entry.
-  String get cacheKey => imageUrl;
-
   /// Low-res extreme blurred version (for instant placeholders)
   String get blurUrl {
     if (imageUrl.isEmpty) return '';
@@ -116,6 +114,10 @@ class WallpaperEntity extends Equatable {
     required this.tags,
     this.size = '',
     this.createdAt,
+    this.viewCount = 0,
+    this.likeCount = 0,
+    this.shareCount = 0,
+    this.isTrending = false,
   });
 
   @override
@@ -129,6 +131,10 @@ class WallpaperEntity extends Equatable {
         tags,
         size,
         createdAt,
+        viewCount,
+        likeCount,
+        shareCount,
+        isTrending,
       ];
 
   WallpaperEntity copyWith({
@@ -141,6 +147,10 @@ class WallpaperEntity extends Equatable {
     List<String>? tags,
     String? size,
     DateTime? createdAt,
+    int? viewCount,
+    int? likeCount,
+    int? shareCount,
+    bool? isTrending,
   }) {
     return WallpaperEntity(
       id: id ?? this.id,
@@ -152,6 +162,10 @@ class WallpaperEntity extends Equatable {
       tags: tags ?? this.tags,
       size: size ?? this.size,
       createdAt: createdAt ?? this.createdAt,
+      viewCount: viewCount ?? this.viewCount,
+      likeCount: likeCount ?? this.likeCount,
+      shareCount: shareCount ?? this.shareCount,
+      isTrending: isTrending ?? this.isTrending,
     );
   }
 
@@ -215,6 +229,6 @@ class WallpaperEntity extends Equatable {
     }
 
     // Default Fallback
-    return 'Trending';
+    return 'Feed';
   }
 }

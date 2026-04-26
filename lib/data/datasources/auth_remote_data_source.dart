@@ -57,10 +57,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     
     UserModel userModel;
     if (userDoc.exists) {
-      // Update login history and version
+      // Update login history, version, and profile info
       await firestore.collection('users').doc(user.uid).update({
         'login_history': FieldValue.serverTimestamp(),
         'app_version': AppConstants.appVersion,
+        if (user.displayName != null) 'name': user.displayName,
+        if (user.photoURL != null) 'photo_url': user.photoURL,
       });
       userModel = UserModel.fromFirestore(userDoc.data()!, user.uid);
     } else {
@@ -69,6 +71,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         uid: user.uid,
         name: user.displayName ?? 'Unknown',
         email: user.email ?? '',
+        photoUrl: user.photoURL,
         phoneNo: user.phoneNumber,
         loginHistory: DateTime.now(),
         ownedWallpaperCount: 0,
@@ -76,6 +79,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
       await firestore.collection('users').doc(user.uid).set({
         ...userModel.toFirestore(),
+        'liked_wallpapers': [],
         'login_history': FieldValue.serverTimestamp(),
         'app_version': AppConstants.appVersion,
       });
@@ -97,6 +101,29 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final userDoc = await firestore.collection('users').doc(user.uid).get();
       if (userDoc.exists) {
         return UserModel.fromFirestore(userDoc.data()!, user.uid);
+      } else {
+        // Critical Fix: If user exists in Auth but document is missing in Firestore,
+        // create it now. This fixes the "Likes not working for non-admins" issue
+        // where users were missing their profile documents.
+        final userModel = UserModel(
+          uid: user.uid,
+          name: user.displayName ?? 'User',
+          email: user.email ?? '',
+          photoUrl: user.photoURL,
+          phoneNo: user.phoneNumber,
+          loginHistory: DateTime.now(),
+          ownedWallpaperCount: 0,
+          appVersion: AppConstants.appVersion,
+        );
+        
+        await firestore.collection('users').doc(user.uid).set({
+          ...userModel.toFirestore(),
+          'liked_wallpapers': [],
+          'login_history': FieldValue.serverTimestamp(),
+          'app_version': AppConstants.appVersion,
+        });
+        
+        return userModel;
       }
     }
     return null;

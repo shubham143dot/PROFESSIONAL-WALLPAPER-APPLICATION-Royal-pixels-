@@ -57,7 +57,7 @@ final parallaxProvider = StateNotifierProvider<ParallaxNotifier, bool>((ref) {
 class ParallaxNotifier extends StateNotifier<bool> {
   static const _key = 'is_parallax_enabled';
 
-  ParallaxNotifier() : super(true) {
+  ParallaxNotifier([super.initialState = true]) {
     _loadPreference();
   }
 

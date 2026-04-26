@@ -226,7 +226,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                 // ── Daily Streak ───────────────────────────────────────────
                 _buildSectionLabel('🔥 Daily Streak', subtitle: 'Login every day to grow your stash'),
                 const SizedBox(height: 12),
-                _buildStreakCard(diamondState.streak),
+                _buildStreakCard(diamondState),
                 const SizedBox(height: 28),
 
                 // ── Watch & Earn ─────────────────────────────────────────
@@ -422,17 +422,23 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
   }
 
   // ── Streak Card ────────────────────────────────────────────────────────────
-  Widget _buildStreakCard(int currentStreak) {
+  Widget _buildStreakCard(DiamondState diamondState) {
+    final currentStreak = diamondState.streak;
+    final canClaim = diamondState.canClaimToday;
     final currentDay = currentStreak.clamp(0, 7);
+    
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: const Color(0xFF0E1220),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF1E2840), width: 1.2),
+        border: Border.all(
+          color: canClaim ? AppColors.goldMid.withAlpha(80) : const Color(0xFF1E2840), 
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0x20FF6B00),
+            color: canClaim ? AppColors.goldMid.withAlpha(20) : const Color(0x20FF6B00),
             blurRadius: 20,
             spreadRadius: -4,
           ),
@@ -937,15 +943,14 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Secure Digital Payments · Service Offline',
+                    'Instant Delivery • Secure Digital Payments',
                     style:
                         TextStyle(color: Colors.white.withAlpha(70), fontSize: 11),
                   ),
                 ],
               ),
             ),
-            // UPI badge
-            // Maintenance badge
+            // Status badge
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(

@@ -78,4 +78,29 @@ class WallpaperRepositoryImpl implements WallpaperRepository {
       return Left(ServerFailure(e.toString()));
     }
   }
+
+  @override
+  Future<void> incrementViewCount(String id, {String? userId}) async {
+    await remoteDataSource.incrementViewCount(id, userId: userId);
+  }
+
+  @override
+  Future<Either<Failure, bool>> toggleLike(String userId, String id, {bool isFavorite = true}) async {
+    try {
+      final isLiked = await remoteDataSource.toggleLike(userId, id, isFavorite: isFavorite);
+      return Right(isLiked);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<void> toggleLikeAnonymous(String id, bool isAdding) async {
+    await remoteDataSource.toggleLikeAnonymous(id, isAdding);
+  }
+
+  @override
+  Future<void> incrementShareCount(String id) async {
+    await remoteDataSource.incrementShareCount(id);
+  }
 }

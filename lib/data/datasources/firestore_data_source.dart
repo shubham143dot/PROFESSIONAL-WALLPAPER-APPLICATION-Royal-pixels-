@@ -5,6 +5,7 @@ import '../models/wallpaper_model.dart';
 abstract class FirestoreDataSource {
   Future<List<WallpaperModel>> getWallpapers({required int page, required int limit, bool isPremium = false});
   Future<WallpaperModel> getWallpaperDetails(String id);
+  Future<WallpaperModel?> getWallpaperById(String id);
   Future<void> addWallpaper(WallpaperModel wallpaper);
   Future<void> deleteWallpaper(String id);
   Future<void> updateWallpaper(String id, {required String newTitle, required String newCategory, required bool isPremium, required int diamondCost, required List<String> tags});
@@ -38,6 +39,8 @@ abstract class FirestoreDataSource {
     String? screenshotUrl,
   });
   Future<void> updateUserActivity(String userId);
+  Future<bool> toggleLike(String userId, String wallpaperId, {bool isFavorite = true});
+  Future<void> toggleLikeAnonymous(String wallpaperId, bool isAdding);
 
   // ── Diamond System ─────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getDiamondData(String userId);
@@ -47,6 +50,14 @@ abstract class FirestoreDataSource {
   /// Awards +5 diamonds for download/set-as (unified, per-wallpaper dedup + 80/day cap).
   /// Returns a map: { 'granted': bool, 'newBalance': int, 'reason': String? }
   Future<Map<String, dynamic>> addSmallReward(String userId, String wallpaperId);
+
+  /// Atomically increments the view counter on a wallpaper document.
+  /// Fire-and-forget — silently fails on offline/error.
+  Future<void> incrementViewCount(String wallpaperId, {String? userId});
+  Future<void> incrementShareCount(String wallpaperId);
+
+  /// Fetches top trending wallpapers (sorted by view_count descending).
+  Future<List<WallpaperModel>> getTrendingWallpapers({int limit = 10});
 }
 
 
@@ -124,6 +135,22 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
       return WallpaperModel.fromFirestore(doc.data()!, doc.id);
     } else {
       throw Exception('Wallpaper not found');
+    }
+  }
+
+  @override
+  Future<WallpaperModel?> getWallpaperById(String id) async {
+    try {
+      final doc = await firestore.collection('wallpapers').doc(id).get();
+      if (doc.exists) {
+        return WallpaperModel.fromFirestore(doc.data()!, doc.id);
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error fetching wallpaper by ID: $e');
+      }
+      return null;
     }
   }
 
@@ -244,14 +271,27 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     
     await firestore.runTransaction((transaction) async {
       final userSnapshot = await transaction.get(userRef);
-      if (!userSnapshot.exists) return; // Do nothing if user document doesn't exist yet
-      
-      final data = userSnapshot.data();
-      final currentScore = data?['activity_score'] ?? 0;
-      final Timestamp? lastLoginTs = data?['login_history'] as Timestamp?;
-      
+      Map<String, dynamic> updates = {};
       final now = DateTime.now();
       bool isNewDay = true;
+
+      if (!userSnapshot.exists) {
+        // Create user document if it doesn't exist
+        updates = {
+          'activity_score': 10,
+          'login_history': FieldValue.serverTimestamp(),
+          'total_spent': 0.0,
+          'owned_wallpaper': 0,
+          'diamonds': 0,
+          'streak': 0,
+        };
+        transaction.set(userRef, updates);
+        return;
+      }
+      
+      final data = userSnapshot.data()!;
+      final currentScore = data['activity_score'] ?? 0;
+      final Timestamp? lastLoginTs = data['login_history'] as Timestamp?;
       
       if (lastLoginTs != null) {
         final lastLoginDate = lastLoginTs.toDate();
@@ -262,18 +302,16 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
         }
       }
       
-      Map<String, dynamic> updates = {};
-      
       // Initialize new fields for backward compatibility
-      if (data?['activity_score'] == null) {
+      if (data['activity_score'] == null) {
         updates['activity_score'] = currentScore;
       }
-      if (data?['total_spent'] == null) {
+      if (data['total_spent'] == null) {
         updates['total_spent'] = 0.0;
       }
       
       if (isNewDay) {
-        updates['activity_score'] = currentScore + 10;
+        updates['activity_score'] = (updates['activity_score'] ?? currentScore) + 10;
         updates['login_history'] = FieldValue.serverTimestamp();
       }
       
@@ -526,6 +564,12 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     Map<String, dynamic> data = wallpaper.toFirestore();
     data['created_at'] = FieldValue.serverTimestamp();
     
+    // Ensure we don't save an empty ID field inside the document, 
+    // as it's redundant and can cause deduplication issues.
+    if (data['id'] == null || (data['id'] is String && (data['id'] as String).isEmpty)) {
+      data.remove('id');
+    }
+    
     if (wallpaper.id.isEmpty) {
       await firestore.collection('wallpapers').add(data);
     } else {
@@ -593,5 +637,181 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     }
 
     await batch.commit();
+  }
+
+  // ── Trending / View Count ──────────────────────────────────────────────────
+
+  @override
+  Future<void> incrementViewCount(String wallpaperId, {String? userId}) async {
+    try {
+      if (userId == null) {
+        // Anonymous user: just increment (fallback) or skip to stay strictly accurate
+        // Here we increment to still show some growth for non-logged users
+        await firestore
+            .collection('wallpapers')
+            .doc(wallpaperId)
+            .update({'view_count': FieldValue.increment(1)});
+        return;
+      }
+
+      // Logged-in user: use a subcollection for exact deduplication
+      final viewerRef = firestore
+          .collection('wallpapers')
+          .doc(wallpaperId)
+          .collection('viewers')
+          .doc(userId);
+
+      // Check if this user has already viewed this wallpaper
+      final viewerDoc = await viewerRef.get();
+      if (viewerDoc.exists) {
+        return; // Already counted
+      }
+
+      // Atomic update: Record the view AND increment the count
+      final batch = firestore.batch();
+      batch.set(viewerRef, {
+        'viewed_at': FieldValue.serverTimestamp(),
+      });
+      batch.update(firestore.collection('wallpapers').doc(wallpaperId), {
+        'view_count': FieldValue.increment(1),
+      });
+
+      await batch.commit();
+    } catch (_) {
+      // Fire-and-forget
+    }
+  }
+
+  @override
+  Future<bool> toggleLike(String userId, String wallpaperId, {bool isFavorite = true}) async {
+    final wallpaperRef = firestore.collection('wallpapers').doc(wallpaperId);
+    final userRef = firestore.collection('users').doc(userId);
+    final fieldName = isFavorite ? 'liked_wallpapers' : 'feed_likes';
+
+    try {
+      final userSnapshot = await userRef.get();
+      bool newlyLiked = false;
+
+      if (!userSnapshot.exists) {
+        // Create user document if it doesn't exist
+        await userRef.set({
+          'liked_wallpapers': isFavorite ? [wallpaperId] : [],
+          'feed_likes': !isFavorite ? [wallpaperId] : [],
+          'owned_wallpaper': 0,
+          'activity_score': 0,
+          'diamonds': 0,
+          'total_spent': 0.0,
+          'is_subscribed': false,
+          'streak': 0,
+          'login_history': FieldValue.serverTimestamp(),
+        });
+        newlyLiked = true;
+      } else {
+        final userData = userSnapshot.data() ?? {};
+        final List<dynamic> likedList = userData[fieldName] ?? [];
+        final wasLiked = likedList.contains(wallpaperId);
+
+        if (wasLiked) {
+          await userRef.update({
+            fieldName: FieldValue.arrayRemove([wallpaperId])
+          });
+          newlyLiked = false;
+        } else {
+          await userRef.update({
+            fieldName: FieldValue.arrayUnion([wallpaperId])
+          });
+          newlyLiked = true;
+        }
+      }
+
+      // Best effort update for wallpaper like count
+      // This is separated from user doc update to ensure likes "work" (in favorites/state)
+      // even if the global wallpaper doc update fails due to Firestore Rules.
+      try {
+        await wallpaperRef.update({
+          'like_count': FieldValue.increment(newlyLiked ? 1 : -1)
+        });
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Wallpaper count update failed (likely permission): $e');
+        }
+      }
+
+      return newlyLiked;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error toggling like: $e');
+      }
+      return false;
+    }
+  }
+
+  @override
+  Future<void> toggleLikeAnonymous(String wallpaperId, bool isAdding) async {
+    final wallpaperRef = firestore.collection('wallpapers').doc(wallpaperId);
+    try {
+      await wallpaperRef.update({
+        'like_count': FieldValue.increment(isAdding ? 1 : -1)
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error toggling anonymous like: $e');
+      }
+    }
+  }
+
+  @override
+  Future<void> incrementShareCount(String wallpaperId) async {
+    try {
+      await firestore
+          .collection('wallpapers')
+          .doc(wallpaperId)
+          .update({'share_count': FieldValue.increment(1)});
+    } catch (_) {
+      // Fire-and-forget
+    }
+  }
+
+  @override
+  Future<List<WallpaperModel>> getTrendingWallpapers({int limit = 10}) async {
+    try {
+      // Primary: fetch wallpapers flagged as trending
+      final flaggedSnap = await firestore
+          .collection('wallpapers')
+          .where('is_trending', isEqualTo: true)
+          .limit(limit)
+          .get();
+
+      final flagged = flaggedSnap.docs.expand((doc) {
+        try {
+          return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
+        } catch (_) {
+          return <WallpaperModel>[];
+        }
+      }).toList();
+
+      // If flagged set is big enough, return it
+      if (flagged.length >= 5) return flagged;
+
+      // Fallback: top by view_count (requires index on view_count desc)
+      try {
+        final viewSnap = await firestore
+            .collection('wallpapers')
+            .orderBy('view_count', descending: true)
+            .limit(limit)
+            .get();
+        return viewSnap.docs.expand((doc) {
+          try {
+            return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
+          } catch (_) {
+            return <WallpaperModel>[];
+          }
+        }).toList();
+      } catch (_) {
+        return flagged; // Return what we have if index missing
+      }
+    } catch (e) {
+      return [];
+    }
   }
 }

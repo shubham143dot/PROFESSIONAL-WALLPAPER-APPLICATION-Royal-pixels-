@@ -4,6 +4,7 @@ import '../../domain/entities/wallpaper_entity.dart';
 import '../../domain/usecases/get_wallpapers_usecase.dart';
 import '../../domain/usecases/delete_wallpaper_usecase.dart';
 import '../../domain/usecases/update_wallpaper_usecase.dart';
+import '../../domain/repositories/wallpaper_repository.dart';
 import '../../data/models/wallpaper_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -51,10 +52,12 @@ class WallpaperNotifier extends Notifier<WallpaperState> {
 
   List<WallpaperEntity> _deduplicate(List<WallpaperEntity> wallpapers) {
     // Deduplicate by Firestore document ID — NOT imageUrl.
-    // Deduplicating by imageUrl caused wallpapers to silently vanish when two
-    // different Firestore docs happened to share the same image (e.g. re-uploads).
+    // We only skip if we have a non-empty ID that we've seen before.
     final seenIds = <String>{};
-    return wallpapers.where((wp) => wp.id.isNotEmpty && seenIds.add(wp.id)).toList();
+    return wallpapers.where((wp) {
+      if (wp.id.isEmpty) return true; // Don't filter out if ID is somehow missing
+      return seenIds.add(wp.id);
+    }).toList();
   }
 
   Future<void> loadWallpapers({bool forceRefresh = false}) async {
@@ -236,6 +239,34 @@ class WallpaperNotifier extends Notifier<WallpaperState> {
           error: null,
         );
       },
+    );
+  }
+
+  void incrementViews(String id, {String? userId}) {
+    final repo = sl<WallpaperRepository>();
+    repo.incrementViewCount(id, userId: userId); // Fire and forget for remote
+
+    // Update local state for immediate feedback
+    state = state.copyWith(
+      freeWallpapers: state.freeWallpapers.map((w) => w.id == id ? w.copyWith(viewCount: w.viewCount + 1) : w).toList(),
+      premiumWallpapers: state.premiumWallpapers.map((w) => w.id == id ? w.copyWith(viewCount: w.viewCount + 1) : w).toList(),
+    );
+  }
+
+  void incrementLikesLocally(String id, int adjustment) {
+    state = state.copyWith(
+      freeWallpapers: state.freeWallpapers.map((w) => w.id == id ? w.copyWith(likeCount: (w.likeCount + adjustment).clamp(0, 9999999)) : w).toList(),
+      premiumWallpapers: state.premiumWallpapers.map((w) => w.id == id ? w.copyWith(likeCount: (w.likeCount + adjustment).clamp(0, 9999999)) : w).toList(),
+    );
+  }
+
+  void incrementShares(String id) {
+    final repo = sl<WallpaperRepository>();
+    repo.incrementShareCount(id);
+
+    state = state.copyWith(
+      freeWallpapers: state.freeWallpapers.map((w) => w.id == id ? w.copyWith(shareCount: w.shareCount + 1) : w).toList(),
+      premiumWallpapers: state.premiumWallpapers.map((w) => w.id == id ? w.copyWith(shareCount: w.shareCount + 1) : w).toList(),
     );
   }
 }
