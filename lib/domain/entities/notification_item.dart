@@ -45,5 +45,6 @@ class NotificationItem extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, title, message, timestamp, type, isRead, imageUrl, data];
+  List<Object?> get props =>
+      [id, title, message, timestamp, type, isRead, imageUrl, data];
 }

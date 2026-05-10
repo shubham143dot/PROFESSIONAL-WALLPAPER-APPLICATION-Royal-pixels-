@@ -12,9 +12,10 @@ enum SnackBarType { success, error, info }
 /// ```
 class RoyalSnackBar {
   RoyalSnackBar._();
-  
+
   /// Global key to show snackbars from anywhere (including providers)
-  static final GlobalKey<ScaffoldMessengerState> messengerKey = GlobalKey<ScaffoldMessengerState>();
+  static final GlobalKey<ScaffoldMessengerState> messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
 
   static void show(
     BuildContext? context,
@@ -22,7 +23,9 @@ class RoyalSnackBar {
     SnackBarType type = SnackBarType.success,
     Duration duration = const Duration(seconds: 3),
   }) {
-    final messenger = context != null ? ScaffoldMessenger.of(context) : messengerKey.currentState;
+    final messenger = context != null
+        ? ScaffoldMessenger.of(context)
+        : messengerKey.currentState;
     if (messenger != null) {
       _showOnState(messenger, message, type: type, duration: duration);
     }

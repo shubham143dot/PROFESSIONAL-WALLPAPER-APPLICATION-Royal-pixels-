@@ -20,7 +20,8 @@ const String projectId = 'royalpixels-c2b02'; // ← your Firebase project ID
 // The ONE wallpaper to add to the free section
 const Map<String, dynamic> freeWallpaper = {
   'title': 'Name Time Stone',
-  'image_url': 'https://res.cloudinary.com/dl00rha3n/image/upload/v1774675099/image4_a7imnz.jpg',
+  'image_url':
+      'https://res.cloudinary.com/dl00rha3n/image/upload/v1774675099/image4_a7imnz.jpg',
   'category': 'Nature',
   'is_premium': false,
   'price': 0.0,
@@ -30,7 +31,8 @@ const Map<String, dynamic> freeWallpaper = {
 
 Future<String> getAccessToken(Map<String, dynamic> serviceAccount) async {
   final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  final header = base64Url.encode(utf8.encode(json.encode({'alg': 'RS256', 'typ': 'JWT'})));
+  final header = base64Url
+      .encode(utf8.encode(json.encode({'alg': 'RS256', 'typ': 'JWT'})));
   final payload = base64Url.encode(utf8.encode(json.encode({
     'iss': serviceAccount['client_email'],
     'scope': 'https://www.googleapis.com/auth/datastore',

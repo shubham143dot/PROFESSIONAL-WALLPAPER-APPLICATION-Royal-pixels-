@@ -1,8 +1,8 @@
 import 'dart:ui';
+import '../../../core/services/adaptive_performance.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/ads/ad_helper.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/diamond_provider.dart';
@@ -11,6 +11,10 @@ import 'package:flutter/services.dart';
 import '../../../core/utils/safe_tap.dart';
 
 import '../../../core/widgets/login_required_sheet.dart';
+import '../../../core/scroll/elite_scroll_physics.dart';
+import '../../widgets/premium_touch_tile.dart';
+import '../../../core/services/iap_service.dart';
+import '../../../core/constants/iap_constants.dart';
 
 class DiamondStorePage extends ConsumerStatefulWidget {
   const DiamondStorePage({super.key});
@@ -21,24 +25,29 @@ class DiamondStorePage extends ConsumerStatefulWidget {
 
 class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
     with SingleTickerProviderStateMixin {
-  bool _isWatchingAd = false;
   late AnimationController _glowController;
 
   static const List<int> _streakRewards = [10, 15, 20, 25, 30, 40, 50];
   static const List<String> _dayLabels = [
-    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+    'Day 1',
+    'Day 2',
+    'Day 3',
+    'Day 4',
+    'Day 5',
+    'Day 6',
+    'Day 7'
   ];
 
   // ── Diamond Packs ──────────────────────────────────────────────────────────
   static const List<_DiamondPack> _packs = [
     _DiamondPack(
-      id: 'pack_300',
+      id: IapConstants.pack300,
       diamonds: 300,
       price: 49,
       tier: _PackTier.small,
     ),
     _DiamondPack(
-      id: 'pack_800',
+      id: IapConstants.pack800,
       diamonds: 800,
       price: 99,
       tier: _PackTier.medium,
@@ -46,21 +55,21 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
       isPopular: true,
     ),
     _DiamondPack(
-      id: 'pack_2000',
+      id: IapConstants.pack2000,
       diamonds: 2000,
       price: 199,
       tier: _PackTier.medium,
       badge: '+20% EXTRA',
     ),
     _DiamondPack(
-      id: 'pack_3500',
+      id: IapConstants.pack3500,
       diamonds: 3500,
       price: 299,
       tier: _PackTier.large,
       badge: 'LIMITED OFFER',
     ),
     _DiamondPack(
-      id: 'pack_7000',
+      id: IapConstants.pack7000,
       diamonds: 7000,
       price: 499,
       tier: _PackTier.mega,
@@ -84,31 +93,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
     super.dispose();
   }
 
-  Future<void> _watchAd() async {
-    SafeTap.run('watch_ad_bonus', () async {
-      final authState = ref.read(authProvider);
-      if (!authState.isAuthenticated) {
-        showLoginRequiredSheet(context, reason: LoginRequiredReason.diamonds);
-        return;
-      }
 
-      setState(() => _isWatchingAd = true);
-      try {
-        AdHelper.showRewardedAd(
-          onCompleted: (earned) {
-            if (earned && authState.user != null) {
-              ref.read(diamondProvider.notifier).addAdReward(authState.user!.uid);
-              RoyalSnackBar.show(context, '💎 +10 Diamonds added to your wallet!');
-              HapticFeedback.mediumImpact();
-            }
-            if (mounted) setState(() => _isWatchingAd = false);
-          },
-        );
-      } catch (e) {
-        if (mounted) setState(() => _isWatchingAd = false);
-      }
-    });
-  }
 
   Future<void> _buyDiamondPack(_DiamondPack pack) async {
     SafeTap.run('buy_diamond_pack_${pack.id}', () async {
@@ -117,24 +102,37 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
         showLoginRequiredSheet(context, reason: LoginRequiredReason.diamonds);
         return;
       }
+
+      HapticFeedback.mediumImpact();
       
-      HapticFeedback.selectionClick();
-      RoyalSnackBar.show(
-        context,
-        '🛠️ Payment system is under maintenance. Please check back later!',
-        type: SnackBarType.info,
-      );
+      try {
+        final iapService = ref.read(iapServiceProvider);
+        await iapService.buyProduct(pack.id);
+        
+        // Note: The UI will update automatically because IapService
+        // updates the diamondProvider which we are watching.
+      } catch (e) {
+        HapticFeedback.heavyImpact();
+        if (mounted) {
+          RoyalSnackBar.show(
+            context,
+            '❌ An error occurred initiating purchase.',
+            type: SnackBarType.error,
+          );
+        }
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final diamondState = ref.watch(diamondProvider);
+    final isSubscribed = ref.watch(authProvider).user?.isSubscribed ?? false;
 
     return Scaffold(
       backgroundColor: const Color(0xFF06080F),
       body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
+        physics: const EliteScrollPhysics(),
         slivers: [
           // ── Premium AppBar ─────────────────────────────────────────────────
           SliverAppBar(
@@ -144,18 +142,24 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
             backgroundColor: Colors.transparent,
             elevation: 0,
             flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xCC0A0D1A), Color(0xAA06080F)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
+              child: AdaptivePerformance.enableBackdropBlur
+                  ? BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xCC0A0D1A), Color(0xAA06080F)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF06080F),
+                      ),
                     ),
-                  ),
-                ),
-              ),
             ),
             leading: IconButton(
               icon: Container(
@@ -176,23 +180,20 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
               children: [
                 ShaderMask(
                   shaderCallback: (b) => AppColors.goldGradient.createShader(b),
-                  child: const Text(
-                    '💎',
-                    style: TextStyle(fontSize: 18),
+                  child: const Icon(
+                    Icons.diamond_rounded,
+                    color: Colors.white,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: 8),
-                ShaderMask(
-                  shaderCallback: (b) =>
-                      AppColors.goldGradient.createShader(b),
-                  child: const Text(
-                    'DIAMOND STORE',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
-                      letterSpacing: 2.5,
-                    ),
+                const SizedBox(width: 10),
+                const Text(
+                  'DIAMOND STORE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                    letterSpacing: 1.5,
                   ),
                 ),
               ],
@@ -223,25 +224,66 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                 _buildBalanceCard(diamondState.diamonds),
                 const SizedBox(height: 28),
 
-                // ── Daily Streak ───────────────────────────────────────────
-                _buildSectionLabel('🔥 Daily Streak', subtitle: 'Login every day to grow your stash'),
-                const SizedBox(height: 12),
-                _buildStreakCard(diamondState),
-                const SizedBox(height: 28),
+                if (!isSubscribed) ...[
+                  // ── Daily Streak ───────────────────────────────────────────
+                  _buildSectionLabel('🔥 Daily Streak',
+                      subtitle: 'Login every day to grow your stash'),
+                  const SizedBox(height: 12),
+                  _buildStreakCard(diamondState),
+                  const SizedBox(height: 28),
 
-                // ── Watch & Earn ─────────────────────────────────────────
-                _buildSectionLabel('📺 Watch & Earn', subtitle: 'Up to 5 ads per day · +10 💎 each'),
-                const SizedBox(height: 12),
-                _buildAdCard(diamondState),
-                const SizedBox(height: 28),
+                  // ── How to Earn ──────────────────────────────────────────
+                  _buildSectionLabel('💰 How to Earn',
+                      subtitle: 'Earn diamonds from actions'),
+                  const SizedBox(height: 12),
+                  _buildEarnCard(),
+                  const SizedBox(height: 36),
+                ] else ...[
+                  // Premium Status Card
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.goldMid.withAlpha(40),
+                          AppColors.goldMid.withAlpha(10),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: AppColors.goldMid.withAlpha(100), width: 1.5),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.workspace_premium_rounded, color: AppColors.goldMid, size: 48)
+                            .animate(onPlay: (c) => c.repeat())
+                            .shimmer(duration: 2.seconds),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'PRO MEMBERSHIP ACTIVE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'You have unlimited access to all premium wallpapers. Diamonds and daily streaks are disabled as you no longer need them!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(150),
+                            fontSize: 13,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ).animate().fadeIn().scale(),
+                  const SizedBox(height: 36),
+                ],
 
-                // ── How to Earn ──────────────────────────────────────────
-                _buildSectionLabel('💰 How to Earn', subtitle: 'Max 130 💎 diamonds per day'),
-                const SizedBox(height: 12),
-                _buildEarnCard(),
-                const SizedBox(height: 36),
-
-                 // ── TOP-UP Section ───────────────────────────────────────
+                // ── TOP-UP Section ───────────────────────────────────────
                 _buildTopUpSection(),
               ]),
             ),
@@ -292,7 +334,11 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
             padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF1E1040), Color(0xFF0C1730), Color(0xFF06080F)],
+                colors: [
+                  Color(0xFF1E1040),
+                  Color(0xFF0C1730),
+                  Color(0xFF06080F)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 stops: [0.0, 0.5, 1.0],
@@ -343,8 +389,11 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
               ),
               borderRadius: BorderRadius.circular(36),
             ),
-            child: const Center(
-              child: Text('💎', style: TextStyle(fontSize: 42)),
+            child: Center(
+              child: ShaderMask(
+                shaderCallback: (b) => AppColors.goldGradient.createShader(b),
+                child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 42),
+              ),
             ),
           )
               .animate(onPlay: (c) => c.repeat())
@@ -402,13 +451,23 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                         border: Border.all(
                             color: const Color(0xFF2A4080), width: 1),
                       ),
-                      child: const Text(
-                        '💎 Diamonds',
-                        style: TextStyle(
-                          color: Color(0xFF8899CC),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ShaderMask(
+                            shaderCallback: (b) => AppColors.goldGradient.createShader(b),
+                            child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 10),
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Diamonds',
+                            style: TextStyle(
+                              color: Color(0xFF8899CC),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -423,25 +482,33 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
 
   // ── Streak Card ────────────────────────────────────────────────────────────
   Widget _buildStreakCard(DiamondState diamondState) {
-    final currentStreak = diamondState.streak;
+    final streak = diamondState.streak;
     final canClaim = diamondState.canClaimToday;
-    final currentDay = currentStreak.clamp(0, 7);
     
+    // Calculate how many days are shown as "completed"
+    int doneDays = streak % 7;
+    if (streak == 7 && !canClaim) doneDays = 7;
+    
+    final activeDay = canClaim ? (doneDays % 7) + 1 : -1;
+
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF0E1220),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: canClaim ? AppColors.goldMid.withAlpha(80) : const Color(0xFF1E2840), 
-          width: 1.2,
+          color: canClaim
+              ? AppColors.goldMid.withAlpha(100)
+              : const Color(0xFF1E2840),
+          width: 1.5,
         ),
         boxShadow: [
-          BoxShadow(
-            color: canClaim ? AppColors.goldMid.withAlpha(20) : const Color(0x20FF6B00),
-            blurRadius: 20,
-            spreadRadius: -4,
-          ),
+          if (canClaim)
+            BoxShadow(
+              color: AppColors.goldMid.withAlpha(30),
+              blurRadius: 30,
+              spreadRadius: -5,
+            ),
         ],
       ),
       child: Column(
@@ -450,25 +517,32 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                      colors: [Color(0xFFFF6B00), Color(0xFFFF3300)]),
+                    colors: [Color(0xFFFF6B00), Color(0xFFFF3300)],
+                  ),
                   borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF6B00).withAlpha(40),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
-                    const Text('🔥', style: TextStyle(fontSize: 12)),
-                    const SizedBox(width: 4),
+                    const Text('🔥', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 6),
                     Text(
-                      currentDay == 0
-                          ? 'Start Streak'
-                          : 'Day $currentDay / 7',
+                      canClaim 
+                        ? (doneDays == 0 ? 'Start Your Streak' : 'Day $activeDay Ready')
+                        : 'Streak: $doneDays / 7',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -476,105 +550,108 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                 ),
               ),
               const Spacer(),
-              Text(
-                'Complete all 7 days → 🎁 Bonus!',
-                style: TextStyle(
-                    color: Colors.white.withAlpha(80), fontSize: 10),
-              ),
+              if (!canClaim)
+                Text(
+                  'Come back tomorrow!',
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(100),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else
+                const Text(
+                  '🎁 Day 7 Bonus!',
+                  style: TextStyle(
+                    color: AppColors.goldLight,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1500.ms),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             children: List.generate(7, (i) {
               final dayNum = i + 1;
-              final isPast = dayNum < currentDay;
-              final isCurrent = dayNum == currentDay;
+              final isDone = dayNum <= doneDays;
+              final isNext = dayNum == activeDay;
 
-              Color bg;
-              Color border;
-              LinearGradient? grad;
+              Color borderColor;
+              Color? bgColor;
+              Widget child;
 
-              if (isCurrent) {
-                bg = Colors.transparent;
-                border = AppColors.goldMid;
-                grad = const LinearGradient(
-                  colors: [Color(0xFF3D2A00), Color(0xFF1E1500)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+              if (isDone) {
+                borderColor = const Color(0xFF2A7040);
+                bgColor = const Color(0xFF0A2010);
+                child = const Icon(Icons.check_rounded, color: Colors.greenAccent, size: 14);
+              } else if (isNext) {
+                borderColor = AppColors.goldMid;
+                bgColor = const Color(0xFF2D2000);
+                child = ShaderMask(
+                  shaderCallback: (b) => AppColors.goldGradient.createShader(b),
+                  child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 14),
                 );
-              } else if (isPast) {
-                bg = const Color(0xFF0A2010);
-                border = const Color(0xFF2A7040);
-                grad = null;
               } else {
-                bg = const Color(0xFF0D1220);
-                border = const Color(0xFF1A2240);
-                grad = null;
+                borderColor = const Color(0xFF1E2840);
+                bgColor = const Color(0xFF0D1220);
+                child = Text(
+                  '$dayNum',
+                  style: const TextStyle(
+                    color: Color(0xFF445577),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                );
               }
 
               return Expanded(
                 child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: bg,
-                    gradient: grad != null
-                        ? LinearGradient(
-                            colors: grad.colors,
-                            begin: grad.begin,
-                            end: grad.end,
-                          )
-                        : null,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: border, width: 1.2),
-                    boxShadow: isCurrent
-                        ? [
-                            BoxShadow(
-                              color: AppColors.goldMid.withAlpha(60),
-                              blurRadius: 12,
-                              spreadRadius: 1,
-                            )
-                          ]
-                        : [],
-                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
                   child: Column(
                     children: [
-                      Text(
-                        isCurrent
-                            ? '💎'
-                            : isPast
-                                ? '✓'
-                                : '·',
-                        style: TextStyle(
-                          fontSize: isCurrent ? 12 : 11,
-                          color: isPast ? Colors.greenAccent : const Color(0xFF556688),
+                      Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: bgColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: borderColor,
+                            width: isNext ? 2 : 1.2,
+                          ),
+                          boxShadow: isNext ? [
+                            BoxShadow(
+                              color: AppColors.goldMid.withAlpha(50),
+                              blurRadius: 10,
+                              spreadRadius: 0,
+                            )
+                          ] : [],
                         ),
-                      ),
-                      const SizedBox(height: 2),
+                        child: Center(child: child),
+                      ).animate(target: isNext ? 1 : 0)
+                       .scale(begin: const Offset(1, 1), end: const Offset(1.05, 1.05), curve: Curves.easeInOut)
+                       .then()
+                       .shake(hz: 2),
+                      const SizedBox(height: 6),
                       Text(
                         _dayLabels[i],
                         style: TextStyle(
-                          color: isCurrent
-                              ? AppColors.goldLight
-                              : isPast
-                                  ? Colors.greenAccent.withAlpha(180)
-                                  : const Color(0xFF445566),
+                          color: isDone 
+                              ? Colors.greenAccent.withAlpha(150)
+                              : isNext ? AppColors.goldLight : const Color(0xFF445577),
                           fontSize: 8,
-                          fontWeight: isCurrent
-                              ? FontWeight.w800
-                              : FontWeight.w500,
+                          fontWeight: isNext ? FontWeight.w800 : FontWeight.w600,
                         ),
                       ),
+                      const SizedBox(height: 1),
                       Text(
                         '+${_streakRewards[i]}',
                         style: TextStyle(
-                          color: isCurrent
-                              ? AppColors.goldMid
-                              : isPast
-                                  ? const Color(0xFF447744)
-                                  : const Color(0xFF334455),
+                          color: isDone 
+                              ? Colors.greenAccent.withAlpha(100)
+                              : isNext ? AppColors.goldMid : const Color(0xFF334455),
                           fontSize: 8,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ],
@@ -583,263 +660,92 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
               );
             }),
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF080C18),
-              borderRadius: BorderRadius.circular(10),
-              border:
-                  Border.all(color: const Color(0xFF1A2240), width: 1),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline,
-                    color: Color(0xFF446688), size: 13),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Text(
-                    'Miss a day and your streak resets. Day 7 gives a special bonus!',
-                    style: TextStyle(
-                        color: Colors.white.withAlpha(70), fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ).animate().fade().slideY(begin: 0.05);
-  }
-
-  // ── Ad Card ────────────────────────────────────────────────────────────────
-  Widget _buildAdCard(DiamondState diamondState) {
-    final isPro = ref.watch(authProvider).user?.isSubscribed ?? false;
-    final canWatch = diamondState.canWatchAd;
-    final remaining = diamondState.remainingAdsToday;
-    final watched = 5 - remaining;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1220),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: canWatch
-              ? AppColors.goldMid.withAlpha(50)
-              : const Color(0xFF1E2840),
-          width: 1.2,
-        ),
-        boxShadow: canWatch
-            ? [
-                BoxShadow(
-                  color: AppColors.goldMid.withAlpha(20),
-                  blurRadius: 24,
-                  spreadRadius: -4,
-                )
-              ]
-            : [],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Play icon container
-              Container(
-                width: 52,
-                height: 52,
+          if (canClaim) ...[
+            const SizedBox(height: 24),
+            PremiumTouchTile(
+              onTap: () async {
+                final authState = ref.read(authProvider);
+                if (!authState.isAuthenticated) {
+                  showLoginRequiredSheet(context, reason: LoginRequiredReason.diamonds);
+                  return;
+                }
+                
+                HapticFeedback.heavyImpact();
+                final result = await ref.read(diamondProvider.notifier).claimDailyReward(authState.user!.uid);
+                if (result != null && mounted) {
+                  RoyalSnackBar.show(
+                    context,
+                    'You received ${result.diamonds} diamonds!',
+                    type: SnackBarType.success,
+                  );
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                height: 54,
                 decoration: BoxDecoration(
-                  gradient: canWatch
-                      ? const LinearGradient(
-                          colors: [Color(0xFF2A2000), Color(0xFF1A1500)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: canWatch ? null : const Color(0xFF0D1220),
+                  gradient: AppColors.goldGradient,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: canWatch
-                        ? AppColors.goldMid.withAlpha(60)
-                        : const Color(0xFF1A2240),
-                    width: 1,
-                  ),
-                ),
-                child: Icon(
-                  Icons.play_circle_fill_rounded,
-                  color: canWatch ? AppColors.goldMid : const Color(0xFF334466),
-                  size: 30,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          isPro ? 'Pro Bonus' : 'Watch Ad',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFFD76A), Color(0xFFFFAA00)],
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            '+10 💎',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      canWatch
-                          ? (isPro 
-                              ? '$remaining claims remaining' 
-                              : '$remaining ads remaining today')
-                          : '⛔ Limit reached — come back tomorrow!',
-                      style: TextStyle(
-                        color: canWatch
-                            ? const Color(0xFF6688AA)
-                            : Colors.redAccent.withAlpha(180),
-                        fontSize: 12,
-                      ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.goldMid.withAlpha(60),
+                      blurRadius: 15,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          // Progress bar
-          Row(
-            children: [
-              Text(
-                isPro ? '$watched/5 claimed' : '$watched/5 watched',
-                style: TextStyle(
-                    color: Colors.white.withAlpha(70), fontSize: 11),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: watched / 5,
-                    backgroundColor: const Color(0xFF1A2240),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      canWatch ? AppColors.goldMid : const Color(0xFF334466),
+                child: const Center(
+                  child: Text(
+                    'CLAIM DAILY REWARD',
+                    style: TextStyle(
+                      color: Color(0xFF2D1E00),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
                     ),
-                    minHeight: 6,
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          // Watch button
-          SizedBox(
-            width: double.infinity,
-            child: GestureDetector(
-              onTap: canWatch ? _watchAd : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: canWatch
-                      ? const LinearGradient(
-                          colors: [Color(0xFFFFD76A), Color(0xFFFFAA00)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: canWatch ? null : const Color(0xFF0D1220),
-                  borderRadius: BorderRadius.circular(14),
-                  border: canWatch
-                      ? null
-                      : Border.all(
-                          color: const Color(0xFF1E2840), width: 1),
-                  boxShadow: canWatch
-                      ? [
-                          BoxShadow(
-                            color: AppColors.goldMid.withAlpha(80),
-                            blurRadius: 20,
-                            offset: const Offset(0, 6),
-                          )
-                        ]
-                      : [],
-                ),
-                child: _isWatchingAd
-                    ? const SizedBox(
-                        height: 20,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.black,
-                            strokeWidth: 2.5,
-                          ),
-                        ),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isPro
-                                ? Icons.auto_awesome
-                                : (canWatch ? Icons.play_arrow_rounded : Icons.lock_rounded),
-                            color: canWatch
-                                ? Colors.black
-                                : const Color(0xFF334466),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isPro
-                                ? 'Claim Bonus · Get +10 💎'
-                                : (canWatch
-                                    ? 'Watch Ad · Earn +10 💎'
-                                    : 'Daily Limit Reached (5/day)'),
-                            style: TextStyle(
-                              color: canWatch
-                                  ? Colors.black
-                                  : const Color(0xFF334466),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
+            ).animate(onPlay: (c) => c.repeat(reverse: true))
+             .shimmer(duration: 2000.ms, color: Colors.white.withAlpha(40))
+             .scale(begin: const Offset(1, 1), end: const Offset(1.02, 1.02), duration: 1000.ms),
+          ] else ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF080C18),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF1A2240), width: 1),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFF446688), size: 14),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Come back tomorrow for Day ${((streak % 7) + 1) > 7 ? 1 : ((streak % 7) + 1)} rewards!',
+                      style: TextStyle(color: Colors.white.withAlpha(80), fontSize: 11, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+          ],
         ],
       ),
-    ).animate().fade(delay: 100.ms).slideY(begin: 0.05);
+    ).animate().fade().slideY(begin: 0.1);
   }
+
+
 
   // ── Earn Card ──────────────────────────────────────────────────────────────
   Widget _buildEarnCard() {
     final items = [
-      ('🔥', 'Daily Login Streak', 'Day 1–7: +10 to +50 💎 per day'),
-      ('📺', 'Watch & Earn (Ads)', '+10 💎 per ad · max 5 ads/day = 50 💎'),
-      ('📥', 'Download Wallpaper', '+5 💎 · free & premium · 80 💎/day cap'),
-      ('🖼️', 'Set as Wallpaper', '+5 💎 · free & premium · 80 💎/day cap'),
-      ('🏆', 'Daily Maximum', 'Up to 130 💎/day  (80 actions + 50 ads)'),
+      (Icons.local_fire_department_rounded, 'Daily Login Streak', 'Earn up to 50 diamonds per day'),
+      (Icons.file_download_rounded, 'Download Wallpaper', '+5 diamonds · free & premium · 80/day cap'),
+      (Icons.wallpaper_rounded, 'Set as Wallpaper', '+5 diamonds · free & premium · 80/day cap'),
+      (Icons.emoji_events_rounded, 'Daily Maximum', 'Earn up to 80 diamonds daily from all actions'),
     ];
 
     return Container(
@@ -855,8 +761,8 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 13),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                 child: Row(
                   children: [
                     Container(
@@ -869,8 +775,10 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                             color: const Color(0xFF1E2840), width: 1),
                       ),
                       child: Center(
-                        child: Text(item.$1,
-                            style: const TextStyle(fontSize: 17)),
+                        child: ShaderMask(
+                          shaderCallback: (b) => AppColors.goldGradient.createShader(b),
+                          child: Icon(item.$1, color: Colors.white, size: 20),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -889,8 +797,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                           Text(
                             item.$3,
                             style: const TextStyle(
-                                color: Color(0xFF5577AA),
-                                fontSize: 11),
+                                color: Color(0xFF5577AA), fontSize: 11),
                           ),
                         ],
                       ),
@@ -908,7 +815,10 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
               ),
               if (i < items.length - 1)
                 const Divider(
-                    height: 1, color: Color(0xFF141C2C), indent: 16, endIndent: 16),
+                    height: 1,
+                    color: Color(0xFF141C2C),
+                    indent: 16,
+                    endIndent: 16),
             ],
           );
         }).toList(),
@@ -932,10 +842,10 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                     shaderCallback: (b) =>
                         AppColors.goldGradient.createShader(b),
                     child: const Text(
-                      '💎 BUY DIAMONDS',
+                      'AVAILABLE PACKS',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 2,
                       ),
@@ -944,31 +854,31 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                   const SizedBox(height: 2),
                   Text(
                     'Instant Delivery • Secure Digital Payments',
-                    style:
-                        TextStyle(color: Colors.white.withAlpha(70), fontSize: 11),
+                    style: TextStyle(
+                        color: Colors.white.withAlpha(70), fontSize: 11),
                   ),
                 ],
               ),
             ),
-            // Status badge
+            // Secure badge
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.red.withAlpha(40),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.red.withAlpha(80)),
+                color: Colors.green.withAlpha(20),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.withAlpha(40), width: 1),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.pause_circle_filled_rounded, color: Colors.white, size: 12),
-                  SizedBox(width: 4),
-                  Text(
-                    'CLOSED',
+                  const Icon(Icons.verified_user_rounded, color: Colors.green, size: 14),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'SECURE',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Colors.green,
                       fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ],
@@ -987,17 +897,14 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
             crossAxisCount: 3,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 0.72,
+            childAspectRatio: 0.64,
           ),
           itemCount: _packs.length,
           itemBuilder: (context, i) {
             return _DiamondPackCard(
               pack: _packs[i],
               onTap: () => _buyDiamondPack(_packs[i]),
-            )
-                .animate()
-                .fade(delay: Duration(milliseconds: 60 * i))
-                .scale(
+            ).animate().fade(delay: Duration(milliseconds: 60 * i)).scale(
                   begin: const Offset(0.85, 0.85),
                   duration: 350.ms,
                   curve: Curves.easeOutBack,
@@ -1012,11 +919,11 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.lock_rounded,
+              Icon(Icons.shield_rounded,
                   color: Colors.white.withAlpha(50), size: 12),
               const SizedBox(width: 5),
               Text(
-                'Payments are temporarily closed for maintenance  •  Coming back soon',
+                'End-to-end encrypted transactions  •  Powered by Royal Payments',
                 style: TextStyle(
                   color: Colors.white.withAlpha(50),
                   fontSize: 10,
@@ -1139,65 +1046,64 @@ class _DiamondPackCardState extends State<_DiamondPackCard>
   Widget _buildDiamondArt() {
     final p = widget.pack;
     final size = p.tier == _PackTier.mega
-        ? 38.0
+        ? 52.0
         : p.tier == _PackTier.large
-            ? 32.0
-            : 24.0;
+            ? 44.0
+            : 36.0;
+
+    // Custom Gold Diamond Art using Icons and Gradients
+    Widget goldDiamond(double s) => ShaderMask(
+          shaderCallback: (b) => AppColors.goldGradient.createShader(b),
+          child: Icon(Icons.diamond_rounded, color: Colors.white, size: s),
+        );
 
     if (p.tier == _PackTier.small) {
-      return Text('💎', style: TextStyle(fontSize: size));
+      return goldDiamond(size);
     } else if (p.tier == _PackTier.medium) {
       return SizedBox(
-        width: 52,
-        height: 46,
+        width: 60,
+        height: 50,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Positioned(
-                top: 0,
-                child: Text('💎', style: TextStyle(fontSize: size - 2))),
-            Positioned(
-                bottom: 0,
-                left: 4,
-                child: Text('💎', style: TextStyle(fontSize: size - 5))),
-            Positioned(
-                bottom: 0,
-                right: 4,
-                child: Text('💎', style: TextStyle(fontSize: size - 5))),
+            Positioned(top: 0, child: goldDiamond(size * 0.8)),
+            Positioned(bottom: 0, left: 4, child: goldDiamond(size * 0.6)),
+            Positioned(bottom: 0, right: 4, child: goldDiamond(size * 0.6)),
           ],
         ),
       );
     } else if (p.tier == _PackTier.large) {
       return SizedBox(
-        width: 58,
-        height: 54,
+        width: 70,
+        height: 60,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Positioned(
-                top: 0,
-                child: Text('💎', style: TextStyle(fontSize: size))),
-            Positioned(
-                bottom: 2,
-                left: 0,
-                child: Text('💎', style: TextStyle(fontSize: size - 6))),
-            Positioned(
-                bottom: 2,
-                right: 0,
-                child: Text('💎', style: TextStyle(fontSize: size - 6))),
-            Positioned(
-                bottom: 0,
-                child: Text('💎', style: TextStyle(fontSize: size - 9))),
+            Positioned(top: 0, child: goldDiamond(size * 0.8)),
+            Positioned(bottom: 5, left: 0, child: goldDiamond(size * 0.6)),
+            Positioned(bottom: 5, right: 0, child: goldDiamond(size * 0.6)),
+            Positioned(bottom: 0, child: goldDiamond(size * 0.5)),
           ],
         ),
       );
     } else {
+      // Mega Pack - Treasure Chest style
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('🎁', style: TextStyle(fontSize: size)),
-          const SizedBox(height: 2),
-          const Text('💎💎💎', style: TextStyle(fontSize: 13, letterSpacing: -2)),
+          ShaderMask(
+            shaderCallback: (b) => AppColors.goldGradient.createShader(b),
+            child: Icon(Icons.inventory_2_rounded, color: Colors.white, size: size),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              goldDiamond(14),
+              goldDiamond(14),
+              goldDiamond(14),
+            ],
+          ),
         ],
       );
     }
@@ -1226,123 +1132,151 @@ class _DiamondPackCardState extends State<_DiamondPackCard>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: c.border.withAlpha(140), width: 1.5),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: p.isBestValue || p.isPopular 
+                  ? c.border.withAlpha(180) 
+                  : AppColors.glassBorder, 
+              width: p.isBestValue ? 2 : 1.2
+            ),
             boxShadow: [
-              BoxShadow(
-                color: c.glow,
-                blurRadius: 16,
-                spreadRadius: 1,
-              ),
+              if (p.isBestValue || p.isPopular)
+                BoxShadow(
+                  color: c.glow.withAlpha(40),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
             ],
           ),
-          child: Column(
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
             children: [
-              // ── Top: diamond count strip ──────────────────────────────
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      c.border.withAlpha(60),
-                      c.border.withAlpha(20),
-                    ],
-                  ),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(14)),
+              // Subtle background pattern
+              Positioned(
+                right: -20,
+                top: -20,
+                child: Opacity(
+                  opacity: 0.05,
+                  child: Icon(Icons.diamond_outlined, size: 100, color: c.border),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('💎', style: TextStyle(fontSize: 10)),
-                    const SizedBox(width: 3),
-                    Text(
-                      _formatDiamonds(p.diamonds),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
+              ),
+
+              Column(
+                children: [
+                  // ── Top: diamond count strip ──────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: c.border.withAlpha(20),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          _formatDiamonds(p.diamonds),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        Text(
+                          'DIAMOND PACK',
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(120),
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Diamond Art ─────────────────────────────────────────────
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: _buildDiamondArt(),
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+
+                  // ── Buy button ─────────────────────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [c.btnTop, c.btnBottom],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: c.btnBottom.withAlpha(100),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        '₹${p.price}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
               // ── Badge ──────────────────────────────────────────────────
-              if (p.badge != null) ...[
-                const SizedBox(height: 5),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: c.badgeBg,
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: c.badgeBg.withAlpha(100),
-                        blurRadius: 8,
-                        spreadRadius: -2,
-                      )
-                    ],
-                  ),
-                  child: Text(
-                    p.badge!,
-                    style: TextStyle(
-                      color: c.badgeText,
-                      fontSize: 7,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
+              if (p.badge != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Transform.translate(
+                      offset: const Offset(0, -6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [c.badgeBg, c.badgeBg.withAlpha(200)]),
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            )
+                          ],
+                        ),
+                        child: Text(
+                          p.badge!,
+                          style: TextStyle(
+                            color: c.badgeText,
+                            fontSize: 7,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ] else
-                const SizedBox(height: 5),
-
-              // ── Diamond Art ─────────────────────────────────────────────
-              Expanded(
-                child: Center(child: _buildDiamondArt()),
-              ),
-
-              // ── Buy button ─────────────────────────────────────────────
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(7, 0, 7, 7),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [c.btnTop, c.btnBottom],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: c.btnBottom.withAlpha(120),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  '₹${p.price}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black38,
-                        offset: Offset(0, 1),
-                        blurRadius: 3,
-                      )
-                    ],
-                  ),
-                ),
-              ),
             ],
           ),
         ),

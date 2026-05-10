@@ -9,16 +9,20 @@ class GetWallpapersParams {
   final int limit;
   final bool isPremium;
 
-  GetWallpapersParams({required this.page, required this.limit, this.isPremium = false});
+  GetWallpapersParams(
+      {required this.page, required this.limit, this.isPremium = false});
 }
 
-class GetWallpapersUseCase implements UseCase<List<WallpaperEntity>, GetWallpapersParams> {
+class GetWallpapersUseCase
+    implements UseCase<List<WallpaperEntity>, GetWallpapersParams> {
   final WallpaperRepository repository;
 
   GetWallpapersUseCase(this.repository);
 
   @override
-  Future<Either<Failure, List<WallpaperEntity>>> call(GetWallpapersParams params) async {
-    return await repository.getWallpapers(page: params.page, limit: params.limit, isPremium: params.isPremium);
+  Future<Either<Failure, List<WallpaperEntity>>> call(
+      GetWallpapersParams params) async {
+    return await repository.getWallpapers(
+        page: params.page, limit: params.limit, isPremium: params.isPremium);
   }
 }

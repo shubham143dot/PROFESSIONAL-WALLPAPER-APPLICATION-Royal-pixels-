@@ -8,7 +8,8 @@ class AddWallpaperUseCase {
 
   AddWallpaperUseCase(this.repository);
 
-  Future<Either<Failure, void>> call(WallpaperEntity wallpaper) async {
+  /// Returns the new Firestore document ID on success.
+  Future<Either<Failure, String>> call(WallpaperEntity wallpaper) async {
     return await repository.addWallpaper(wallpaper);
   }
 }

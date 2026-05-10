@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:ui';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/wallpaper_provider.dart';
 import '../../providers/likes_provider.dart';
+import '../../providers/haptic_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../widgets/wallpaper_card.dart';
 import '../../widgets/diamond_loader.dart';
 import '../../../core/utils/safe_tap.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/constants/animation_constants.dart';
+import '../../../core/scroll/velocity_aware_controller.dart';
+import '../../../core/scroll/elite_scroll_physics.dart';
+import '../../../core/services/adaptive_performance.dart';
 
 class MyWallpapersPage extends ConsumerStatefulWidget {
   final bool embeddedMode;
@@ -20,6 +29,7 @@ class MyWallpapersPage extends ConsumerStatefulWidget {
 
 class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
     with AutomaticKeepAliveClientMixin {
+  late final VelocityAwareScrollController _scrollController;
   @override
   bool get wantKeepAlive => true;
 
@@ -28,6 +38,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
   @override
   void initState() {
     super.initState();
+    _scrollController = VelocityAwareScrollController();
     // Lock to favorites view when embedded in the Favorites tab
     _showFavorites = widget.showFavoritesOnly;
 
@@ -42,6 +53,12 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
         ref.read(wallpaperProvider.notifier).loadWallpapers();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   /// Shows a confirmation sheet and removes the wallpaper from favorites.
@@ -258,10 +275,10 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
     );
 
     if (confirmed == true && mounted) {
-      // ── 1. Delete from device gallery (MediaStore) ──────────────────────────
+      // â”€â”€ 1. Delete from device gallery (MediaStore) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       await _deleteFromGallery(wallpaperId);
 
-      // ── 2. Remove from global state ──────────────────────────────────────────
+      // â”€â”€ 2. Remove from global state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       ref.read(downloadProvider.notifier).removeDownload(wallpaperId);
 
       if (mounted) {
@@ -323,7 +340,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
           if (title.startsWith(targetPrefix)) {
             // Delete permanently from device
             await PhotoManager.editor.deleteWithIds([asset.id]);
-            return; // Done — file found and deleted
+            return; // Done â€” file found and deleted
           }
         }
       }
@@ -360,96 +377,140 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
                   return _buildEmptyState();
                 }
 
-                return Column(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        widget.embeddedMode ? (MediaQuery.of(context).padding.top + 64) : 12,
-                        16,
-                        2,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _showFavorites ? Icons.favorite : Icons.download_done,
-                            color: Colors.amber, 
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${myWallpapers.length} wallpaper${myWallpapers.length != 1 ? 's' : ''} ${_showFavorites ? 'favorited' : 'saved'}',
-                            style: const TextStyle(color: Colors.white70, fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: GridView.builder(
-                        padding: EdgeInsets.fromLTRB(
-                          12, 
-                          4, 
-                          12, 
-                          widget.embeddedMode ? (MediaQuery.of(context).padding.bottom + 80) : 12
-                        ),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.65,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                        itemCount: myWallpapers.length,
-                        itemBuilder: (context, index) {
-                          final wp = myWallpapers[index];
-                          return Stack(
+                return CustomScrollView(
+                  controller: _scrollController,
+                  physics: const EliteAlwaysScrollPhysics(),
+                  cacheExtent: 1500, // Pre-render buffer for smoother scroll
+                  slivers: [
+                    if (widget.embeddedMode)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 70, 20, 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Positioned.fill(
-                                child: WallpaperCard(
-                                  wallpaper: wp,
-                                  onTap: () => context.push('/detail', extra: wp),
-                                ),
-                              ),
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    SafeTap.run('my_wp_action_${wp.id}', () {
-                                      if (_showFavorites) {
-                                        _removeFromFavorites(wp.id, wp.title);
-                                      } else {
-                                        _deleteWallpaper(wp.id, wp.title);
-                                      }
-                                    });
-                                  },
-                                  child: Container(
-                                    width: 34,
-                                    height: 34,
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withAlpha(160),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: _showFavorites
-                                            ? Colors.pinkAccent.withAlpha(180)
-                                            : Colors.redAccent.withAlpha(180),
-                                        width: 1.2,
-                                      ),
+                              Text(
+                                _showFavorites ? 'ROYAL FAVORITES' : 'SAVED COLLECTION',
+                                style: TextStyle(
+                                  color: AppColors.goldMid,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 2.0,
+                                  shadows: [
+                                    Shadow(
+                                      color: AppColors.goldMid.withOpacity(0.5),
+                                      blurRadius: 10,
                                     ),
-                                    child: Icon(
-                                      _showFavorites
-                                          ? Icons.heart_broken_rounded
-                                          : Icons.delete_outline_rounded,
-                                      color: _showFavorites
-                                          ? Colors.pinkAccent
-                                          : Colors.redAccent,
-                                      size: 18,
+                                  ],
+                                ),
+                              ).animate().fade(duration: 400.ms).slideX(begin: -0.1),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${myWallpapers.length} Wallpapers',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.5,
+                                ),
+                              ).animate(delay: 100.ms).fade(duration: 400.ms).slideX(begin: -0.1),
+                            ],
+                          ),
+                        ),
+                      ),
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        16, 
+                        widget.embeddedMode ? 0 : 20, 
+                        16, 
+                        widget.embeddedMode ? (MediaQuery.of(context).padding.bottom + 110) : 20
+                      ),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3, // Changed from 2 for maximum view
+                          childAspectRatio: 0.56, // Adjusted for 3-column look
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final wp = myWallpapers[index];
+                            final card = Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: WallpaperCard(
+                                    wallpaper: wp,
+                                    scrollController: _scrollController,
+                                    onTap: () => context.push('/detail', extra: wp),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 10,
+                                  right: 10,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      SafeTap.run('my_wp_action_${wp.id}', () {
+                                        ref.read(hapticProvider.notifier).lightImpact();
+                                        if (_showFavorites) {
+                                          _removeFromFavorites(wp.id, wp.title);
+                                        } else {
+                                          _deleteWallpaper(wp.id, wp.title);
+                                        }
+                                      });
+                                    },
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Builder(
+                                        builder: (context) {
+                                          final content = Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withAlpha(AdaptivePerformance.enableBackdropBlur ? 90 : 200),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: _showFavorites
+                                                    ? Colors.pinkAccent.withAlpha(120)
+                                                    : Colors.white24,
+                                                width: 1.0,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              _showFavorites
+                                                  ? Icons.favorite
+                                                  : Icons.delete_outline_rounded,
+                                              color: _showFavorites
+                                                  ? Colors.pinkAccent
+                                                  : Colors.white,
+                                              size: 18,
+                                            ),
+                                          );
+                                          return AdaptivePerformance.enableBackdropBlur
+                                              ? BackdropFilter(
+                                                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                                                  child: content,
+                                                )
+                                              : content;
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          );
-                        },
+                              ],
+                            );
+                            
+                            return RepaintBoundary(
+                              child: card.animate(delay: (index % 12 * AppAnimations.staggeringDelay.inMilliseconds).ms)
+                                .fade(duration: 600.ms, curve: Curves.easeOut)
+                                .slideY(
+                                    begin: AppAnimations.cardSlideOffset,
+                                    end: 0,
+                                    duration: AppAnimations.smoothEntrance,
+                                    curve: AppAnimations.easeOutExpo),
+                            );
+                          },
+                          childCount: myWallpapers.length,
+                        ),
                       ),
                     ),
                   ],
@@ -464,17 +525,53 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF121212),
+        flexibleSpace: RepaintBoundary(
+          child: ClipRect(
+            child: Builder(
+              builder: (context) {
+                final content = Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.04 : 0.08),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.white.withOpacity(0.12),
+                        width: 0.8,
+                      ),
+                    ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.08 : 0.15),
+                        Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.01 : 0.05),
+                      ],
+                    ),
+                  ),
+                );
+                return AdaptivePerformance.enableBackdropBlur
+                    ? BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 25.0, sigmaY: 25.0),
+                        child: content,
+                      )
+                    : content;
+              },
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: AppColors.goldLight),
           onPressed: () => context.pop(),
         ),
         title: Text(
           _showFavorites ? 'Favorite Wallpapers' : 'My Wallpapers',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.0,
+          ),
         ),
         actions: [
           if (!widget.showFavoritesOnly)
@@ -501,34 +598,94 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 100,
-            height: 100,
+            width: 120,
+            height: 120,
             decoration: BoxDecoration(
-              color: Colors.amber.withAlpha(25),
+              color: AppColors.goldMid.withAlpha(20),
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.goldMid.withAlpha(10),
+                  blurRadius: 40,
+                  spreadRadius: 10,
+                ),
+              ],
             ),
-            child: Icon(_showFavorites ? Icons.favorite_border : Icons.download, size: 48, color: Colors.amber),
-          ),
-          const SizedBox(height: 24),
+            child: Icon(
+              _showFavorites ? Icons.favorite_border_rounded : Icons.cloud_download_outlined, 
+              size: 54, 
+              color: AppColors.goldMid
+            ),
+          ).animate().scale(delay: 200.ms, duration: 600.ms, curve: Curves.easeOutBack)
+           .fadeIn(duration: 600.ms),
+          const SizedBox(height: 32),
           Text(
             _showFavorites ? 'No Favorites Yet' : 'No Saved Wallpapers',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
             ),
-          ),
-          const SizedBox(height: 12),
+          ).animate().slideY(begin: 0.5, duration: 500.ms, curve: Curves.easeOutQuart)
+           .fadeIn(duration: 500.ms),
+          const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 48),
             child: Text(
               _showFavorites 
-                ? 'Tap the heart icon on any wallpaper to add it to your favorites.'
-                : 'Download a wallpaper from the home screen and it will appear here.',
+                ? 'Start curating your royal collection by hearting your favorite wallpapers.'
+                : 'Your downloaded wallpapers will appear here for quick access.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white54, fontSize: 15),
+              style: const TextStyle(
+                color: Colors.white54, 
+                fontSize: 15,
+                height: 1.5,
+              ),
             ),
-          ),
+          ).animate(delay: 100.ms).slideY(begin: 0.5, duration: 500.ms, curve: Curves.easeOutQuart)
+           .fadeIn(duration: 500.ms),
+          const SizedBox(height: 40),
+          GestureDetector(
+            onTap: () {
+              ref.read(hapticProvider.notifier).lightImpact();
+              
+              if (widget.embeddedMode) {
+                // Navigate back to Home tab (index 0)
+                ref.read(navigationProvider.notifier).goToHome();
+              } else {
+                context.pop();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.goldMid, AppColors.goldDeep],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.goldMid.withAlpha(80),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Text(
+                'Explore Now',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ).animate(delay: 200.ms).slideY(begin: 0.5, duration: 500.ms, curve: Curves.easeOutQuart)
+           .fadeIn(duration: 500.ms),
         ],
       ),
     );

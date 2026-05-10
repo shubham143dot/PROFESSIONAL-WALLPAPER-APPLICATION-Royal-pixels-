@@ -9,15 +9,13 @@ class UserEntity extends Equatable {
   final int ownedWallpaperCount;
   final double totalSpent;
   final int activityScore;
-  final bool isSubscribed;
-  final DateTime? subscriptionExpiry;
 
   // ── Diamond System fields ─────────────────────────────────────────────────
   final int diamonds;
   final int streak;
   final String? appVersion;
-  final int adsWatchedToday;
 
+  final bool isSubscribed;
   final String? photoUrl;
 
   const UserEntity({
@@ -30,12 +28,10 @@ class UserEntity extends Equatable {
     required this.ownedWallpaperCount,
     this.totalSpent = 0.0,
     this.activityScore = 0,
-    this.isSubscribed = false,
-    this.subscriptionExpiry,
     this.diamonds = 0,
     this.streak = 0,
+    this.isSubscribed = false,
     this.appVersion,
-    this.adsWatchedToday = 0,
   });
 
   UserEntity copyWith({
@@ -48,12 +44,10 @@ class UserEntity extends Equatable {
     int? ownedWallpaperCount,
     double? totalSpent,
     int? activityScore,
-    bool? isSubscribed,
-    DateTime? subscriptionExpiry,
     int? diamonds,
     int? streak,
+    bool? isSubscribed,
     String? appVersion,
-    int? adsWatchedToday,
   }) {
     return UserEntity(
       uid: uid ?? this.uid,
@@ -65,12 +59,10 @@ class UserEntity extends Equatable {
       ownedWallpaperCount: ownedWallpaperCount ?? this.ownedWallpaperCount,
       totalSpent: totalSpent ?? this.totalSpent,
       activityScore: activityScore ?? this.activityScore,
-      isSubscribed: isSubscribed ?? this.isSubscribed,
-      subscriptionExpiry: subscriptionExpiry ?? this.subscriptionExpiry,
       diamonds: diamonds ?? this.diamonds,
       streak: streak ?? this.streak,
+      isSubscribed: isSubscribed ?? this.isSubscribed,
       appVersion: appVersion ?? this.appVersion,
-      adsWatchedToday: adsWatchedToday ?? this.adsWatchedToday,
     );
   }
 
@@ -85,11 +77,9 @@ class UserEntity extends Equatable {
         ownedWallpaperCount,
         totalSpent,
         activityScore,
-        isSubscribed,
-        subscriptionExpiry,
         diamonds,
         streak,
+        isSubscribed,
         appVersion,
-        adsWatchedToday,
       ];
 }

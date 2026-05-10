@@ -32,7 +32,8 @@ class DiamondCounterWidget extends StatelessWidget {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
               child: Container(
-                padding: const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
+                padding: const EdgeInsets.only(
+                    left: 10, right: 4, top: 4, bottom: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withAlpha(15),
                   borderRadius: BorderRadius.circular(20),
@@ -129,4 +130,3 @@ class DiamondCounterWidget extends StatelessWidget {
     );
   }
 }
-

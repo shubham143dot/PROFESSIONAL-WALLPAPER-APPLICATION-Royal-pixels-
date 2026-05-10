@@ -15,20 +15,52 @@ class ImageFilterUtils {
       case WallpaperFilter.grayscale:
         // Standard Grayscale Matrix
         return [
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0,      0,      0,      1, 0,
+          0.2126,
+          0.7152,
+          0.0722,
+          0,
+          0,
+          0.2126,
+          0.7152,
+          0.0722,
+          0,
+          0,
+          0.2126,
+          0.7152,
+          0.0722,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
         ];
       case WallpaperFilter.highContrast:
         // Increase contrast by scaling RGB values and shifting
         final double contrast = 1.5; // 1.5x contrast
         final double shift = -128 * (contrast - 1);
         return [
-          contrast, 0,        0,        0, shift,
-          0,        contrast, 0,        0, shift,
-          0,        0,        contrast, 0, shift,
-          0,        0,        0,        1, 0,
+          contrast,
+          0,
+          0,
+          0,
+          shift,
+          0,
+          contrast,
+          0,
+          0,
+          shift,
+          0,
+          0,
+          contrast,
+          0,
+          shift,
+          0,
+          0,
+          0,
+          1,
+          0,
         ];
       case WallpaperFilter.amoledBlack:
         // Simulated AMOLED effect via ColorMatrix
@@ -36,25 +68,58 @@ class ImageFilterUtils {
         final double contrast = 1.2;
         final double shift = -30; // Crush darker colors to black
         return [
-          contrast, 0,        0,        0, shift,
-          0,        contrast, 0,        0, shift,
-          0,        0,        contrast, 0, shift,
-          0,        0,        0,        1, 0,
+          contrast,
+          0,
+          0,
+          0,
+          shift,
+          0,
+          contrast,
+          0,
+          0,
+          shift,
+          0,
+          0,
+          contrast,
+          0,
+          shift,
+          0,
+          0,
+          0,
+          1,
+          0,
         ];
       case WallpaperFilter.original:
         // Identity Matrix (No change)
         return [
-          1, 0, 0, 0, 0,
-          0, 1, 0, 0, 0,
-          0, 0, 1, 0, 0,
-          0, 0, 0, 1, 0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
         ];
     }
   }
 
   /// Applies the selected filter to raw image bytes using the `image` package
   /// Returns the modified JPEG bytes.
-  static Future<Uint8List> applyFilterToBytes(Uint8List imageBytes, WallpaperFilter filter) async {
+  static Future<Uint8List> applyFilterToBytes(
+      Uint8List imageBytes, WallpaperFilter filter) async {
     if (filter == WallpaperFilter.original) return imageBytes;
 
     // Decode image

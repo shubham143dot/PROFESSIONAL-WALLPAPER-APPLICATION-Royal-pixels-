@@ -17,18 +17,24 @@ class CloudinaryUpload {
 
   /// Uploads an image file to Cloudinary using Signed API.
   /// If [isPremiumOrSpecial] is true, uses the premium Cloudinary account.
-  static Future<String?> uploadImage(File imageFile, {bool isPremiumOrSpecial = false}) async {
-    final String cloudName = isPremiumOrSpecial ? _premiumCloudName : _freeCloudName;
+  static Future<String?> uploadImage(File imageFile,
+      {bool isPremiumOrSpecial = false}) async {
+    final String cloudName =
+        isPremiumOrSpecial ? _premiumCloudName : _freeCloudName;
     final String apiKey = isPremiumOrSpecial ? _premiumApiKey : _freeApiKey;
-    final String apiSecret = isPremiumOrSpecial ? _premiumApiSecret : _freeApiSecret;
+    final String apiSecret =
+        isPremiumOrSpecial ? _premiumApiSecret : _freeApiSecret;
 
-    final String timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(0, 10);
-    
+    final String timestamp =
+        DateTime.now().millisecondsSinceEpoch.toString().substring(0, 10);
+
     // Cloudinary requires signed parameters in alphabetical order
     // For a base upload, we sign 'timestamp={timestamp}'
-    final String signature = _generateSignature({'timestamp': timestamp}, apiSecret);
+    final String signature =
+        _generateSignature({'timestamp': timestamp}, apiSecret);
 
-    final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
+    final url =
+        Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
 
     try {
       var request = http.MultipartRequest('POST', url)
@@ -43,13 +49,14 @@ class CloudinaryUpload {
         final responseData = await response.stream.toBytes();
         final responseString = utf8.decode(responseData);
         final jsonMap = jsonDecode(responseString);
-        
+
         return jsonMap['secure_url'];
       } else {
         final responseData = await response.stream.toBytes();
         final responseString = utf8.decode(responseData);
         if (kDebugMode) {
-          debugPrint('Cloudinary Upload Failed (${response.statusCode}): $responseString');
+          debugPrint(
+              'Cloudinary Upload Failed (${response.statusCode}): $responseString');
         }
         return null;
       }
@@ -62,20 +69,20 @@ class CloudinaryUpload {
   }
 
   /// Generates SHA-1 signature for Cloudinary API requests
-  static String _generateSignature(Map<String, String> params, String apiSecret) {
+  static String _generateSignature(
+      Map<String, String> params, String apiSecret) {
     // 1. Sort parameters alphabetically by key
     final sortedKeys = params.keys.toList()..sort();
-    
+
     // 2. Map into key=value pairs joined by &
-    final parameterString = sortedKeys
-        .map((key) => '$key=${params[key]}')
-        .join('&');
-    
+    final parameterString =
+        sortedKeys.map((key) => '$key=${params[key]}').join('&');
+
     // 3. Append API Secret and hash with SHA-1
     final stringToSign = '$parameterString$apiSecret';
     final bytes = utf8.encode(stringToSign);
     final digest = sha1.convert(bytes);
-    
+
     return digest.toString();
   }
 }

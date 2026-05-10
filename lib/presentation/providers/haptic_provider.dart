@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,11 +12,17 @@ import '../../domain/entities/haptic_level.dart';
 /// Returns true if a vibrator is present and functional.
 final hapticSupportProvider = FutureProvider<bool>((ref) async {
   try {
+    if (kIsWeb) return false;
+    // On most modern mobile devices, haptics are supported.
+    // Vibration.hasVibrator() is the source of truth but we'll fallback to true on iOS
+    // because all supported iOS devices since iPhone 7 have Taptic Engine.
+    if (Platform.isIOS) return true;
+    
     final hasVibrator = await Vibration.hasVibrator();
     return hasVibrator == true;
   } catch (e) {
     if (kDebugMode) print('Haptic Detection Error: $e');
-    return false;
+    return true; // Optimistic fallback
   }
 });
 
@@ -25,100 +32,106 @@ final hapticProvider = NotifierProvider<HapticNotifier, HapticLevel>(() {
 
 class HapticNotifier extends Notifier<HapticLevel> {
   static const _key = 'user_haptic_level';
-  
+
   // Cache hardware capabilities for speed
   bool? _hasVibrator;
   bool? _hasCustomVibrations;
   bool? _hasAmplitudeControl;
+  Completer<void>? _initCompleter;
 
   @override
   HapticLevel build() {
     final prefs = sl<SharedPreferences>();
     final saved = prefs.getString(_key);
-    
-    // Warm up the hardware cache
+
+    // Warm up the hardware cache immediately
     _initHardwareCache();
-    
+
     return HapticLevel.fromString(saved);
   }
 
   Future<void> _initHardwareCache() async {
+    if (_initCompleter != null) return _initCompleter!.future;
+    _initCompleter = Completer<void>();
+
     try {
-      _hasVibrator = await Vibration.hasVibrator();
-      if (_hasVibrator == true) {
-        _hasCustomVibrations = await Vibration.hasCustomVibrationsSupport();
-        _hasAmplitudeControl = await Vibration.hasAmplitudeControl();
+      if (kIsWeb) {
+        _hasVibrator = false;
+      } else {
+        _hasVibrator = await Vibration.hasVibrator();
+        if (_hasVibrator == true) {
+          _hasCustomVibrations = await Vibration.hasCustomVibrationsSupport();
+          _hasAmplitudeControl = await Vibration.hasAmplitudeControl();
+        }
       }
     } catch (_) {
-      _hasVibrator = false;
+      _hasVibrator = true; // Optimistic fallback for standard haptics
+    } finally {
+      _initCompleter!.complete();
     }
   }
 
   Future<void> setLevel(HapticLevel level) async {
+    if (state == level) return;
     state = level;
-    final prefs = sl<SharedPreferences>();
-    await prefs.setString(_key, level.name);
+    
     // Give immediate feedback when setting (Preview)
     trigger(previewLevel: level);
+
+    // Persist in background
+    final prefs = sl<SharedPreferences>();
+    prefs.setString(_key, level.name);
   }
+
+  // Throttle physical vibration to once per 35ms to prevent hardware queue lag
+  // 35ms is optimized for fast taps (up to 28 taps per second)
+  DateTime _lastVibrateTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Internal method to perform physical haptic feedback with high compatibility
   Future<void> _perform(HapticLevel physicalLevel) async {
     if (physicalLevel == HapticLevel.off) return;
 
+    final now = DateTime.now();
+    if (now.difference(_lastVibrateTime).inMilliseconds < 35) return;
+    _lastVibrateTime = now;
+
     try {
-      // Ensure cache is ready if it's the first time
+      // Ensure cache is ready
       if (_hasVibrator == null) await _initHardwareCache();
       if (_hasVibrator == false) return;
 
-      if (Platform.isAndroid) {
-        // Android-specific: Vibration package is most reliable for timed pulses
-        switch (physicalLevel) {
-          case HapticLevel.light:
-            if (_hasCustomVibrations == true) {
-              Vibration.vibrate(duration: 15, amplitude: _hasAmplitudeControl == true ? 80 : -1);
-            } else {
-              HapticFeedback.lightImpact();
-            }
-            break;
-          case HapticLevel.medium:
-            if (_hasCustomVibrations == true) {
-              Vibration.vibrate(duration: 30, amplitude: _hasAmplitudeControl == true ? 150 : -1);
-            } else {
-              HapticFeedback.mediumImpact();
-            }
-            break;
-          case HapticLevel.strong:
-            if (_hasCustomVibrations == true) {
-              Vibration.vibrate(duration: 50, amplitude: _hasAmplitudeControl == true ? 255 : -1);
-            } else {
-              HapticFeedback.heavyImpact();
-            }
-            break;
-          case HapticLevel.off:
-            break;
-        }
-      } else if (Platform.isIOS) {
-        // iOS-specific: Taptic Engine (HapticFeedback) is vastly superior to generic vibration
-        switch (physicalLevel) {
-          case HapticLevel.light:
-            HapticFeedback.lightImpact();
-            break;
-          case HapticLevel.medium:
-            HapticFeedback.mediumImpact();
-            break;
-          case HapticLevel.strong:
-            HapticFeedback.heavyImpact();
-            break;
-          case HapticLevel.off:
-            break;
-        }
-      } else {
-        // Fallback for other platforms
-        HapticFeedback.mediumImpact();
+      // Platform-agnostic approach using Flutter's native HapticFeedback
+      // supplemented by Vibration package where native falls short.
+      
+      switch (physicalLevel) {
+        case HapticLevel.light:
+          // Selection click is the lightest OS-level feedback
+          await HapticFeedback.selectionClick();
+          break;
+          
+        case HapticLevel.medium:
+          // Medium impact is crisp and noticeable
+          await HapticFeedback.mediumImpact();
+          break;
+          
+        case HapticLevel.strong:
+          if (Platform.isAndroid && _hasCustomVibrations == true) {
+            // On Android, "heavyImpact" can sometimes be subtle. 
+            // We use a custom pulse for a "Strong" premium feel.
+            Vibration.vibrate(
+              duration: 40,
+              amplitude: _hasAmplitudeControl == true ? 255 : -1,
+            );
+          } else {
+            await HapticFeedback.heavyImpact();
+          }
+          break;
+          
+        case HapticLevel.off:
+          break;
       }
     } catch (e) {
-      // Final fallback to core Flutter haptics
+      // Final fallback to core Flutter haptics which never fails
       HapticFeedback.selectionClick();
     }
   }
@@ -137,24 +150,29 @@ class HapticNotifier extends Notifier<HapticLevel> {
   void _triggerSemantic(HapticLevel eventIntensity) {
     if (state == HapticLevel.off) return;
 
+    // Use a simpler, more direct mapping. 
+    // If user sets 'Strong', everything is one notch stronger.
+    // If user sets 'Light', everything is one notch lighter.
+    
     HapticLevel finalLevel;
-    switch (state) {
-      case HapticLevel.light:
-        finalLevel = (eventIntensity == HapticLevel.strong) 
-            ? HapticLevel.medium 
-            : HapticLevel.light;
-        break;
-      case HapticLevel.medium:
-        finalLevel = eventIntensity;
-        break;
-      case HapticLevel.strong:
-        finalLevel = (eventIntensity == HapticLevel.light)
-            ? HapticLevel.medium
-            : HapticLevel.strong;
-        break;
-      case HapticLevel.off:
-        return;
+    if (state == HapticLevel.medium) {
+      finalLevel = eventIntensity;
+    } else if (state == HapticLevel.light) {
+      // Downgrade intensity
+      if (eventIntensity == HapticLevel.strong) {
+        finalLevel = HapticLevel.medium;
+      } else {
+        finalLevel = HapticLevel.light;
+      }
+    } else { // state == HapticLevel.strong
+      // Upgrade intensity
+      if (eventIntensity == HapticLevel.light) {
+        finalLevel = HapticLevel.medium;
+      } else {
+        finalLevel = HapticLevel.strong;
+      }
     }
+    
     _perform(finalLevel);
   }
 

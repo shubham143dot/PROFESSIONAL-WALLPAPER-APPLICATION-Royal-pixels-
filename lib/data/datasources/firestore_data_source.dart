@@ -3,15 +3,22 @@ import 'package:flutter/foundation.dart';
 import '../models/wallpaper_model.dart';
 
 abstract class FirestoreDataSource {
-  Future<List<WallpaperModel>> getWallpapers({required int page, required int limit, bool isPremium = false});
+  Future<List<WallpaperModel>> getWallpapers(
+      {required int page, required int limit, bool isPremium = false});
   Future<WallpaperModel> getWallpaperDetails(String id);
   Future<WallpaperModel?> getWallpaperById(String id);
-  Future<void> addWallpaper(WallpaperModel wallpaper);
+  Future<String> addWallpaper(WallpaperModel wallpaper);
   Future<void> deleteWallpaper(String id);
-  Future<void> updateWallpaper(String id, {required String newTitle, required String newCategory, required bool isPremium, required int diamondCost, required List<String> tags});
+  Future<void> updateWallpaper(String id,
+      {required String newTitle,
+      required String newCategory,
+      required bool isPremium,
+      required int diamondCost,
+      required List<String> tags});
   Future<void> renameCategory(String oldName, String newName);
   Future<String> getPaymentUpiId();
-  Future<void> unlockPremiumWallpaper(String userId, String wallpaperId, [double amount = 0.0]);
+  Future<void> unlockPremiumWallpaper(String userId, String wallpaperId,
+      [double amount = 0.0]);
   Future<bool> isWallpaperUnlocked(String userId, String wallpaperId);
   Future<void> submitPaymentRequest({
     required String userId,
@@ -21,14 +28,7 @@ abstract class FirestoreDataSource {
     required String wallpaperTitle,
     String? screenshotUrl,
   });
-  Future<void> submitSubscriptionRequest({
-    required String userId,
-    required int months,
-    required double amount,
-    required String txnId,
-    String? screenshotUrl,
-  });
-  Future<bool> checkSubscriptionStatus(String userId);
+
   Future<void> submitDiamondPackRequest({
     required String userId,
     required String packId,
@@ -39,17 +39,19 @@ abstract class FirestoreDataSource {
     String? screenshotUrl,
   });
   Future<void> updateUserActivity(String userId);
-  Future<bool> toggleLike(String userId, String wallpaperId, {bool isFavorite = true});
+  Future<bool> toggleLike(String userId, String wallpaperId,
+      {bool isFavorite = true});
   Future<void> toggleLikeAnonymous(String wallpaperId, bool isAdding);
 
   // ── Diamond System ─────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getDiamondData(String userId);
   Future<Map<String, dynamic>> claimDailyReward(String userId);
-  Future<int> addAdReward(String userId);
   Future<int> spendDiamonds(String userId, String wallpaperId, int cost);
+
   /// Awards +5 diamonds for download/set-as (unified, per-wallpaper dedup + 80/day cap).
   /// Returns a map: { 'granted': bool, 'newBalance': int, 'reason': String? }
-  Future<Map<String, dynamic>> addSmallReward(String userId, String wallpaperId);
+  Future<Map<String, dynamic>> addSmallReward(
+      String userId, String wallpaperId);
 
   /// Atomically increments the view counter on a wallpaper document.
   /// Fire-and-forget — silently fails on offline/error.
@@ -57,9 +59,14 @@ abstract class FirestoreDataSource {
   Future<void> incrementShareCount(String wallpaperId);
 
   /// Fetches top trending wallpapers (sorted by view_count descending).
-  Future<List<WallpaperModel>> getTrendingWallpapers({int limit = 10});
-}
+  Future<List<WallpaperModel>> getTrendingWallpapers({int limit = 30});
 
+  /// Updates the user's subscription status.
+  Future<void> updateSubscriptionStatus(String userId, bool isSubscribed);
+
+  /// Awards [amount] diamonds to the user.
+  Future<int> addDiamonds(String userId, int amount);
+}
 
 class FirestoreDataSourceImpl implements FirestoreDataSource {
   final FirebaseFirestore firestore;
@@ -67,18 +74,28 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   FirestoreDataSourceImpl({required this.firestore});
 
   @override
-  Future<List<WallpaperModel>> getWallpapers({required int page, required int limit, bool isPremium = false}) async {
+  Future<List<WallpaperModel>> getWallpapers(
+      {required int page, required int limit, bool isPremium = false}) async {
     try {
       // 1. Attempt server-side sorting (Preferred for performance)
       // IMPORTANT: Requires a composite index (is_premium, created_at) in Firestore
-      final querySnapshot = await firestore
+      // When limit <= 0, fetch ALL wallpapers (no cap).
+      Query<Map<String, dynamic>> query = firestore
           .collection('wallpapers')
           .where('is_premium', isEqualTo: isPremium)
-          .orderBy('created_at', descending: true)
-          .limit(limit)
-          .get();
+          .orderBy('created_at', descending: true);
+      if (limit > 0) {
+        query = query.limit(page * limit);
+      }
+      final querySnapshot = await query.get();
 
-      return querySnapshot.docs.expand((doc) {
+      final allDocs = querySnapshot.docs;
+      final start = (page - 1) * limit;
+      final pageDocs = (limit > 0 && allDocs.length > start)
+          ? allDocs.sublist(start)
+          : allDocs;
+
+      return pageDocs.expand((doc) {
         try {
           return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
         } catch (e) {
@@ -90,27 +107,41 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
       }).toList();
     } catch (e) {
       final errorMsg = e.toString();
-      
-      // 2. Identify missing index error (failed-precondition)
-      if (errorMsg.contains('failed-precondition') || errorMsg.contains('requires an index')) {
-        if (kDebugMode) {
-          debugPrint('Firestore: Missing composite index for wallpapers. Falling back to client-side sorting.');
-        }
-        
-        // Use a simpler query that only filters (no ordering) to bypass index requirement
-        final querySnapshot = await firestore
-            .collection('wallpapers')
-            .where('is_premium', isEqualTo: isPremium)
-            .limit(limit * 2) // Fetch a bit more to improve sorting quality
-            .get();
 
-        final list = querySnapshot.docs.expand((doc) {
-          try {
-            return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
-          } catch (err) {
-            return <WallpaperModel>[];
-          }
-        }).toList();
+      // 2. Identify missing index error (failed-precondition)
+      if (errorMsg.contains('failed-precondition') ||
+          errorMsg.contains('requires an index')) {
+        if (kDebugMode) {
+          debugPrint(
+              'Firestore: Missing composite index for wallpapers. Falling back to client-side sorting.');
+        }
+
+        // Use a simpler query that only filters (no ordering) to bypass index requirement
+        Query<Map<String, dynamic>> fallbackQuery = firestore
+            .collection('wallpapers')
+            .where('is_premium', isEqualTo: isPremium);
+        if (limit > 0) {
+          fallbackQuery = fallbackQuery.limit(page * limit);
+        }
+        final querySnapshot = await fallbackQuery.get();
+
+        final allDocs = querySnapshot.docs;
+        final start = (page - 1) * limit;
+        final list = (limit > 0 && allDocs.length > start)
+            ? allDocs.sublist(start).expand((doc) {
+                try {
+                  return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
+                } catch (err) {
+                  return <WallpaperModel>[];
+                }
+              }).toList()
+            : allDocs.expand((doc) {
+                try {
+                  return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
+                } catch (err) {
+                  return <WallpaperModel>[];
+                }
+              }).toList();
 
         // 3. Apply client-side sorting as a fallback
         list.sort((a, b) {
@@ -120,9 +151,12 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
         });
 
         // 4. Respect the original limit after sorting
-        return list.take(limit).toList();
+        return limit > 0 ? list.take(limit).toList() : list;
       }
-      
+
+      if (kDebugMode) {
+        debugPrint('❌ Firestore getWallpapers Error: $e');
+      }
       // If it's a different error, rethrow it
       rethrow;
     }
@@ -158,8 +192,9 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   Future<String> getPaymentUpiId() async {
     // ── UPI System Removed ──────────────────────────────────────────────────
     // Manual UPI payments are being replaced by Google Play Billing.
-    throw Exception('Manual UPI payments are currently disabled. Please use Diamonds to unlock content.');
-    
+    throw Exception(
+        'Manual UPI payments are currently disabled. Please use Diamonds to unlock content.');
+
     /*
     final snapshot = await firestore.collection('payment_methods').limit(1).get();
     if (snapshot.docs.isNotEmpty) {
@@ -171,16 +206,18 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   }
 
   @override
-  Future<void> unlockPremiumWallpaper(String userId, String wallpaperId, [double amount = 0.0]) async {
+  Future<void> unlockPremiumWallpaper(String userId, String wallpaperId,
+      [double amount = 0.0]) async {
     final userRef = firestore.collection('users').doc(userId);
-    
+
     await firestore.runTransaction((transaction) async {
       final userSnapshot = await transaction.get(userRef);
       if (!userSnapshot.exists) throw Exception('User not found');
-      
+
       final currentCount = userSnapshot.data()?['owned_wallpaper'] ?? 0;
-      final currentSpent = (userSnapshot.data()?['total_spent'] ?? 0.0).toDouble();
-      
+      final currentSpent =
+          (userSnapshot.data()?['total_spent'] ?? 0.0).toDouble();
+
       transaction.update(userRef, {
         'owned_wallpaper': currentCount + 1,
         'unlocked_wallpapers': FieldValue.arrayUnion([wallpaperId]),
@@ -208,20 +245,11 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     String? screenshotUrl,
   }) async {
     // ── Disabled for Play Store Safety ──────────────────────────────────────
-    throw Exception('Manual payments are currently disabled. Please use the Diamond system or wait for the upcoming Google Play Billing update.');
+    throw Exception(
+        'Manual payments are currently disabled. Please use the Diamond system or wait for the upcoming Google Play Billing update.');
   }
 
-  @override
-  Future<void> submitSubscriptionRequest({
-    required String userId,
-    required int months,
-    required double amount,
-    required String txnId,
-    String? screenshotUrl,
-  }) async {
-    // ── Disabled for Play Store Safety ──────────────────────────────────────
-    throw Exception('Manual subscriptions are currently disabled. Official Google Play Subscriptions are coming soon!');
-  }
+
 
   @override
   Future<void> submitDiamondPackRequest({
@@ -234,41 +262,14 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     String? screenshotUrl,
   }) async {
     // ── Disabled for Play Store Safety ──────────────────────────────────────
-    throw Exception('Manual diamond purchases are currently disabled. Please use the Ad rewards to earn more diamonds!');
+    throw Exception(
+        'Manual diamond purchases are currently disabled. Please use the Ad rewards to earn more diamonds!');
   }
-
-  @override
-  Future<bool> checkSubscriptionStatus(String userId) async {
-    final doc = await firestore.collection('users').doc(userId).get();
-    if (!doc.exists) return false;
-    final data = doc.data();
-    final isSubscribed = data?['is_subscribed'] ?? false;
-    final expiry = (data?['subscription_expiry'] as Timestamp?)?.toDate();
-    final planType = data?['plan_type'] as String? ?? '';
-
-    // Lifetime plan — never expires
-    if (isSubscribed && planType == 'lifetime') return true;
-
-    if (isSubscribed && expiry != null && expiry.isAfter(DateTime.now())) {
-      return true;
-    }
-    // Automatically revert if expired (only for non-lifetime plans)
-    if (isSubscribed &&
-        expiry != null &&
-        expiry.isBefore(DateTime.now()) &&
-        planType != 'lifetime') {
-      await firestore.collection('users').doc(userId).update({
-        'is_subscribed': false,
-      });
-    }
-    return false;
-  }
-
 
   @override
   Future<void> updateUserActivity(String userId) async {
     final userRef = firestore.collection('users').doc(userId);
-    
+
     await firestore.runTransaction((transaction) async {
       final userSnapshot = await transaction.get(userRef);
       Map<String, dynamic> updates = {};
@@ -288,20 +289,20 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
         transaction.set(userRef, updates);
         return;
       }
-      
+
       final data = userSnapshot.data()!;
       final currentScore = data['activity_score'] ?? 0;
       final Timestamp? lastLoginTs = data['login_history'] as Timestamp?;
-      
+
       if (lastLoginTs != null) {
         final lastLoginDate = lastLoginTs.toDate();
-        if (lastLoginDate.year == now.year && 
-            lastLoginDate.month == now.month && 
+        if (lastLoginDate.year == now.year &&
+            lastLoginDate.month == now.month &&
             lastLoginDate.day == now.day) {
           isNewDay = false;
         }
       }
-      
+
       // Initialize new fields for backward compatibility
       if (data['activity_score'] == null) {
         updates['activity_score'] = currentScore;
@@ -309,12 +310,13 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
       if (data['total_spent'] == null) {
         updates['total_spent'] = 0.0;
       }
-      
+
       if (isNewDay) {
-        updates['activity_score'] = (updates['activity_score'] ?? currentScore) + 10;
+        updates['activity_score'] =
+            (updates['activity_score'] ?? currentScore) + 10;
         updates['login_history'] = FieldValue.serverTimestamp();
       }
-      
+
       if (updates.isNotEmpty) {
         transaction.update(userRef, updates);
       }
@@ -333,28 +335,50 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     final doc = await firestore.collection('users').doc(userId).get();
     final data = doc.data() ?? {};
     final today = _todayString();
-    final lastRewardDate      = data['lastRewardDate']      as String? ?? '';
-    final lastAdDate          = data['lastAdDate']          as String? ?? '';
+    final lastRewardDate = data['lastRewardDate'] as String? ?? '';
     final lastSmallRewardDate = data['lastSmallRewardDate'] as String? ?? '';
 
     // Reset counters when the date changes
-    final adsWatchedToday        = (lastAdDate          == today)
-        ? (data['adsWatchedToday']        as int? ?? 0) : 0;
     final smallRewardEarnedToday = (lastSmallRewardDate == today)
-        ? (data['smallRewardEarnedToday'] as int? ?? 0) : 0;
+        ? (data['smallRewardEarnedToday'] as int? ?? 0)
+        : 0;
+
+    int streak = data['streak'] as int? ?? 0;
+    bool canClaimToday = lastRewardDate != today;
+
+    // Check if streak is broken (missed more than 1 day)
+    if (lastRewardDate.isNotEmpty && lastRewardDate != today) {
+      try {
+        final lastParts = lastRewardDate.split('-');
+        final lastDate = DateTime(
+          int.parse(lastParts[0]),
+          int.parse(lastParts[1]),
+          int.parse(lastParts[2]),
+        );
+        final now = DateTime.now();
+        final yesterday = DateTime(now.year, now.month, now.day - 1);
+
+        bool isYesterday = lastDate.year == yesterday.year &&
+            lastDate.month == yesterday.month &&
+            lastDate.day == yesterday.day;
+
+        if (!isYesterday) {
+          streak = 0; // Streak is broken
+        }
+      } catch (_) {
+        streak = 0;
+      }
+    }
 
     return {
-      'diamonds':               data['diamonds'] as int? ?? 0,
-      'streak':                 data['streak']   as int? ?? 0,
-      'adsWatchedToday':        adsWatchedToday,
+      'diamonds': data['diamonds'] as int? ?? 0,
+      'streak': streak,
       'smallRewardEarnedToday': smallRewardEarnedToday,
-      'lastRewardDate':         lastRewardDate,
-      'lastAdDate':             lastAdDate,
-      'lastSmallRewardDate':    lastSmallRewardDate,
-      'canClaimToday':          lastRewardDate != today,
+      'lastRewardDate': lastRewardDate,
+      'lastSmallRewardDate': lastSmallRewardDate,
+      'canClaimToday': canClaimToday,
     };
   }
-
 
   @override
   Future<Map<String, dynamic>> claimDailyReward(String userId) async {
@@ -429,42 +453,10 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     return rewards[(day - 1).clamp(0, 6)];
   }
 
-  @override
-  Future<int> addAdReward(String userId) async {
-    final userRef = firestore.collection('users').doc(userId);
-    late int newBalance;
 
-    await firestore.runTransaction((transaction) async {
-      final snap = await transaction.get(userRef);
-      if (!snap.exists) throw Exception('User not found');
-
-      final data = snap.data()!;
-      final today = _todayString();
-      final lastAdDate = data['lastAdDate'] as String? ?? '';
-      final adsWatchedToday = (lastAdDate == today)
-          ? (data['adsWatchedToday'] as int? ?? 0)
-          : 0;
-
-      if (adsWatchedToday >= 5) {
-        throw Exception('Daily ad limit reached (5/day)');
-      }
-
-      final currentDiamonds = data['diamonds'] as int? ?? 0;
-      newBalance = currentDiamonds + 10;
-
-      transaction.update(userRef, {
-        'diamonds': newBalance,
-        'adsWatchedToday': adsWatchedToday + 1,
-        'lastAdDate': today,
-      });
-    });
-
-    return newBalance;
-  }
 
   @override
-  Future<int> spendDiamonds(
-      String userId, String wallpaperId, int cost) async {
+  Future<int> spendDiamonds(String userId, String wallpaperId, int cost) async {
     final userRef = firestore.collection('users').doc(userId);
     late int newBalance;
 
@@ -507,9 +499,8 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
       final isNewDay = lastSmallRewardDate != today;
 
       // Reset daily tracking on new day
-      final smallRewardEarnedToday = isNewDay
-          ? 0
-          : (data['smallRewardEarnedToday'] as int? ?? 0);
+      final smallRewardEarnedToday =
+          isNewDay ? 0 : (data['smallRewardEarnedToday'] as int? ?? 0);
       final rewardedWallpapers = isNewDay
           ? <String>[]
           : List<String>.from(
@@ -558,22 +549,36 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     return result;
   }
 
-
   @override
-  Future<void> addWallpaper(WallpaperModel wallpaper) async {
+  Future<String> addWallpaper(WallpaperModel wallpaper) async {
+    // ── Duplicate guard: reject if this exact image URL already exists ──
+    if (wallpaper.imageUrl.isNotEmpty) {
+      final existing = await firestore
+          .collection('wallpapers')
+          .where('image_url', isEqualTo: wallpaper.imageUrl)
+          .limit(1)
+          .get();
+      if (existing.docs.isNotEmpty) {
+        throw Exception('Duplicate: This image has already been uploaded.');
+      }
+    }
+
     Map<String, dynamic> data = wallpaper.toFirestore();
     data['created_at'] = FieldValue.serverTimestamp();
-    
-    // Ensure we don't save an empty ID field inside the document, 
+
+    // Ensure we don't save an empty ID field inside the document,
     // as it's redundant and can cause deduplication issues.
-    if (data['id'] == null || (data['id'] is String && (data['id'] as String).isEmpty)) {
+    if (data['id'] == null ||
+        (data['id'] is String && (data['id'] as String).isEmpty)) {
       data.remove('id');
     }
-    
+
     if (wallpaper.id.isEmpty) {
-      await firestore.collection('wallpapers').add(data);
+      final docRef = await firestore.collection('wallpapers').add(data);
+      return docRef.id;
     } else {
       await firestore.collection('wallpapers').doc(wallpaper.id).set(data);
+      return wallpaper.id;
     }
   }
 
@@ -583,7 +588,12 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   }
 
   @override
-  Future<void> updateWallpaper(String id, {required String newTitle, required String newCategory, required bool isPremium, required int diamondCost, required List<String> tags}) async {
+  Future<void> updateWallpaper(String id,
+      {required String newTitle,
+      required String newCategory,
+      required bool isPremium,
+      required int diamondCost,
+      required List<String> tags}) async {
     await firestore.collection('wallpapers').doc(id).update({
       'title': newTitle,
       'category': newCategory,
@@ -609,7 +619,7 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     for (var doc in wallpapersSnap.docs) {
       final data = doc.data();
       List<dynamic> tags = data['tags'] ?? [];
-      
+
       // Update tags
       tags = tags.map((t) {
         if (t == oldCategoryLower) return newCategoryLower;
@@ -627,11 +637,13 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     }
 
     // 2. Update category_covers
-    final oldCoverRef = firestore.collection('category_covers').doc(oldCategoryLower);
+    final oldCoverRef =
+        firestore.collection('category_covers').doc(oldCategoryLower);
     final oldCoverDoc = await oldCoverRef.get();
-    
+
     if (oldCoverDoc.exists) {
-      final newCoverRef = firestore.collection('category_covers').doc(newCategoryLower);
+      final newCoverRef =
+          firestore.collection('category_covers').doc(newCategoryLower);
       batch.set(newCoverRef, oldCoverDoc.data()!);
       batch.delete(oldCoverRef);
     }
@@ -683,7 +695,8 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   }
 
   @override
-  Future<bool> toggleLike(String userId, String wallpaperId, {bool isFavorite = true}) async {
+  Future<bool> toggleLike(String userId, String wallpaperId,
+      {bool isFavorite = true}) async {
     final wallpaperRef = firestore.collection('wallpapers').doc(wallpaperId);
     final userRef = firestore.collection('users').doc(userId);
     final fieldName = isFavorite ? 'liked_wallpapers' : 'feed_likes';
@@ -701,7 +714,6 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
           'activity_score': 0,
           'diamonds': 0,
           'total_spent': 0.0,
-          'is_subscribed': false,
           'streak': 0,
           'login_history': FieldValue.serverTimestamp(),
         });
@@ -728,9 +740,8 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
       // This is separated from user doc update to ensure likes "work" (in favorites/state)
       // even if the global wallpaper doc update fails due to Firestore Rules.
       try {
-        await wallpaperRef.update({
-          'like_count': FieldValue.increment(newlyLiked ? 1 : -1)
-        });
+        await wallpaperRef
+            .update({'like_count': FieldValue.increment(newlyLiked ? 1 : -1)});
       } catch (e) {
         if (kDebugMode) {
           debugPrint('Wallpaper count update failed (likely permission): $e');
@@ -750,9 +761,8 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   Future<void> toggleLikeAnonymous(String wallpaperId, bool isAdding) async {
     final wallpaperRef = firestore.collection('wallpapers').doc(wallpaperId);
     try {
-      await wallpaperRef.update({
-        'like_count': FieldValue.increment(isAdding ? 1 : -1)
-      });
+      await wallpaperRef
+          .update({'like_count': FieldValue.increment(isAdding ? 1 : -1)});
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error toggling anonymous like: $e');
@@ -773,7 +783,7 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   }
 
   @override
-  Future<List<WallpaperModel>> getTrendingWallpapers({int limit = 10}) async {
+  Future<List<WallpaperModel>> getTrendingWallpapers({int limit = 30}) async {
     try {
       // Primary: fetch wallpapers flagged as trending
       final flaggedSnap = await firestore
@@ -794,24 +804,48 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
       if (flagged.length >= 5) return flagged;
 
       // Fallback: top by view_count (requires index on view_count desc)
-      try {
-        final viewSnap = await firestore
-            .collection('wallpapers')
-            .orderBy('view_count', descending: true)
-            .limit(limit)
-            .get();
-        return viewSnap.docs.expand((doc) {
-          try {
-            return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
-          } catch (_) {
-            return <WallpaperModel>[];
-          }
-        }).toList();
-      } catch (_) {
-        return flagged; // Return what we have if index missing
-      }
+      final topSnap = await firestore
+          .collection('wallpapers')
+          .orderBy('view_count', descending: true)
+          .limit(limit)
+          .get();
+
+      return topSnap.docs.expand((doc) {
+        try {
+          return [WallpaperModel.fromFirestore(doc.data(), doc.id)];
+        } catch (_) {
+          return <WallpaperModel>[];
+        }
+      }).toList();
     } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error fetching trending wallpapers: $e');
+      }
       return [];
     }
+  }
+
+  @override
+  Future<void> updateSubscriptionStatus(String userId, bool isSubscribed) async {
+    await firestore.collection('users').doc(userId).update({
+      'is_subscribed': isSubscribed,
+      'premium_since': isSubscribed ? FieldValue.serverTimestamp() : null,
+    });
+  }
+
+  @override
+  Future<int> addDiamonds(String userId, int amount) async {
+    final userRef = firestore.collection('users').doc(userId);
+    return await firestore.runTransaction((transaction) async {
+      final snap = await transaction.get(userRef);
+      if (!snap.exists) {
+        transaction.set(userRef, {'diamonds': amount});
+        return amount;
+      }
+      final current = (snap.data()?['diamonds'] as int?) ?? 0;
+      final newValue = current + amount;
+      transaction.update(userRef, {'diamonds': newValue});
+      return newValue;
+    });
   }
 }

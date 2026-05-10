@@ -5,7 +5,6 @@ import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 import '../../data/datasources/auth_remote_data_source.dart';
 import '../../data/datasources/firestore_data_source.dart';
 import '../../data/repositories/auth_repository_impl.dart';
@@ -26,8 +25,6 @@ import '../../domain/usecases/rename_category_usecase.dart';
 import '../../domain/repositories/notification_repository.dart';
 import '../../data/repositories/notification_repository_impl.dart';
 
-
-
 final sl = GetIt.instance;
 
 Future<void> setupLocator() async {
@@ -41,8 +38,9 @@ Future<void> setupLocator() async {
   // The serverClientId (web client ID) is required so that googleAuth.idToken
   // is always populated. Without it, Firebase credential creation will fail.
   sl.registerLazySingleton(() => GoogleSignIn(
-    serverClientId: '871231257178-vtn84glpkom9qtrg075tt4hs7uhp0a6h.apps.googleusercontent.com',
-  ));
+        serverClientId:
+            '871231257178-vtn84glpkom9qtrg075tt4hs7uhp0a6h.apps.googleusercontent.com',
+      ));
 
   // --- Data Sources ---
   sl.registerLazySingleton<AuthRemoteDataSource>(
@@ -76,7 +74,6 @@ Future<void> setupLocator() async {
       prefs: sl(),
     ),
   );
-
 
   // --- Use Cases ---
   sl.registerLazySingleton(() => LoginUseCase(sl()));

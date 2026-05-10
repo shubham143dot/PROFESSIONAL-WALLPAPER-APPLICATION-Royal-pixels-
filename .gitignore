@@ -72,4 +72,7 @@ flutter_analyze.txt
 temp*.txt
 analyze*.txt
 
+# Scratch directory
+scratch/
+
 

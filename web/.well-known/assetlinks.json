@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.royalpixels.app",
+      "sha256_cert_fingerprints": [
+        "EB:F7:09:C2:64:EA:9E:05:59:F3:29:FF:47:30:EA:00:93:DE:05:68:92:EF:93:1E:D0:BE:85:8A:52:54:39:97"
+      ]
+    }
+  }
+]

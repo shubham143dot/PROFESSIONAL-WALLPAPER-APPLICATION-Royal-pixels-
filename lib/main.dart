@@ -1,32 +1,33 @@
+import 'dart:io' show Platform;
+
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:io' show Platform;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:screen_protector/screen_protector.dart';
 
-import 'package:royal_pixels/core/theme/app_theme.dart';
-import 'package:royal_pixels/presentation/navigation/app_router.dart';
-import 'package:royal_pixels/core/di/service_locator.dart';
-import 'package:royal_pixels/presentation/providers/auth_provider.dart';
-import 'package:royal_pixels/core/services/notification_service.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
-
-import 'package:royal_pixels/core/services/wallpaper_scheduler.dart';
-
-
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:royal_pixels/core/constants/app_constants.dart';
+import 'package:royal_pixels/core/di/service_locator.dart';
+import 'package:royal_pixels/core/scroll/scroll.dart';
+import 'package:royal_pixels/core/services/adaptive_performance.dart';
+import 'package:royal_pixels/core/services/notification_service.dart';
+import 'package:royal_pixels/core/services/wallpaper_scheduler.dart';
+import 'package:royal_pixels/core/theme/app_theme.dart';
 import 'package:royal_pixels/core/utils/royal_snack_bar.dart';
+import 'package:royal_pixels/presentation/navigation/app_router.dart';
+import 'package:royal_pixels/presentation/providers/auth_provider.dart';
+import 'package:royal_pixels/core/services/iap_service.dart';
 
 void main() async {
-  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-  // Set system UI as early as possible
+  // Set system UI as early as possible.
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     systemNavigationBarColor: Colors.transparent,
@@ -34,7 +35,6 @@ void main() async {
     statusBarIconBrightness: Brightness.light,
   ));
 
-  // Parallelize non-dependent initializations for faster startup
   await Future.wait([
     _initFirebase(),
     setupLocator(),
@@ -42,15 +42,27 @@ void main() async {
     _initDisplayMode(),
     _initScreenProtector(),
     WallpaperScheduler.init(),
+    AdaptivePerformance.initialize(), // Phase 3: detect device tier at startup
   ]);
+
+  // Phase 7: Even more aggressive image cache sizing for 2GB-4GB stability
+  // Low-end (2GB): 40 items / 40MB — extreme limit to prevent background process kills
+  // Standard (4GB): 100 items / 100MB 
+  // High-end (8GB+): 250 items / 350MB
+  final (maxItems, maxBytes) = switch (AdaptivePerformance.tier) {
+    DeviceTier.high => (250, 350 * 1024 * 1024),
+    DeviceTier.standard => (100, 100 * 1024 * 1024),
+    DeviceTier.low => (40, 40 * 1024 * 1024),
+  };
+  PaintingBinding.instance.imageCache.maximumSize = maxItems;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = maxBytes;
 
   runApp(
     const ProviderScope(
       child: RoyalPixelsApp(),
     ),
   );
-  
-  // Remove splash after first frame or shortly after
+
   FlutterNativeSplash.remove();
 }
 
@@ -58,7 +70,8 @@ Future<void> _initFirebase() async {
   try {
     await Firebase.initializeApp();
     await FirebaseAppCheck.instance.activate(
-      providerAndroid: AndroidPlayIntegrityProvider(),
+      androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+      appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.deviceCheck,
     );
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (e) {
@@ -93,7 +106,6 @@ Future<void> _initDisplayMode() async {
   } catch (_) {}
 }
 
-
 class RoyalPixelsApp extends ConsumerStatefulWidget {
   const RoyalPixelsApp({super.key});
 
@@ -101,26 +113,30 @@ class RoyalPixelsApp extends ConsumerStatefulWidget {
   ConsumerState<RoyalPixelsApp> createState() => _RoyalPixelsAppState();
 }
 
-class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp> with WidgetsBindingObserver {
+class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyScreenshotPolicy(ref.read(authProvider));
+      // Initialize In-App Purchases stream
+      ref.read(iapServiceProvider);
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Note: IapService disposes its own subscription, but we could explicitly dispose if needed
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // App resumed
+      // App resumed.
     }
   }
 
@@ -135,8 +151,8 @@ class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp> with WidgetsBin
       }
     } catch (e) {
       if (kDebugMode) {
-      debugPrint('Screen protector policy failed: $e');
-    }
+        debugPrint('Screen protector policy failed: $e');
+      }
     }
   }
 
@@ -152,10 +168,11 @@ class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp> with WidgetsBin
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: RoyalSnackBar.messengerKey,
-      themeMode: ThemeMode.dark, // Enforce dark theme based on requirements
+      scrollBehavior: const PremiumScrollBehavior(),
+      themeMode: ThemeMode.dark,
       theme: AppTheme.darkTheme,
       darkTheme: AppTheme.darkTheme,
-      routerConfig: appRouter, 
+      routerConfig: appRouter,
     );
   }
 }

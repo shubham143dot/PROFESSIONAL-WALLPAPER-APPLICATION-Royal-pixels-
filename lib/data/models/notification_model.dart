@@ -14,7 +14,8 @@ class NotificationModel extends NotificationItem {
     super.data,
   });
 
-  factory NotificationModel.fromFirestore(Map<String, dynamic> json, String id) {
+  factory NotificationModel.fromFirestore(
+      Map<String, dynamic> json, String id) {
     return NotificationModel(
       id: id,
       title: json['title'] as String? ?? '',

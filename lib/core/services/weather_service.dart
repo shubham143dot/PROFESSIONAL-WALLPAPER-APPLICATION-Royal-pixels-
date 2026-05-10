@@ -7,13 +7,15 @@ enum WeatherCondition { sunny, rainy, cloudy, stormy, foggy, snowy, unknown }
 
 class WeatherService {
   // TODO: Move to a secure config
-  static const String _apiKey = 'f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6'; // Placeholder
+  static const String _apiKey =
+      'f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6'; // Placeholder
 
   Future<WeatherCondition> getCurrentCondition() async {
     try {
       final position = await _determinePosition();
-      final url = 'https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$_apiKey';
-      
+      final url =
+          'https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$_apiKey';
+
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -29,11 +31,19 @@ class WeatherService {
   }
 
   WeatherCondition _mapToCondition(String main) {
-    if (main.contains('sun') || main.contains('clear')) return WeatherCondition.sunny;
-    if (main.contains('rain') || main.contains('drizzle')) return WeatherCondition.rainy;
+    if (main.contains('sun') || main.contains('clear')) {
+      return WeatherCondition.sunny;
+    }
+    if (main.contains('rain') || main.contains('drizzle')) {
+      return WeatherCondition.rainy;
+    }
     if (main.contains('cloud')) return WeatherCondition.cloudy;
-    if (main.contains('storm') || main.contains('thunder')) return WeatherCondition.stormy;
-    if (main.contains('fog') || main.contains('mist') || main.contains('haze')) return WeatherCondition.foggy;
+    if (main.contains('storm') || main.contains('thunder')) {
+      return WeatherCondition.stormy;
+    }
+    if (main.contains('fog') || main.contains('mist') || main.contains('haze')) {
+      return WeatherCondition.foggy;
+    }
     if (main.contains('snow')) return WeatherCondition.snowy;
     return WeatherCondition.unknown;
   }
@@ -48,11 +58,14 @@ class WeatherService {
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return Future.error('Location permissions are denied');
+      if (permission == LocationPermission.denied) {
+        return Future.error('Location permissions are denied');
+      }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      return Future.error('Location permissions are permanently denied, we cannot request permissions.');
+      return Future.error(
+          'Location permissions are permanently denied, we cannot request permissions.');
     }
 
     return await Geolocator.getCurrentPosition();
@@ -60,12 +73,18 @@ class WeatherService {
 
   List<String> getTagsForWeather(WeatherCondition condition) {
     switch (condition) {
-      case WeatherCondition.sunny: return ['nature', 'bright', 'sunrise', 'warm', 'sky'];
-      case WeatherCondition.rainy: return ['dark', 'moody', 'minimal', 'forest', 'rain'];
-      case WeatherCondition.stormy: return ['lightning', 'dramatic', 'dark', 'cyberpunk'];
-      case WeatherCondition.foggy: return ['minimal', 'misty', 'soft', 'abstract'];
-      case WeatherCondition.snowy: return ['winter', 'white', 'minimal', 'nature'];
-      default: return [];
+      case WeatherCondition.sunny:
+        return ['nature', 'bright', 'sunrise', 'warm', 'sky'];
+      case WeatherCondition.rainy:
+        return ['dark', 'moody', 'minimal', 'forest', 'rain'];
+      case WeatherCondition.stormy:
+        return ['lightning', 'dramatic', 'dark', 'cyberpunk'];
+      case WeatherCondition.foggy:
+        return ['minimal', 'misty', 'soft', 'abstract'];
+      case WeatherCondition.snowy:
+        return ['winter', 'white', 'minimal', 'nature'];
+      default:
+        return [];
     }
   }
 }

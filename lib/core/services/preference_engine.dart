@@ -66,7 +66,8 @@ class PreferenceEngine {
     }
 
     final batch = _firestore.batch();
-    final prefDoc = _firestore.collection('users').doc(uid).collection('preferences');
+    final prefDoc =
+        _firestore.collection('users').doc(uid).collection('preferences');
 
     for (final tag in event.tags) {
       batch.set(
@@ -96,7 +97,7 @@ class PreferenceEngine {
         .doc(user.uid)
         .collection('preferences')
         .orderBy('score', descending: true)
-        .limit(10)
+        .limit(25)
         .get();
 
     return snapshot.docs

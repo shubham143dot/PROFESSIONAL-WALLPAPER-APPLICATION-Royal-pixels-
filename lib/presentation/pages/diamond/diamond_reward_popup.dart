@@ -1,4 +1,5 @@
 import 'dart:ui';
+import '../../../core/services/adaptive_performance.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,7 +8,6 @@ import '../../../domain/entities/diamond_data.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/diamond_provider.dart';
 import '../../providers/haptic_provider.dart';
-
 
 /// Premium daily reward bottom sheet popup.
 /// Shows automatically on first app open per day.
@@ -43,13 +43,18 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
 
   static const List<int> _streakRewards = [10, 15, 20, 25, 30, 40, 50];
   static const List<String> _dayLabels = [
-    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+    'Day 1',
+    'Day 2',
+    'Day 3',
+    'Day 4',
+    'Day 5',
+    'Day 6',
+    'Day 7'
   ];
 
   Future<void> _claim() async {
     if (_claimed || _isLoading) return;
     ref.read(hapticProvider.notifier).heavyImpact();
-
 
     if (widget.reward.isBonus) {
       setState(() => _showBonusChoice = true);
@@ -89,28 +94,48 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.bg1.withAlpha(230),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            border: const Border(
-              top: BorderSide(color: AppColors.glassBorder, width: 1),
-              left: BorderSide(color: AppColors.glassBorder, width: 1),
-              right: BorderSide(color: AppColors.glassBorder, width: 1),
+      child: AdaptivePerformance.enableBackdropBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.bg1.withAlpha(13),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                  border: const Border(
+                    top: BorderSide(color: AppColors.glassBorder, width: 1),
+                    left: BorderSide(color: AppColors.glassBorder, width: 1),
+                    right: BorderSide(color: AppColors.glassBorder, width: 1),
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    child: _showBonusChoice
+                        ? _buildBonusChoice()
+                        : _buildMainContent(day, diamonds),
+                  ),
+                ),
+              ),
+            )
+          : Container(
+              decoration: BoxDecoration(
+                color: AppColors.bg1.withAlpha(250),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                border: const Border(
+                  top: BorderSide(color: AppColors.glassBorder, width: 1),
+                  left: BorderSide(color: AppColors.glassBorder, width: 1),
+                  right: BorderSide(color: AppColors.glassBorder, width: 1),
+                ),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: _showBonusChoice
+                      ? _buildBonusChoice()
+                      : _buildMainContent(day, diamonds),
+                ),
+              ),
             ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-              child: _showBonusChoice
-                  ? _buildBonusChoice()
-                  : _buildMainContent(day, diamonds),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -184,67 +209,97 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
 
   Widget _buildStreakRow(int currentDay) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(7, (i) {
         final dayNum = i + 1;
-        final isPast = dayNum < currentDay;
-        final isCurrent = dayNum == currentDay;
+        final isDone = dayNum < currentDay || (dayNum == currentDay && _claimed);
+        final isActive = dayNum == currentDay && !_claimed;
         final isFuture = dayNum > currentDay;
 
-        Color bg;
-        Color border;
-        if (isCurrent) {
-          bg = AppColors.goldMid.withAlpha(40);
-          border = AppColors.goldMid;
-        } else if (isPast) {
-          bg = Colors.green.withAlpha(30);
-          border = Colors.green.withAlpha(100);
+        Color borderColor;
+        Color? bgColor;
+        Widget child;
+
+        if (isDone) {
+          borderColor = const Color(0xFF2A7040);
+          bgColor = const Color(0xFF0A2010);
+          child = const Icon(Icons.check_rounded, color: Colors.greenAccent, size: 14);
+        } else if (isActive) {
+          borderColor = AppColors.goldMid;
+          bgColor = const Color(0xFF2D2000);
+          child = ShaderMask(
+            shaderCallback: (b) => AppColors.goldGradient.createShader(b),
+            child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 14),
+          );
         } else {
-          bg = AppColors.bg2;
-          border = AppColors.glassBorder;
+          borderColor = const Color(0xFF1E2840);
+          bgColor = const Color(0xFF0D1220);
+          child = Text(
+            '$dayNum',
+            style: const TextStyle(
+              color: Color(0xFF445577),
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          );
         }
 
         return Expanded(
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: border, width: 1.2),
-            ),
+            margin: const EdgeInsets.symmetric(horizontal: 2),
             child: Column(
               children: [
-                Text(
-                  isCurrent
-                      ? '💎'
-                      : isPast
-                          ? '✓'
-                          : '◇',
-                  style: TextStyle(
-                    fontSize: isCurrent ? 14 : 12,
-                    color: isPast ? Colors.greenAccent : AppColors.textMuted,
+                Container(
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: borderColor,
+                      width: isActive ? 2 : 1.2,
+                    ),
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: AppColors.goldMid.withAlpha(50),
+                              blurRadius: 10,
+                              spreadRadius: 0,
+                            )
+                          ]
+                        : [],
                   ),
-                ),
-                const SizedBox(height: 3),
+                  child: Center(child: child),
+                )
+                    .animate(target: isActive ? 1 : 0)
+                    .scale(
+                        begin: const Offset(1, 1),
+                        end: const Offset(1.05, 1.05),
+                        curve: Curves.easeInOut)
+                    .then()
+                    .shake(hz: 2),
+                const SizedBox(height: 6),
                 Text(
                   _dayLabels[i],
                   style: TextStyle(
-                    color: isCurrent
-                        ? AppColors.goldLight
-                        : isFuture
-                            ? AppColors.textMuted
-                            : Colors.greenAccent,
-                    fontSize: 9,
-                    fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
+                    color: isDone
+                        ? Colors.greenAccent.withAlpha(150)
+                        : isActive
+                            ? AppColors.goldLight
+                            : const Color(0xFF445577),
+                    fontSize: 8,
+                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                   ),
                 ),
+                const SizedBox(height: 1),
                 Text(
                   '+${_streakRewards[i]}',
                   style: TextStyle(
-                    color: isCurrent ? AppColors.goldMid : AppColors.textMuted,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
+                    color: isDone
+                        ? Colors.greenAccent.withAlpha(100)
+                        : isActive
+                            ? AppColors.goldMid
+                            : const Color(0xFF334455),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
@@ -334,10 +389,10 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
       child: GestureDetector(
         onTap: _claim,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(
             gradient: AppColors.goldGradient,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
                 color: AppColors.goldMid.withAlpha(80),
@@ -352,32 +407,29 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
                   width: 20,
                   child: Center(
                     child: CircularProgressIndicator(
-                      color: Colors.black,
-                      strokeWidth: 2,
+                      color: Color(0xFF2D1E00),
+                      strokeWidth: 2.5,
                     ),
                   ),
                 )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('💎', style: TextStyle(fontSize: 18)),
+                    const Icon(Icons.diamond_rounded, color: Color(0xFF2D1E00), size: 18),
                     const SizedBox(width: 8),
                     Text(
-                      'Claim +$diamonds Diamonds',
+                      'CLAIM +$diamonds DIAMONDS',
                       style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
+                        color: Color(0xFF2D1E00),
+                        fontSize: 15,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
+                        letterSpacing: 1.0,
                       ),
                     ),
                   ],
                 ),
         ),
-      )
-          .animate(delay: 300.ms)
-          .fade()
-          .slideY(begin: 0.3),
+      ).animate(delay: 300.ms).fade().slideY(begin: 0.3),
     );
   }
 
@@ -477,8 +529,8 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
                     ),
                     Text(
                       'Then use them to unlock a wallpaper',
-                      style: TextStyle(
-                          color: AppColors.textMuted, fontSize: 11),
+                      style:
+                          TextStyle(color: AppColors.textMuted, fontSize: 11),
                     ),
                   ],
                 ),

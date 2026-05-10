@@ -59,7 +59,7 @@ class UpdateCheckResult {
 /// ```
 class UpdateService {
   static const String _collection = 'app_config';
-  static const String _document   = 'update';
+  static const String _document = 'update';
 
   /// Fetches the update config from Firestore and returns an [UpdateCheckResult].
   /// Returns [UpdateType.none] on any error to avoid blocking users on network issues.
@@ -89,19 +89,23 @@ class UpdateService {
           .get();
 
       if (!doc.exists) {
-        if (kDebugMode) debugPrint('[UpdateService] No update config in Firestore.');
+        if (kDebugMode) {
+          debugPrint('[UpdateService] No update config in Firestore.');
+        }
         return fallback;
       }
 
       final data = doc.data()!;
-      final int latestBuild  = (data['latest_build_number'] as num?)?.toInt() ?? 0;
-      final int minBuild     = (data['min_build_number']    as num?)?.toInt() ?? 0;
-      final String storeUrl  = data['store_url']?.toString() ?? '';
+      final int latestBuild =
+          (data['latest_build_number'] as num?)?.toInt() ?? 0;
+      final int minBuild = (data['min_build_number'] as num?)?.toInt() ?? 0;
+      final String storeUrl = data['store_url']?.toString() ?? '';
       final String versionName = data['latest_version_name']?.toString() ?? '';
-      final String notes     = data['release_notes']?.toString() ?? '';
+      final String notes = data['release_notes']?.toString() ?? '';
 
       if (kDebugMode) {
-        debugPrint('[UpdateService] Firestore → latest: $latestBuild, min: $minBuild');
+        debugPrint(
+            '[UpdateService] Firestore → latest: $latestBuild, min: $minBuild');
       }
 
       // 3. Determine update type

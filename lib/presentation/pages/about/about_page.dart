@@ -67,7 +67,8 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
             child: FadeTransition(
               opacity: _fadeAnim,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -273,7 +274,8 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               color: Colors.red.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.withValues(alpha: 0.2), width: 1),
+              border: Border.all(
+                  color: Colors.red.withValues(alpha: 0.2), width: 1),
             ),
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -281,7 +283,9 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.block_rounded, color: Colors.redAccent.withValues(alpha: 0.85), size: 14),
+                    Icon(Icons.block_rounded,
+                        color: Colors.redAccent.withValues(alpha: 0.85),
+                        size: 14),
                     const SizedBox(width: 8),
                     Text(
                       'Restricted Usage',
@@ -302,14 +306,21 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                     'Reproduction',
                     'Distribution',
                     'Resale',
-                  ].map((a) => Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.close, color: Colors.redAccent, size: 12),
-                      const SizedBox(width: 4),
-                      Text(a, style: TextStyle(color: Colors.redAccent.withValues(alpha: 0.8), fontSize: 12)),
-                    ],
-                  )).toList(),
+                  ]
+                      .map((a) => Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.close,
+                                  color: Colors.redAccent, size: 12),
+                              const SizedBox(width: 4),
+                              Text(a,
+                                  style: TextStyle(
+                                      color: Colors.redAccent
+                                          .withValues(alpha: 0.8),
+                                      fontSize: 12)),
+                            ],
+                          ))
+                      .toList(),
                 ),
               ],
             ),
@@ -328,7 +339,8 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
           query: 'subject=Royal%20Pixels%20Support',
         );
         try {
-          if (!await launchUrl(emailLaunchUri, mode: LaunchMode.externalApplication)) {
+          if (!await launchUrl(emailLaunchUri,
+              mode: LaunchMode.externalApplication)) {
             await launchUrl(emailLaunchUri);
           }
         } catch (e) {
@@ -344,7 +356,8 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
         decoration: BoxDecoration(
           color: const Color(0xFF141420),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.07), width: 1),
+          border:
+              Border.all(color: Colors.white.withValues(alpha: 0.07), width: 1),
         ),
         child: Row(
           children: [
@@ -354,7 +367,8 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                 color: Colors.green.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.email_rounded, color: Colors.greenAccent, size: 22),
+              child: const Icon(Icons.email_rounded,
+                  color: Colors.greenAccent, size: 22),
             ),
             const SizedBox(width: 16),
             const Expanded(
@@ -385,9 +399,14 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
               decoration: BoxDecoration(
                 color: Colors.greenAccent.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3)),
+                border: Border.all(
+                    color: Colors.greenAccent.withValues(alpha: 0.3)),
               ),
-              child: const Text('Contact Us', style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.w600)),
+              child: const Text('Contact Us',
+                  style: TextStyle(
+                      color: Colors.greenAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -398,7 +417,8 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
   Widget _buildPrivacyPolicyButton() {
     return InkWell(
       onTap: () async {
-        final url = Uri.parse('https://sites.google.com/view/royal-pixels-privacy/home');
+        final url = Uri.parse(
+            'https://sites.google.com/view/royal-pixels-privacy/home');
         try {
           await launchUrl(url, mode: LaunchMode.externalApplication);
         } catch (e) {
@@ -414,7 +434,8 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
         decoration: BoxDecoration(
           color: const Color(0xFF141420),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.07), width: 1),
+          border:
+              Border.all(color: Colors.white.withValues(alpha: 0.07), width: 1),
         ),
         child: Row(
           children: [
@@ -424,7 +445,8 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                 color: Colors.blue.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.privacy_tip_rounded, color: Colors.blueAccent, size: 22),
+              child: const Icon(Icons.privacy_tip_rounded,
+                  color: Colors.blueAccent, size: 22),
             ),
             const SizedBox(width: 16),
             const Expanded(
@@ -450,18 +472,18 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                 ],
               ),
             ),
-            const Icon(Icons.open_in_new_rounded, color: Colors.white54, size: 20),
+            const Icon(Icons.open_in_new_rounded,
+                color: Colors.white54, size: 20),
           ],
         ),
       ),
     );
   }
 
-
-
   // Helpers
 
-  Widget _highlightText(String highlighted, String rest, {required Color highlight}) {
+  Widget _highlightText(String highlighted, String rest,
+      {required Color highlight}) {
     return RichText(
       text: TextSpan(
         children: [
@@ -516,11 +538,18 @@ class _InfoCard extends StatelessWidget {
         color: const Color(0xFF141420),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isExpanded ? iconColor.withValues(alpha: 0.45) : Colors.white.withValues(alpha: 0.07),
+          color: isExpanded
+              ? iconColor.withValues(alpha: 0.45)
+              : Colors.white.withValues(alpha: 0.07),
           width: 1,
         ),
         boxShadow: isExpanded
-            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))]
+            ? [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4))
+              ]
             : [],
       ),
       child: InkWell(
@@ -579,7 +608,9 @@ class _InfoCard extends StatelessWidget {
               AnimatedCrossFade(
                 firstChild: const SizedBox.shrink(),
                 secondChild: expandedContent,
-                crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                crossFadeState: isExpanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
                 duration: const Duration(milliseconds: 280),
               ),
             ],

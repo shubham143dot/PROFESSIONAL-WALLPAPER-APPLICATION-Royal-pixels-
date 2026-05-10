@@ -3,9 +3,12 @@ import '../../core/error/failures.dart';
 
 abstract class PaymentRepository {
   Future<Either<Failure, String>> getUpiId();
-  Future<Either<Failure, bool>> initiateUpiPayment(String upiId, double amount, String wallpaperId);
-  Future<Either<Failure, void>> unlockWallpaper(String userId, String wallpaperId);
-  Future<Either<Failure, bool>> checkUnlockStatus(String userId, String wallpaperId);
+  Future<Either<Failure, bool>> initiateUpiPayment(
+      String upiId, double amount, String wallpaperId);
+  Future<Either<Failure, void>> unlockWallpaper(
+      String userId, String wallpaperId);
+  Future<Either<Failure, bool>> checkUnlockStatus(
+      String userId, String wallpaperId);
   Future<Either<Failure, void>> submitManualPayment({
     required String userId,
     required String wallpaperId,
@@ -14,14 +17,7 @@ abstract class PaymentRepository {
     required String wallpaperTitle,
     String? screenshotUrl,
   });
-  Future<Either<Failure, void>> submitSubscriptionPayment({
-    required String userId,
-    required int months,
-    required double amount,
-    required String txnId,
-    String? screenshotUrl,
-  });
-  Future<Either<Failure, bool>> checkSubscriptionStatus(String userId);
+
 
   /// Uploads a payment screenshot to Firebase Storage and returns its download URL.
   Future<Either<Failure, String>> uploadPaymentScreenshot({
@@ -39,5 +35,10 @@ abstract class PaymentRepository {
     required int diamondsGranted,
     required String txnId,
     String? screenshotUrl,
+  });
+  /// Updates user's subscription status.
+  Future<Either<Failure, void>> updateSubscription({
+    required String userId,
+    required bool isSubscribed,
   });
 }

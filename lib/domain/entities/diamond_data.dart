@@ -2,62 +2,52 @@
 class DiamondData {
   final int diamonds;
   final int streak; // 1–7
-  final int adsWatchedToday;          // max 5
-  final int smallRewardEarnedToday;   // combined download+set-as cap: max 80
+  final int smallRewardEarnedToday; // combined download+set-as cap: max 80
   final bool canClaimToday;
-  final String lastRewardDate;        // "YYYY-MM-DD"
-  final String lastAdDate;
-  final String lastSmallRewardDate;   // date when smallRewardEarnedToday was set
+  final String lastRewardDate; // "YYYY-MM-DD"
+  final String lastSmallRewardDate; // date when smallRewardEarnedToday was set
 
   const DiamondData({
     required this.diamonds,
     required this.streak,
-    required this.adsWatchedToday,
     this.smallRewardEarnedToday = 0,
     required this.canClaimToday,
     required this.lastRewardDate,
-    required this.lastAdDate,
     this.lastSmallRewardDate = '',
   });
 
-  static const int dailyAdLimit          = 5;
-  static const int dailySmallRewardCap   = 80; // combined cap for download+set-as
-  static const int smallRewardAmount     = 5;
+  static const int dailySmallRewardCap = 80; // combined cap for download+set-as
+  static const int smallRewardAmount = 5;
 
-  bool get canWatchAd   => adsWatchedToday       < dailyAdLimit;
   bool get canEarnSmall => smallRewardEarnedToday < dailySmallRewardCap;
 
-  int get remainingAdsToday      => dailyAdLimit        - adsWatchedToday;
-  int get remainingSmallReward   => dailySmallRewardCap - smallRewardEarnedToday;
+  int get remainingSmallReward => dailySmallRewardCap - smallRewardEarnedToday;
 
   DiamondData copyWith({
     int? diamonds,
     int? streak,
-    int? adsWatchedToday,
     int? smallRewardEarnedToday,
     bool? canClaimToday,
     String? lastRewardDate,
-    String? lastAdDate,
     String? lastSmallRewardDate,
   }) {
     return DiamondData(
-      diamonds:               diamonds               ?? this.diamonds,
-      streak:                 streak                 ?? this.streak,
-      adsWatchedToday:        adsWatchedToday        ?? this.adsWatchedToday,
-      smallRewardEarnedToday: smallRewardEarnedToday ?? this.smallRewardEarnedToday,
-      canClaimToday:          canClaimToday          ?? this.canClaimToday,
-      lastRewardDate:         lastRewardDate         ?? this.lastRewardDate,
-      lastAdDate:             lastAdDate             ?? this.lastAdDate,
-      lastSmallRewardDate:    lastSmallRewardDate    ?? this.lastSmallRewardDate,
+      diamonds: diamonds ?? this.diamonds,
+      streak: streak ?? this.streak,
+      smallRewardEarnedToday:
+          smallRewardEarnedToday ?? this.smallRewardEarnedToday,
+      canClaimToday: canClaimToday ?? this.canClaimToday,
+      lastRewardDate: lastRewardDate ?? this.lastRewardDate,
+      lastSmallRewardDate: lastSmallRewardDate ?? this.lastSmallRewardDate,
     );
   }
 }
 
 /// Result returned when a daily reward is claimed.
 class DailyRewardResult {
-  final int day;         // 1–7
-  final int diamonds;    // diamonds awarded this claim
-  final bool isBonus;    // true on day 7
+  final int day; // 1–7
+  final int diamonds; // diamonds awarded this claim
+  final bool isBonus; // true on day 7
 
   const DailyRewardResult({
     required this.day,

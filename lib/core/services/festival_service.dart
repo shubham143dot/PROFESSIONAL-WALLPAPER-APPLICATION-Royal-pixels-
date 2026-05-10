@@ -51,13 +51,30 @@ class FestivalService {
     if (country != 'IN') return null;
 
     final calendar = {
-      '2026-03-03': Festival(name: 'Holi', date: DateTime(2026, 3, 3), tags: ['vibrant', 'colors', 'festival', 'abstract'], country: 'IN'),
-      '2026-04-10': Festival(name: 'Ramadan', date: DateTime(2026, 4, 10), tags: ['moon', 'spiritual', 'night', 'dark'], country: 'IN'),
-      '2026-08-15': Festival(name: 'Independence Day', date: DateTime(2026, 8, 15), tags: ['india', 'tricolored', 'proud', 'flag'], country: 'IN'),
-      '2026-10-20': Festival(name: 'Diwali', date: DateTime(2026, 10, 20), tags: ['diwali', 'lights', 'golden', 'festival'], country: 'IN'),
+      '2026-03-03': Festival(
+          name: 'Holi',
+          date: DateTime(2026, 3, 3),
+          tags: ['vibrant', 'colors', 'festival', 'abstract'],
+          country: 'IN'),
+      '2026-04-10': Festival(
+          name: 'Ramadan',
+          date: DateTime(2026, 4, 10),
+          tags: ['moon', 'spiritual', 'night', 'dark'],
+          country: 'IN'),
+      '2026-08-15': Festival(
+          name: 'Independence Day',
+          date: DateTime(2026, 8, 15),
+          tags: ['india', 'tricolored', 'proud', 'flag'],
+          country: 'IN'),
+      '2026-10-20': Festival(
+          name: 'Diwali',
+          date: DateTime(2026, 10, 20),
+          tags: ['diwali', 'lights', 'golden', 'festival'],
+          country: 'IN'),
     };
 
-    final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final dateKey =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     return calendar[dateKey];
   }
 }

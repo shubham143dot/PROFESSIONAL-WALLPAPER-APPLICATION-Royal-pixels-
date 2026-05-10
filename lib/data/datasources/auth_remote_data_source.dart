@@ -4,7 +4,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 import '../../core/constants/app_constants.dart';
 
-
 abstract class AuthRemoteDataSource {
   Future<UserModel> signInWithGoogle();
   Future<void> signOut();
@@ -29,7 +28,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception('Google Sign-In was cancelled by the user');
     }
 
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
 
     // idToken can be null if serverClientId is not configured in GoogleSignIn.
     // Ensure the service_locator.dart passes serverClientId to GoogleSignIn().
@@ -45,7 +45,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       idToken: googleAuth.idToken,
     );
 
-    final auth.UserCredential userCredential = await firebaseAuth.signInWithCredential(credential);
+    final auth.UserCredential userCredential =
+        await firebaseAuth.signInWithCredential(credential);
     final auth.User? user = userCredential.user;
 
     if (user == null) {
@@ -54,7 +55,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     // Check if user exists in Firestore
     final userDoc = await firestore.collection('users').doc(user.uid).get();
-    
+
     UserModel userModel;
     if (userDoc.exists) {
       // Update login history, version, and profile info
@@ -115,14 +116,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           ownedWallpaperCount: 0,
           appVersion: AppConstants.appVersion,
         );
-        
+
         await firestore.collection('users').doc(user.uid).set({
           ...userModel.toFirestore(),
           'liked_wallpapers': [],
           'login_history': FieldValue.serverTimestamp(),
           'app_version': AppConstants.appVersion,
         });
-        
+
         return userModel;
       }
     }

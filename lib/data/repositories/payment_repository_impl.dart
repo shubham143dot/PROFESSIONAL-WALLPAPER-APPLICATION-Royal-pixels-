@@ -80,8 +80,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
   }) async {
     try {
       final file = File(localFilePath);
-      final fileName =
-          'payment_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName = 'payment_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = storage
           .ref()
           .child('payment_screenshots')
@@ -125,37 +124,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
     }
   }
 
-  @override
-  Future<Either<Failure, void>> submitSubscriptionPayment({
-    required String userId,
-    required int months,
-    required double amount,
-    required String txnId,
-    String? screenshotUrl,
-  }) async {
-    try {
-      await remoteDataSource.submitSubscriptionRequest(
-        userId: userId,
-        months: months,
-        amount: amount,
-        txnId: txnId,
-        screenshotUrl: screenshotUrl,
-      );
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
 
-  @override
-  Future<Either<Failure, bool>> checkSubscriptionStatus(String userId) async {
-    try {
-      final isSub = await remoteDataSource.checkSubscriptionStatus(userId);
-      return Right(isSub);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
 
   @override
   Future<Either<Failure, void>> submitDiamondPackPayment({
@@ -182,5 +151,16 @@ class PaymentRepositoryImpl implements PaymentRepository {
       return Left(ServerFailure(e.toString()));
     }
   }
+  @override
+  Future<Either<Failure, void>> updateSubscription({
+    required String userId,
+    required bool isSubscribed,
+  }) async {
+    try {
+      await remoteDataSource.updateSubscriptionStatus(userId, isSubscribed);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 }
-

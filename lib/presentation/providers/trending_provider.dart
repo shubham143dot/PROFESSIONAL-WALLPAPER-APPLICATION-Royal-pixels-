@@ -18,7 +18,7 @@ class TrendingNotifier extends AsyncNotifier<List<WallpaperEntity>> {
   Future<List<WallpaperEntity>> _fetch() async {
     try {
       final ds = sl<FirestoreDataSource>();
-      final results = await ds.getTrendingWallpapers(limit: 10);
+      final results = await ds.getTrendingWallpapers(limit: 30);
       // Sort by viewCount descending client-side for safety
       results.sort((a, b) => b.viewCount.compareTo(a.viewCount));
       return results;
@@ -35,21 +35,30 @@ class TrendingNotifier extends AsyncNotifier<List<WallpaperEntity>> {
   void incrementViews(String id, {String? userId}) {
     if (state.hasValue) {
       final list = state.value!;
-      state = AsyncValue.data(list.map((w) => w.id == id ? w.copyWith(viewCount: w.viewCount + 1) : w).toList());
+      state = AsyncValue.data(list
+          .map((w) => w.id == id ? w.copyWith(viewCount: w.viewCount + 1) : w)
+          .toList());
     }
   }
 
   void updateLikeCount(String id, int adjustment) {
     if (state.hasValue) {
       final list = state.value!;
-      state = AsyncValue.data(list.map((w) => w.id == id ? w.copyWith(likeCount: (w.likeCount + adjustment).clamp(0, 9999999)) : w).toList());
+      state = AsyncValue.data(list
+          .map((w) => w.id == id
+              ? w.copyWith(
+                  likeCount: (w.likeCount + adjustment).clamp(0, 9999999))
+              : w)
+          .toList());
     }
   }
 
   void incrementShares(String id) {
     if (state.hasValue) {
       final list = state.value!;
-      state = AsyncValue.data(list.map((w) => w.id == id ? w.copyWith(shareCount: w.shareCount + 1) : w).toList());
+      state = AsyncValue.data(list
+          .map((w) => w.id == id ? w.copyWith(shareCount: w.shareCount + 1) : w)
+          .toList());
     }
   }
 }

@@ -7,5 +7,6 @@ enum NotificationType {
   system;
 
   String toJson() => name;
-  static NotificationType fromJson(String name) => NotificationType.values.byName(name);
+  static NotificationType fromJson(String name) =>
+      NotificationType.values.byName(name);
 }

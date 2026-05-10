@@ -7,14 +7,13 @@ import '../theme/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../../presentation/providers/auth_provider.dart';
 import '../../presentation/providers/haptic_provider.dart';
-
+import '../services/adaptive_performance.dart';
 
 /// Reason codes that customise the message shown in the sheet.
 enum LoginRequiredReason {
   favorites,
   premium,
   diamonds,
-  subscription,
   general,
 }
 
@@ -43,21 +42,20 @@ class _LoginRequiredSheet extends ConsumerWidget {
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(
-              24, 16, 24, MediaQuery.of(context).padding.bottom + 32),
-          decoration: BoxDecoration(
-            color: AppColors.bg0.withAlpha(230),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(32)),
-            border: Border.all(
-                color: AppColors.glassBorder.withAlpha(120), width: 1),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+      child: Builder(
+        builder: (context) {
+          final content = Container(
+            padding: EdgeInsets.fromLTRB(
+                24, 16, 24, MediaQuery.of(context).padding.bottom + 32),
+            decoration: BoxDecoration(
+              color: AppColors.bg0.withAlpha(AdaptivePerformance.enableBackdropBlur ? 13 : 240),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border.all(
+                  color: AppColors.glassBorder.withAlpha(120), width: 1),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               // ── Drag handle ──────────────────────────────────────────
               Container(
                 width: 40,
@@ -129,12 +127,9 @@ class _LoginRequiredSheet extends ConsumerWidget {
                       isLoading: isLoading,
                       onTap: () async {
                         ref.read(hapticProvider.notifier).lightImpact();
-                        await ref
-                            .read(authProvider.notifier)
-                            .loginWithGoogle();
+                        await ref.read(authProvider.notifier).loginWithGoogle();
                         final authState = ref.read(authProvider);
-                        if (authState.user != null &&
-                            context.mounted) {
+                        if (authState.user != null && context.mounted) {
                           Navigator.of(context).pop(true);
                           // Ensure we're on the home route
                           context.go('/home');
@@ -164,7 +159,14 @@ class _LoginRequiredSheet extends ConsumerWidget {
               ).animate().fade(delay: 200.ms, duration: 350.ms),
             ],
           ),
-        ),
+          );
+          return AdaptivePerformance.enableBackdropBlur
+              ? BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: content,
+                )
+              : content;
+        },
       ),
     );
   }
@@ -209,8 +211,8 @@ class _SignInButton extends StatelessWidget {
                     height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                          AppColors.goldMid),
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(AppColors.goldMid),
                     ),
                   ),
                 ),
@@ -263,7 +265,7 @@ _ReasonConfig _reasonConfig(LoginRequiredReason reason) {
         icon: Icons.lock_rounded,
         title: 'Unlock Premium Content',
         description:
-            'Sign in to unlock premium wallpapers using your Diamond wallet or a PRO subscription.',
+            'Sign in to unlock premium wallpapers using your Diamond wallet.',
       );
     case LoginRequiredReason.diamonds:
       return const _ReasonConfig(
@@ -272,13 +274,7 @@ _ReasonConfig _reasonConfig(LoginRequiredReason reason) {
         description:
             'Sign in to earn diamonds, claim daily rewards, and unlock exclusive premium wallpapers.',
       );
-    case LoginRequiredReason.subscription:
-      return const _ReasonConfig(
-        icon: Icons.workspace_premium_rounded,
-        title: 'Unlock PRO Membership',
-        description:
-            'Sign in to purchase a PRO subscription and get unlimited access to all premium wallpapers.',
-      );
+
     case LoginRequiredReason.general:
       return const _ReasonConfig(
         icon: Icons.person_rounded,

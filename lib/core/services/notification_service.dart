@@ -7,8 +7,9 @@ import '../constants/app_constants.dart';
 import '../di/service_locator.dart';
 
 class NotificationService {
-  static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
-  
+  static final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
   static const String _lastPushKey = 'last_push_timestamp';
   static const String _channelId = 'royal_pixels_channel';
   static const String _channelName = 'Royal Pixels Notifications';
@@ -27,9 +28,10 @@ class NotificationService {
     await createNotificationChannel();
 
     // 3. Initialize Local Notifications (for foreground notifications)
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings();
-    
+
     await _localNotifications.initialize(
       const InitializationSettings(android: androidSettings, iOS: iosSettings),
       onDidReceiveNotificationResponse: (details) {
@@ -45,16 +47,17 @@ class NotificationService {
     // 5. Handle token refresh
     messaging.onTokenRefresh.listen((newToken) async {
       // If a user is currently logged in, we should update their token
-      // This will be handled by AuthProvider typically, but we can 
+      // This will be handled by AuthProvider typically, but we can
       // trigger a check if we have the UID.
     });
   }
 
   static Future<void> createNotificationChannel() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
-      final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      
+      final androidPlugin =
+          _localNotifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
       if (androidPlugin != null) {
         const channel = AndroidNotificationChannel(
           _channelId,
@@ -105,7 +108,7 @@ class NotificationService {
       importance: Importance.max,
       priority: Priority.high,
     );
-    
+
     const iosDetails = DarwinNotificationDetails();
 
     await _localNotifications.show(
@@ -119,9 +122,9 @@ class NotificationService {
   static Future<bool> canReceivePush() async {
     final prefs = await SharedPreferences.getInstance();
     final lastPushStr = prefs.getString(_lastPushKey);
-    
+
     if (lastPushStr == null) return true;
-    
+
     try {
       final lastPush = DateTime.parse(lastPushStr);
       final now = DateTime.now();
@@ -152,7 +155,7 @@ class NotificationService {
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // If we wanted to ignore the notification based on the 1-per-day limit,
-  // we could check it here. However, background notifications are often 
+  // we could check it here. However, background notifications are often
   // automatically displayed by the OS if they have a 'notification' payload.
   if (kDebugMode) {
     debugPrint("Handling a background message: ${message.messageId}");

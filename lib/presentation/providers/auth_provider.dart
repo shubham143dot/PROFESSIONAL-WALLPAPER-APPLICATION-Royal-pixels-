@@ -17,7 +17,6 @@ import '../../core/services/notification_service.dart';
 import 'dart:convert';
 import '../../core/constants/app_constants.dart';
 
-
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
   return AuthNotifier();
 });
@@ -26,6 +25,7 @@ class AuthState {
   final bool isLoading;
   final UserEntity? user;
   final String? error;
+
   /// True when user chose "Continue as Guest" — no Firebase Auth session
   final bool isGuest;
 
@@ -94,7 +94,8 @@ class AuthNotifier extends Notifier<AuthState> {
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('AuthNotifier build: Firebase Auth not initialized or failed: $e');
+        debugPrint(
+            'AuthNotifier build: Firebase Auth not initialized or failed: $e');
       }
     }
 
@@ -126,7 +127,8 @@ class AuthNotifier extends Notifier<AuthState> {
       final result = await loginUseCase(NoParams());
 
       await result.fold(
-        (failure) async => state = state.copyWith(isLoading: false, error: failure.message),
+        (failure) async =>
+            state = state.copyWith(isLoading: false, error: failure.message),
         (user) async {
           // If we were in guest mode, merge guest data before clearing
           final wasGuest = state.isGuest;
@@ -155,14 +157,14 @@ class AuthNotifier extends Notifier<AuthState> {
       if (guestFavs.isNotEmpty) {
         final firestore = sl<FirebaseFirestore>();
         final batch = firestore.batch();
-        
+
         // Write to user doc
         batch.set(
           firestore.collection('users').doc(user.uid),
           {'liked_wallpapers': FieldValue.arrayUnion(guestFavs)},
           SetOptions(merge: true),
         );
-        
+
         // Also update the global like_count for each wallpaper in the batch
         // Note: Batch limit is 500, we expect guestFavs to be much smaller usually.
         for (var id in guestFavs) {
@@ -171,7 +173,7 @@ class AuthNotifier extends Notifier<AuthState> {
             {'like_count': FieldValue.increment(1)},
           );
         }
-        
+
         await batch.commit();
       }
 
@@ -201,7 +203,7 @@ class AuthNotifier extends Notifier<AuthState> {
         final List<dynamic> jsonList = json.decode(localNotifsJson);
         final firestore = sl<FirebaseFirestore>();
         final batch = firestore.batch();
-        
+
         for (var item in jsonList) {
           final model = NotificationModel.fromJson(item);
           final ref = firestore
@@ -213,12 +215,11 @@ class AuthNotifier extends Notifier<AuthState> {
         }
         await batch.commit();
         await prefs.remove('local_notifications');
-        
+
         // Refresh notifications to show migrated ones
         ref.invalidate(notificationProvider);
       }
     } catch (e) {
-
       // Non-fatal: if merge fails, continue login normally
       if (kDebugMode) {
         debugPrint('Guest data merge failed: $e');
@@ -227,36 +228,16 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// Re-fetches the current user document from Firestore and updates state.
-  Future<bool> refreshUser() async {
+  Future<void> refreshUser() async {
     final result = await sl<AuthRepository>().getCurrentUser();
-    return result.fold(
-      (_) => false,
+    result.fold(
+      (_) => null,
       (userData) {
         if (userData != null) {
           state = state.copyWith(user: userData);
-          return userData.isSubscribed;
         }
-        return false;
       },
     );
-  }
-
-  /// Explicitly restores subscription status from Firestore.
-  Future<bool> restoreSubscription() async {
-    state = state.copyWith(isLoading: true);
-    final isPro = await refreshUser();
-    state = state.copyWith(isLoading: false);
-    return isPro;
-  }
-
-  /// Toggles premium status locally for admin accounts (testing purposes).
-  void toggleAdminPremiumOverride() {
-    final user = state.user;
-    if (user != null && user.email == 'subhamsoudeep@gmail.com') {
-      state = state.copyWith(
-        user: user.copyWith(isSubscribed: !user.isSubscribed),
-      );
-    }
   }
 
   Future<void> logout() async {

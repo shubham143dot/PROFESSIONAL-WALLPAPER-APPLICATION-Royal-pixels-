@@ -4,354 +4,457 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/haptic_level.dart';
 import '../providers/haptic_provider.dart';
+import '../../core/services/adaptive_performance.dart';
+import 'premium_touch_tile.dart';
+import 'dart:ui';
 
 class HapticSettingsSheet extends ConsumerWidget {
   const HapticSettingsSheet({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentLevel = ref.watch(hapticProvider);
-    final notifier = ref.read(hapticProvider.notifier);
     final hapticSupport = ref.watch(hapticSupportProvider);
 
     return hapticSupport.when(
-      data: (isHardwareSupported) => _buildContent(context, ref, currentLevel, notifier, isHardwareSupported),
+      data: (isHardwareSupported) => _buildContent(context, ref, isHardwareSupported),
       loading: () => _buildLoading(context),
-      error: (_, __) => _buildContent(context, ref, currentLevel, notifier, false),
+      error: (_, __) => _buildContent(context, ref, false),
     );
   }
 
   Widget _buildLoading(BuildContext context) {
-    return Container(
-      height: 300,
-      decoration: const BoxDecoration(
-        color: AppColors.bg1,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(40),
-          topRight: Radius.circular(40),
-        ),
-      ),
-      child: const Center(
-        child: CircularProgressIndicator(color: AppColors.goldMid),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+      child: Builder(
+        builder: (context) {
+          final content = Container(
+            height: 300,
+            decoration: BoxDecoration(
+              color: AppColors.bg1.withAlpha(AdaptivePerformance.enableBackdropBlur ? 13 : 240),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(color: AppColors.goldMid),
+            ),
+          );
+          return AdaptivePerformance.enableBackdropBlur
+              ? BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: content,
+                )
+              : content;
+        },
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context, WidgetRef ref, HapticLevel currentLevel, HapticNotifier notifier, bool isHardwareSupported) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.bg1,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(40),
-          topRight: Radius.circular(40),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag Handle
-          const SizedBox(height: 12),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.textMuted.withAlpha(80),
-              borderRadius: BorderRadius.circular(2),
-            ),
+  Widget _buildContent(
+      BuildContext context,
+      WidgetRef ref,
+      bool isHardwareSupported) {
+    final enableBlur = AdaptivePerformance.enableBackdropBlur;
+    
+    return Stack(
+      children: [
+        // Main Content Container
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+          child: Builder(
+            builder: (context) {
+              final content = Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: enableBlur ? 0.75 : 0.95), // Solid for fallback
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    width: 1.5,
+                  ),
+                ),
+                child: _buildColumn(context, isHardwareSupported),
+              );
+              return enableBlur
+                  ? BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                      child: content,
+                    )
+                  : content;
+            },
           ),
-          
-          Padding(
-            padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
-            child: Column(
-              children: [
-                const Text(
-                  'Haptic Intensity',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ).animate().fade(duration: 400.ms).slideY(begin: 0.1),
-                
-                const SizedBox(height: 10),
-                
-                Text(
-                  'Customize how the application feels in your hand with precision feedback.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textSecondary.withAlpha(180),
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                ).animate().fade(delay: 150.ms, duration: 400.ms),
+        ),
 
-                // Note if not supported
-                if (!isHardwareSupported)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 24),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        // Premium Close Button (Top Right)
+        Positioned(
+          top: 20,
+          right: 20,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => Navigator.pop(context),
+              borderRadius: BorderRadius.circular(20),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Builder(
+                  builder: (context) {
+                    final content = Container(
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.red.withAlpha(15),
-                        borderRadius: BorderRadius.circular(20),
+                        color: Colors.white.withValues(alpha: enableBlur ? 0.08 : 0.2),
+                        shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.red.withAlpha(50),
+                          color: Colors.white.withValues(alpha: 0.12),
                           width: 1,
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withAlpha(30),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.info_outline_rounded,
-                              color: Colors.redAccent,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'This feature is not supported',
-                                  style: TextStyle(
-                                    color: Colors.redAccent,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 13,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Your device hardware does not support haptic feedback.',
-                                  style: TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: AppColors.textPrimary,
+                        size: 20,
                       ),
-                    ).animate().shake(delay: 600.ms, duration: 500.ms).fadeIn(),
+                    );
+                    return enableBlur
+                        ? BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            child: content,
+                          )
+                        : content;
+                  },
+                ),
+              ),
+            ),
+          ).animate().fade(delay: 400.ms).scale(delay: 400.ms),
+        ),
+      ],
+    );
+  }
+
+
+
+  Widget _buildColumn(BuildContext context, bool isHardwareSupported) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Drag Handle
+        const SizedBox(height: 12),
+        Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(20),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+
+        const SizedBox(height: 32),
+
+        // Hero Section
+        Consumer(
+          builder: (context, ref, _) {
+            final level = ref.watch(hapticProvider);
+            return Column(
+              children: [
+                _buildHeroIcon(level),
+                const SizedBox(height: 24),
+                const Text(
+                  'HAPTIC ENGINE',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
                   ),
+                ).animate().fade().scale(begin: const Offset(0.9, 0.9)),
+                const SizedBox(height: 8),
+                Text(
+                  'Precision-tuned vibration physics for Royal Pixels',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondary.withAlpha(150),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ).animate().fade(delay: 200.ms),
+              ],
+            );
+          },
+        ),
+
+        const SizedBox(height: 40),
+
+        // Main Selector
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: const _HapticControlCenterLarge(),
+        ).animate().fade(delay: 300.ms).slideY(begin: 0.1),
+
+        const SizedBox(height: 32),
+
+        // Technical Note
+        if (!isHardwareSupported)
+          _buildHardwareWarning()
+        else
+          _buildTestingSection(),
+
+        const SizedBox(height: 40),
+
+        // Done Button
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
+          child: SizedBox(
+            width: double.infinity,
+            child: PremiumTouchTile(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(
+                  gradient: AppColors.goldGradient,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.goldMid.withValues(alpha: 0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    'OPTIMIZE ENGINE',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ).animate().fade(delay: 500.ms).slideY(begin: 0.2),
+      ],
+    );
+  }
+
+  Widget _buildHeroIcon(HapticLevel level) {
+    final bool isOff = level == HapticLevel.off;
+    return Container(
+      width: 100,
+      height: 100,
+      decoration: BoxDecoration(
+        color: isOff ? Colors.white.withAlpha(5) : AppColors.goldMid.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isOff ? Colors.white10 : AppColors.goldMid.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: isOff ? [] : [
+          BoxShadow(
+            color: AppColors.goldMid.withValues(alpha: 0.1),
+            blurRadius: 40,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: Center(
+        child: Icon(
+          isOff ? Icons.vibration_outlined : Icons.sensors_rounded,
+          color: isOff ? AppColors.textMuted : AppColors.goldLight,
+          size: 40,
+        ).animate(target: isOff ? 0 : 1)
+         .shimmer(duration: 2.seconds, color: Colors.white24)
+         .shake(duration: 500.ms),
+      ),
+    ).animate(onPlay: (c) => c.repeat(reverse: true))
+     .scale(duration: 2.seconds, begin: const Offset(0.95, 0.95), end: const Offset(1.05, 1.05), curve: Curves.easeInOut);
+  }
+
+  Widget _buildHardwareWarning() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.red.withAlpha(10),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.red.withAlpha(30)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Hardware Limitation',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  'Your device does not support precision haptics.',
+                  style: TextStyle(
+                    color: AppColors.textMuted.withAlpha(200),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),
-
-          const SizedBox(height: 32),
-
-          // Options List - De-congested single column
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children: HapticLevel.values.map((level) {
-                final isSelected = currentLevel == level;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _HapticOptionCard(
-                    level: level,
-                    isSelected: isSelected,
-                    isEnabled: isHardwareSupported,
-                    onTap: () => notifier.setLevel(level),
-                  ),
-                );
-              }).toList(),
-            ),
-          ).animate().fadeIn(delay: 300.ms, duration: 500.ms).slideY(begin: 0.05),
-
-          const SizedBox(height: 24),
-
-          // Test Button
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
-            child: SizedBox(
-              width: double.infinity,
-              child: Consumer(
-                builder: (context, ref, child) {
-                  final isOff = currentLevel == HapticLevel.off;
-                  
-                  return ElevatedButton(
-                    onPressed: (isHardwareSupported) ? () => notifier.trigger() : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isHardwareSupported ? AppColors.bg2 : AppColors.bg3.withAlpha(100),
-                      foregroundColor: isHardwareSupported ? AppColors.goldLight : AppColors.textMuted,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        side: BorderSide(
-                          color: !isHardwareSupported 
-                            ? AppColors.textMuted.withAlpha(20)
-                            : isOff 
-                              ? AppColors.textMuted.withAlpha(40)
-                              : AppColors.goldMid.withAlpha(100), 
-                          width: 1
-                        ),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          !isHardwareSupported 
-                            ? Icons.vibration_outlined 
-                            : isOff ? Icons.volume_off_rounded : Icons.vibration_rounded, 
-                          size: 20,
-                          color: !isHardwareSupported ? AppColors.textMuted : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          !isHardwareSupported 
-                            ? 'HARDWARE NOT SUPPORTED'
-                            : isOff ? 'MUTED' : 'TEST VIBRATION',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.5,
-                            fontSize: 13,
-                            color: !isHardwareSupported ? AppColors.textMuted : null,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ).animate().fade(delay: 500.ms).slideY(begin: 0.2),
         ],
       ),
     );
   }
-}
 
-class _HapticOptionCard extends StatelessWidget {
-  final HapticLevel level;
-  final bool isSelected;
-  final bool isEnabled;
-  final VoidCallback onTap;
-
-  const _HapticOptionCard({
-    required this.level,
-    required this.isSelected,
-    this.isEnabled = true,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: !isEnabled,
-      child: Opacity(
-        opacity: isEnabled ? 1.0 : 0.4,
-        child: GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutQuart,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.goldMid.withAlpha(15) : AppColors.bg2.withAlpha(100),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isSelected ? AppColors.goldMid : AppColors.glassBorder,
-            width: isSelected ? 2.0 : 1.0,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.goldMid.withAlpha(30),
-                    blurRadius: 20,
-                    spreadRadius: -5,
-                  )
-                ]
-              : [],
-        ),
-        child: Row(
-          children: [
-            // Icon Stack
-            Container(
-              width: 52,
-              height: 52,
+  Widget _buildTestingSection() {
+    return Consumer(
+      builder: (context, ref, _) {
+        final level = ref.watch(hapticProvider);
+        if (level == HapticLevel.off) return const SizedBox.shrink();
+        
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: PremiumTouchTile(
+            onTap: () => ref.read(hapticProvider.notifier).trigger(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.goldMid.withAlpha(40) : AppColors.bg3,
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.white.withAlpha(5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white10),
               ),
-              child: Icon(
-                _getIconForLevel(level),
-                color: isSelected ? AppColors.goldLight : AppColors.textSecondary,
-                size: 26,
-              ),
-            ).animate(target: isSelected ? 1 : 0).scale(begin: const Offset(1, 1), end: const Offset(1.05, 1.05)),
-            
-            const SizedBox(width: 16),
-            
-            // Text Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    level.label,
+                  const Icon(Icons.vibration_rounded, color: AppColors.goldLight, size: 18),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'TEST IMPULSE',
                     style: TextStyle(
-                      color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                      fontSize: 17,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    level.description,
-                    style: TextStyle(
-                      color: isSelected ? AppColors.goldLight.withAlpha(180) : AppColors.textMuted,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                      color: AppColors.goldLight,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ],
               ),
             ),
-            
-            // Radio-like indicator
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? AppColors.goldMid : AppColors.textMuted.withAlpha(100),
-                  width: isSelected ? 7 : 2,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Larger version of the haptic control center for the settings sheet
+class _HapticControlCenterLarge extends ConsumerWidget {
+  const _HapticControlCenterLarge();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentLevel = ref.watch(hapticProvider);
+    final notifier = ref.read(hapticProvider.notifier);
+    final levels = HapticLevel.values;
+    final selectedIndex = levels.indexOf(currentLevel);
+
+    return Container(
+      height: 100,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.black.withAlpha(120),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: Colors.white.withAlpha(15), width: 1),
       ),
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final segmentWidth = constraints.maxWidth / levels.length;
+          
+          return Stack(
+            children: [
+              // Selection Pill
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.elasticOut,
+                left: selectedIndex * segmentWidth,
+                top: 0,
+                bottom: 0,
+                width: segmentWidth,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.goldMid.withValues(alpha: 0.4),
+                        AppColors.goldMid.withValues(alpha: 0.1),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: AppColors.goldMid.withValues(alpha: 0.5),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.goldMid.withValues(alpha: 0.2),
+                        blurRadius: 20,
+                      ),
+                    ],
+                  ),
+                ).animate(onPlay: (c) => c.repeat(reverse: true))
+                 .shimmer(duration: 3.seconds, color: Colors.white.withAlpha(15)),
+              ),
+              
+              Row(
+                children: levels.map((level) {
+                  final isSelected = currentLevel == level;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => notifier.setLevel(level),
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _getIconForLevel(level),
+                            color: isSelected ? AppColors.goldLight : AppColors.textMuted,
+                            size: isSelected ? 30 : 24,
+                          ).animate(target: isSelected ? 1 : 0)
+                           .scale(begin: const Offset(0.8, 0.8), end: const Offset(1.15, 1.15), curve: Curves.easeOutBack),
+                          const SizedBox(height: 6),
+                          Text(
+                            level.label.toUpperCase(),
+                            style: TextStyle(
+                              color: isSelected ? AppColors.textPrimary : AppColors.textMuted,
+                              fontSize: 9,
+                              fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   IconData _getIconForLevel(HapticLevel level) {
     switch (level) {
-      case HapticLevel.off:
-        return Icons.do_disturb_on_rounded;
-      case HapticLevel.light:
-        return Icons.blur_on_rounded;
-      case HapticLevel.medium:
-        return Icons.vibration_rounded;
-      case HapticLevel.strong:
-        return Icons.shutter_speed_rounded;
+      case HapticLevel.off: return Icons.not_interested_rounded;
+      case HapticLevel.light: return Icons.blur_on_rounded;
+      case HapticLevel.medium: return Icons.vibration_rounded;
+      case HapticLevel.strong: return Icons.bolt_rounded;
     }
   }
 }

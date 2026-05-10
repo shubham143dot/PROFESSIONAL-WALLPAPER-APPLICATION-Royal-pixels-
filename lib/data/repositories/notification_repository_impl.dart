@@ -39,7 +39,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
   }
 
   Stream<List<NotificationItem>> _getLocalNotificationsStream() {
-    // Since SharedPreferences doesn't have a native stream for keys, 
+    // Since SharedPreferences doesn't have a native stream for keys,
     // we'll return a stream that emits once and we'll manually trigger updates if needed,
     // or just rely on a BehaviorSubject style if we were using a more complex setup.
     // For simplicity, we'll fetch once. The provider will handle the rest.
@@ -54,7 +54,8 @@ class NotificationRepositoryImpl implements NotificationRepository {
   }
 
   @override
-  Future<void> addNotification(String? userId, NotificationItem notification) async {
+  Future<void> addNotification(
+      String? userId, NotificationItem notification) async {
     final model = NotificationModel(
       id: notification.id,
       title: notification.title,
@@ -71,11 +72,11 @@ class NotificationRepositoryImpl implements NotificationRepository {
       final List<NotificationItem> updated = [model, ...current];
       // Limit to 50 notifications locally to avoid bloat
       if (updated.length > 50) updated.removeLast();
-      
+
       await prefs.setString(
-        _localNotificationsKey, 
-        json.encode(updated.map((n) => (n as NotificationModel).toJson()).toList())
-      );
+          _localNotificationsKey,
+          json.encode(
+              updated.map((n) => (n as NotificationModel).toJson()).toList()));
     } else {
       await firestore
           .collection('users')
@@ -97,9 +98,9 @@ class NotificationRepositoryImpl implements NotificationRepository {
         return n;
       }).toList();
       await prefs.setString(
-        _localNotificationsKey, 
-        json.encode(updated.map((n) => (n as NotificationModel).toJson()).toList())
-      );
+          _localNotificationsKey,
+          json.encode(
+              updated.map((n) => (n as NotificationModel).toJson()).toList()));
     } else {
       await firestore
           .collection('users')
@@ -114,11 +115,12 @@ class NotificationRepositoryImpl implements NotificationRepository {
   Future<void> markAllAsRead(String? userId) async {
     if (userId == null) {
       final List<NotificationItem> current = await _getLocalNotifications();
-      final List<NotificationItem> updated = current.map((n) => n.copyWith(isRead: true)).toList();
+      final List<NotificationItem> updated =
+          current.map((n) => n.copyWith(isRead: true)).toList();
       await prefs.setString(
-        _localNotificationsKey, 
-        json.encode(updated.map((n) => (n as NotificationModel).toJson()).toList())
-      );
+          _localNotificationsKey,
+          json.encode(
+              updated.map((n) => (n as NotificationModel).toJson()).toList()));
     } else {
       final unread = await firestore
           .collection('users')
@@ -126,7 +128,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
           .collection('notifications')
           .where('isRead', isEqualTo: false)
           .get();
-      
+
       final batch = firestore.batch();
       for (var doc in unread.docs) {
         batch.update(doc.reference, {'isRead': true});
@@ -145,7 +147,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
           .doc(userId)
           .collection('notifications')
           .get();
-      
+
       final batch = firestore.batch();
       for (var doc in all.docs) {
         batch.delete(doc.reference);
@@ -158,11 +160,12 @@ class NotificationRepositoryImpl implements NotificationRepository {
   Future<void> deleteNotification(String? userId, String notificationId) async {
     if (userId == null) {
       final List<NotificationItem> current = await _getLocalNotifications();
-      final List<NotificationItem> updated = current.where((n) => n.id != notificationId).toList();
+      final List<NotificationItem> updated =
+          current.where((n) => n.id != notificationId).toList();
       await prefs.setString(
-        _localNotificationsKey, 
-        json.encode(updated.map((n) => (n as NotificationModel).toJson()).toList())
-      );
+          _localNotificationsKey,
+          json.encode(
+              updated.map((n) => (n as NotificationModel).toJson()).toList()));
     } else {
       await firestore
           .collection('users')

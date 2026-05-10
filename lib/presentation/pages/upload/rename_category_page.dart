@@ -18,7 +18,7 @@ class RenameCategoryPage extends ConsumerStatefulWidget {
 
 class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
   final _newCategoryController = TextEditingController();
-  
+
   List<String> _existingCategories = [];
   String? _selectedCategory;
   bool _isRenaming = false;
@@ -35,12 +35,14 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
       if (_selectedCategory == null || newName.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select a category and enter a new name!')),
+            const SnackBar(
+                content:
+                    Text('Please select a category and enter a new name!')),
           );
         }
         return;
       }
-      
+
       setState(() => _isRenaming = true);
 
       try {
@@ -50,12 +52,14 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
         result.fold(
           (failure) => throw Exception(failure.message),
           (_) {
-            // Success! 
+            // Success!
             ref.read(wallpaperProvider.notifier).loadWallpapers();
-            
+
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Category renamed successfully to $newName! 🚀')),
+              SnackBar(
+                  content:
+                      Text('Category renamed successfully to $newName! 🚀')),
             );
             context.pop();
           },
@@ -90,25 +94,29 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
       String cat = wp.category.trim();
       if (cat.isEmpty) cat = wp.autoCategory.trim();
       if (cat.isEmpty) continue;
-      
+
       final lowerKey = cat.toLowerCase();
       if (!catMap.containsKey(lowerKey)) {
         catMap[lowerKey] = cat;
       } else {
         // Prefer capitalized versions over lowercase ones
         final existing = catMap[lowerKey]!;
-        if (existing.isNotEmpty && existing[0].toLowerCase() == existing[0] && cat.isNotEmpty && cat[0].toUpperCase() == cat[0]) {
+        if (existing.isNotEmpty &&
+            existing[0].toLowerCase() == existing[0] &&
+            cat.isNotEmpty &&
+            cat[0].toUpperCase() == cat[0]) {
           catMap[lowerKey] = cat;
         }
       }
     }
     _existingCategories = catMap.values.toList()..sort();
-    
+
     List<String> dropDownItems = [..._existingCategories];
 
     if (_selectedCategory == null && dropDownItems.isNotEmpty) {
       _selectedCategory = dropDownItems.first;
-    } else if (_selectedCategory != null && !dropDownItems.contains(_selectedCategory)) {
+    } else if (_selectedCategory != null &&
+        !dropDownItems.contains(_selectedCategory)) {
       if (dropDownItems.isNotEmpty) {
         _selectedCategory = dropDownItems.first;
       } else {
@@ -120,7 +128,8 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Rename Category', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('Rename Category',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: _isRenaming
@@ -130,7 +139,8 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
                 children: [
                   CircularProgressIndicator(color: Colors.amber),
                   SizedBox(height: 16),
-                  Text('Updating categories and properties...', style: TextStyle(color: Colors.white70)),
+                  Text('Updating categories and properties...',
+                      style: TextStyle(color: Colors.white70)),
                 ],
               ),
             )
@@ -144,7 +154,7 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Category Dropdown
                   DropdownButtonFormField<String>(
                     initialValue: _selectedCategory,
@@ -155,12 +165,14 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
                       labelStyle: const TextStyle(color: Colors.white54),
                       filled: true,
                       fillColor: const Color(0xFF1E1E1E),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     items: dropDownItems.map((c) {
                       return DropdownMenuItem(
-                        value: c, 
-                        child: Text(c, style: const TextStyle(color: Colors.white)),
+                        value: c,
+                        child: Text(c,
+                            style: const TextStyle(color: Colors.white)),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -169,9 +181,9 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
                       });
                     },
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // New category term
                   TextField(
                     controller: _newCategoryController,
@@ -181,23 +193,35 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
                       labelStyle: const TextStyle(color: Colors.amber),
                       filled: true,
                       fillColor: const Color(0xFF1E1E1E),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.amber)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.amber)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.amber, width: 2)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.amber)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.amber)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Colors.amber, width: 2)),
                     ),
                   ),
 
                   const SizedBox(height: 48),
-                  
+
                   // Rename Button
                   ElevatedButton(
                     onPressed: _rename,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.amber,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Rename Category', style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+                    child: const Text('Rename Category',
+                        style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),

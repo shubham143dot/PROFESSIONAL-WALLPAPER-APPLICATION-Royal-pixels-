@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import '../../../domain/entities/wallpaper_entity.dart';
-import '../../widgets/diamond_loader.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../domain/entities/wallpaper_entity.dart';
+import '../../widgets/wallpaper_card.dart';
+import '../../../core/scroll/elite_scroll_physics.dart';
+import '../../../core/services/adaptive_performance.dart';
+
 class WallpaperSearchDelegate extends SearchDelegate<WallpaperEntity?> {
   final List<WallpaperEntity> allWallpapers;
-  final bool isPro;
 
-  WallpaperSearchDelegate(this.allWallpapers, {this.isPro = false});
+  WallpaperSearchDelegate(this.allWallpapers);
 
   @override
   String get searchFieldLabel => 'Search wallpapers...';
@@ -155,6 +156,7 @@ class WallpaperSearchDelegate extends SearchDelegate<WallpaperEntity?> {
     return Container(
       color: const Color(0xFF121212),
       child: GridView.builder(
+        physics: const EliteAlwaysScrollPhysics(),
         padding: const EdgeInsets.all(12),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
@@ -165,85 +167,12 @@ class WallpaperSearchDelegate extends SearchDelegate<WallpaperEntity?> {
         itemCount: results.length,
         itemBuilder: (context, index) {
           final wp = results[index];
-          return GestureDetector(
+          return WallpaperCard(
+            wallpaper: wp,
             onTap: () {
               close(context, wp);
               context.push('/detail', extra: wp);
             },
-            child: Card(
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 6,
-              shadowColor: wp.isPremium ? Colors.amber.withAlpha(128) : Colors.black45,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl: wp.optimizedUrl,
-                    fit: BoxFit.cover,
-                    memCacheHeight: 600,
-                    placeholder: (context, url) => Container(
-                      color: Colors.grey[800],
-                      child: const Center(
-                        child: DiamondLoader(size: 30),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: Colors.grey[900],
-                      child: const Icon(Icons.error, color: Colors.white),
-                    ),
-                  ),
-                  if (wp.isPremium)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.amber, width: 1),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.diamond, color: Colors.amber, size: 14),
-                            SizedBox(width: 4),
-                            Text(
-                              'Premium',
-                              style: TextStyle(color: Colors.amber, fontSize: 10),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.transparent, Colors.black87],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                      child: Text(
-                        wp.title.isNotEmpty ? wp.title : wp.category,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           );
         },
       ),
@@ -273,13 +202,15 @@ class _AnimatedSearchSuggestionsState extends State<AnimatedSearchSuggestions> {
   void initState() {
     super.initState();
     suggestions.shuffle();
-    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (mounted) {
-        setState(() {
-          _currentIndex = (_currentIndex + 1) % suggestions.length;
-        });
-      }
-    });
+    if (!AdaptivePerformance.isLow) {
+      _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
+        if (mounted) {
+          setState(() {
+            _currentIndex = (_currentIndex + 1) % suggestions.length;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -290,6 +221,13 @@ class _AnimatedSearchSuggestionsState extends State<AnimatedSearchSuggestions> {
 
   @override
   Widget build(BuildContext context) {
+    if (AdaptivePerformance.isLow) {
+      return Text(
+        'Try searching "${suggestions[_currentIndex]}"',
+        style: const TextStyle(color: Colors.white38, fontSize: 16),
+      );
+    }
+
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 600),
       switchInCurve: Curves.easeInOut,
@@ -329,7 +267,12 @@ class _MicSheetState extends State<_MicSheet>
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    );
+    
+    if (!AdaptivePerformance.isLow) {
+      _pulseCtrl.repeat(reverse: true);
+    }
+
     _pulseAnim = Tween<double>(begin: 1.0, end: 1.35).animate(
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );

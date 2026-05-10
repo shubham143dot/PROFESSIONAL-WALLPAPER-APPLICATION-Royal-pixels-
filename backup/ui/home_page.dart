@@ -28,8 +28,6 @@ import '../../providers/notification_provider.dart';
 import '../../providers/haptic_provider.dart';
 import '../../widgets/haptic_settings_sheet.dart';
 
-
-
 // ─── Filter enum ─────────────────────────────────────────────────────────────
 enum WallpaperFilter { all, free, premium, editorsChoice, ultraHD }
 
@@ -49,7 +47,6 @@ class _HomePageState extends ConsumerState<HomePage>
   // Active wallpaper filter (on Home tab)
   WallpaperFilter _filter = WallpaperFilter.all;
   bool _rewardPopupShown = false;
-
 
   @override
   void initState() {
@@ -206,8 +203,10 @@ class _HomePageState extends ConsumerState<HomePage>
     final items = [
       _NavItem(Icons.home_rounded, Icons.home_outlined, 'Home'),
       _NavItem(Icons.grid_view_rounded, Icons.grid_view_outlined, 'Categories'),
-      _NavItem(Icons.download_done_rounded, Icons.download_outlined, 'My Saved'),
-      _NavItem(Icons.favorite_rounded, Icons.favorite_border_rounded, 'Favorites'),
+      _NavItem(
+          Icons.download_done_rounded, Icons.download_outlined, 'My Saved'),
+      _NavItem(
+          Icons.favorite_rounded, Icons.favorite_border_rounded, 'Favorites'),
       _NavItem(Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
     ];
 
@@ -260,7 +259,7 @@ class _HomePageState extends ConsumerState<HomePage>
           });
         },
         child: SizedBox(
-          height: 72, 
+          height: 72,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -271,7 +270,8 @@ class _HomePageState extends ConsumerState<HomePage>
                 curve: Curves.easeOutBack,
                 child: AnimatedContainer(
                   duration: AppAnimations.interactionQuick,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
                     color: isActive
                         ? AppColors.goldMid.withAlpha(35)
@@ -313,7 +313,6 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-
   // ── Home tab: filter chips + wallpaper grid ────────────────────────────────
   Widget _buildHomeTab(WallpaperState wallpaperState) {
     final filtered = _filteredWallpapers(wallpaperState);
@@ -337,11 +336,36 @@ class _HomePageState extends ConsumerState<HomePage>
   Widget _buildFilterStrip(WallpaperState state) {
     final all = [...state.freeWallpapers, ...state.premiumWallpapers];
     final filters = [
-      (WallpaperFilter.all,    Icons.auto_awesome_mosaic_outlined, 'All',          all.length),
-      (WallpaperFilter.free,   Icons.wallpaper_outlined,           'Free',         state.freeWallpapers.length),
-      (WallpaperFilter.premium, Icons.diamond_outlined,            'Premium',      state.premiumWallpapers.length),
-      (WallpaperFilter.editorsChoice, Icons.star_rounded,          "Editor's",    all.where((w) => w.isEditorsChoice).length),
-      (WallpaperFilter.ultraHD, Icons.hd_rounded,                  '4K',           all.where((w) => w.isUltraHD).length),
+      (
+        WallpaperFilter.all,
+        Icons.auto_awesome_mosaic_outlined,
+        'All',
+        all.length
+      ),
+      (
+        WallpaperFilter.free,
+        Icons.wallpaper_outlined,
+        'Free',
+        state.freeWallpapers.length
+      ),
+      (
+        WallpaperFilter.premium,
+        Icons.diamond_outlined,
+        'Premium',
+        state.premiumWallpapers.length
+      ),
+      (
+        WallpaperFilter.editorsChoice,
+        Icons.star_rounded,
+        "Editor's",
+        all.where((w) => w.isEditorsChoice).length
+      ),
+      (
+        WallpaperFilter.ultraHD,
+        Icons.hd_rounded,
+        '4K',
+        all.where((w) => w.isUltraHD).length
+      ),
     ];
 
     return Container(
@@ -362,12 +386,14 @@ class _HomePageState extends ConsumerState<HomePage>
             if (f.$1 == WallpaperFilter.editorsChoice) {
               chipColor = const Color(0xFFFBBF24);
               chipGradient = isActive
-                  ? const LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFD97706)])
+                  ? const LinearGradient(
+                      colors: [Color(0xFFFBBF24), Color(0xFFD97706)])
                   : null;
             } else if (f.$1 == WallpaperFilter.ultraHD) {
               chipColor = const Color(0xFF22D3EE);
               chipGradient = isActive
-                  ? const LinearGradient(colors: [Color(0xFF22D3EE), Color(0xFF0E7490)])
+                  ? const LinearGradient(
+                      colors: [Color(0xFF22D3EE), Color(0xFF0E7490)])
                   : null;
             } else {
               chipColor = AppColors.goldMid;
@@ -394,13 +420,16 @@ class _HomePageState extends ConsumerState<HomePage>
               child: AnimatedContainer(
                 duration: AppAnimations.interactionQuick,
                 margin: const EdgeInsets.only(right: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: chipGradient,
                   color: isActive ? null : AppColors.bg2.withAlpha(150),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
-                    color: isActive ? Colors.white.withAlpha(100) : chipColor.withAlpha(40),
+                    color: isActive
+                        ? Colors.white.withAlpha(100)
+                        : chipColor.withAlpha(40),
                     width: 0.8,
                   ),
                   boxShadow: isActive
@@ -426,15 +455,18 @@ class _HomePageState extends ConsumerState<HomePage>
                       Text(
                         f.$3,
                         style: TextStyle(
-                          color: isActive ? contentColor : AppColors.textSecondary,
-                          fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                          color:
+                              isActive ? contentColor : AppColors.textSecondary,
+                          fontWeight:
+                              isActive ? FontWeight.w800 : FontWeight.w500,
                           fontSize: 13,
                         ),
                       ),
                       if (!state.isLoading && f.$4 > 0) ...[
                         const SizedBox(width: 5),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
                           decoration: BoxDecoration(
                             color: isActive
                                 ? Colors.black.withAlpha(50)
@@ -467,11 +499,12 @@ class _HomePageState extends ConsumerState<HomePage>
   // ── Skeleton ───────────────────────────────────────────────────────────────
   Widget _buildSkeleton() {
     return MasonryGridView.builder(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 110 + MediaQuery.of(context).padding.bottom),
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      gridDelegate:
-          const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2),
+      padding: EdgeInsets.fromLTRB(
+          16, 8, 16, 110 + MediaQuery.of(context).padding.bottom),
+      physics:
+          const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      gridDelegate: const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2),
       mainAxisSpacing: 16,
       crossAxisSpacing: 16,
       itemCount: 10,
@@ -488,11 +521,12 @@ class _HomePageState extends ConsumerState<HomePage>
   // ── Grid ───────────────────────────────────────────────────────────────────
   Widget _buildGrid(List<WallpaperEntity> wallpapers) {
     return MasonryGridView.builder(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 110 + MediaQuery.of(context).padding.bottom),
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      gridDelegate:
-          const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2),
+      padding: EdgeInsets.fromLTRB(
+          16, 8, 16, 110 + MediaQuery.of(context).padding.bottom),
+      physics:
+          const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      gridDelegate: const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2),
       mainAxisSpacing: 16,
       crossAxisSpacing: 16,
       itemCount: wallpapers.length,
@@ -509,7 +543,8 @@ class _HomePageState extends ConsumerState<HomePage>
             wallpaper: wp,
             onTap: () {
               // Pre-load full image for detail page
-              precacheImage(CachedNetworkImageProvider(wp.optimizedUrl), context);
+              precacheImage(
+                  CachedNetworkImageProvider(wp.optimizedUrl), context);
               context.push('/detail', extra: wp);
             },
             onLongPress: () => showWallpaperLongPressPreview(context, wp),
@@ -535,8 +570,7 @@ class _HomePageState extends ConsumerState<HomePage>
         mainAxisSize: MainAxisSize.min,
         children: [
           ShaderMask(
-            shaderCallback: (b) =>
-                AppColors.goldGradient.createShader(b),
+            shaderCallback: (b) => AppColors.goldGradient.createShader(b),
             child: const Icon(Icons.photo_library_outlined,
                 size: 64, color: Colors.white),
           ),
@@ -621,10 +655,10 @@ class _HomePageState extends ConsumerState<HomePage>
             SizedBox(
               width: double.infinity,
               child: GestureDetector(
-              onTap: () {
-                ref.read(hapticProvider.notifier).lightImpact();
-                showLoginRequiredSheet(context, reason: reason);
-              },
+                onTap: () {
+                  ref.read(hapticProvider.notifier).lightImpact();
+                  showLoginRequiredSheet(context, reason: reason);
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
@@ -638,26 +672,26 @@ class _HomePageState extends ConsumerState<HomePage>
                       ),
                     ],
                   ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Image.asset(
-                          'assets/google_logo.png',
-                          width: 20,
-                          height: 20,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset(
+                        'assets/google_logo.png',
+                        width: 20,
+                        height: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Sign In with Google',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3,
                         ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'Sign In with Google',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ).animate().fade(delay: 200.ms, duration: 400.ms),
@@ -689,7 +723,8 @@ class _HomePageState extends ConsumerState<HomePage>
                     decoration: BoxDecoration(
                       color: AppColors.bg1,
                       borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: AppColors.glassBorder, width: 1.5),
+                      border:
+                          Border.all(color: AppColors.glassBorder, width: 1.5),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withAlpha(100),
@@ -708,7 +743,8 @@ class _HomePageState extends ConsumerState<HomePage>
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: AppColors.bg2,
-                                border: Border.all(color: AppColors.glassBorder, width: 2),
+                                border: Border.all(
+                                    color: AppColors.glassBorder, width: 2),
                               ),
                               child: const Icon(Icons.person_outline_rounded,
                                   color: AppColors.textMuted, size: 38),
@@ -730,21 +766,27 @@ class _HomePageState extends ConsumerState<HomePage>
                                   const SizedBox(height: 10),
                                   // Identity hint bar
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
                                       color: AppColors.bg2.withAlpha(150),
                                       borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: AppColors.glassBorder, width: 0.8),
+                                      border: Border.all(
+                                          color: AppColors.glassBorder,
+                                          width: 0.8),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.info_outline_rounded, size: 12, color: AppColors.textMuted),
+                                        const Icon(Icons.info_outline_rounded,
+                                            size: 12,
+                                            color: AppColors.textMuted),
                                         const SizedBox(width: 6),
                                         Text(
                                           'Sign in to sync your data',
                                           style: TextStyle(
-                                            color: AppColors.textMuted.withAlpha(200),
+                                            color: AppColors.textMuted
+                                                .withAlpha(200),
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -756,11 +798,13 @@ class _HomePageState extends ConsumerState<HomePage>
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
                                 color: AppColors.bg2,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.glassBorder),
+                                border:
+                                    Border.all(color: AppColors.glassBorder),
                               ),
                               child: const Text(
                                 'GUEST',
@@ -775,14 +819,24 @@ class _HomePageState extends ConsumerState<HomePage>
                           ],
                         ),
                         const SizedBox(height: 24),
-                        Divider(color: AppColors.divider.withAlpha(50), height: 1),
+                        Divider(
+                            color: AppColors.divider.withAlpha(50), height: 1),
                         const SizedBox(height: 20),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _buildStatItem('Diamonds', '0', Icons.diamond_rounded, AppColors.textMuted),
-                            _buildStatItem('Streak', '${streak}d', Icons.local_fire_department_rounded, Colors.orangeAccent),
-                            _buildStatItem('Saved', '0', Icons.download_done_rounded, AppColors.textMuted),
+                            _buildStatItem('Diamonds', '0',
+                                Icons.diamond_rounded, AppColors.textMuted),
+                            _buildStatItem(
+                                'Streak',
+                                '${streak}d',
+                                Icons.local_fire_department_rounded,
+                                Colors.orangeAccent),
+                            _buildStatItem(
+                                'Saved',
+                                '0',
+                                Icons.download_done_rounded,
+                                AppColors.textMuted),
                           ],
                         ),
                       ],
@@ -799,7 +853,8 @@ class _HomePageState extends ConsumerState<HomePage>
                     decoration: BoxDecoration(
                       color: AppColors.bg1,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppColors.goldMid.withAlpha(40), width: 1),
+                      border: Border.all(
+                          color: AppColors.goldMid.withAlpha(40), width: 1),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -820,11 +875,16 @@ class _HomePageState extends ConsumerState<HomePage>
                             if (streakState.canClaimToday)
                               GestureDetector(
                                 onTap: () async {
-                                  ref.read(hapticProvider.notifier).lightImpact();
-                                  await ref.read(guestStreakProvider.notifier).claimStreak();
+                                  ref
+                                      .read(hapticProvider.notifier)
+                                      .lightImpact();
+                                  await ref
+                                      .read(guestStreakProvider.notifier)
+                                      .claimStreak();
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
                                   decoration: BoxDecoration(
                                     gradient: AppColors.goldGradient,
                                     borderRadius: BorderRadius.circular(12),
@@ -846,7 +906,10 @@ class _HomePageState extends ConsumerState<HomePage>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: List.generate(7, (i) {
                             final day = i + 1;
-                            final isCollected = day <= (streak % 7 == 0 && streak > 0 ? 7 : streak % 7);
+                            final isCollected = day <=
+                                (streak % 7 == 0 && streak > 0
+                                    ? 7
+                                    : streak % 7);
                             return Column(
                               children: [
                                 Container(
@@ -854,10 +917,14 @@ class _HomePageState extends ConsumerState<HomePage>
                                   height: 38,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: isCollected ? AppColors.goldGradient : null,
+                                    gradient: isCollected
+                                        ? AppColors.goldGradient
+                                        : null,
                                     color: isCollected ? null : AppColors.bg2,
                                     border: Border.all(
-                                      color: isCollected ? Colors.transparent : AppColors.glassBorder,
+                                      color: isCollected
+                                          ? Colors.transparent
+                                          : AppColors.glassBorder,
                                       width: 1,
                                     ),
                                   ),
@@ -865,7 +932,9 @@ class _HomePageState extends ConsumerState<HomePage>
                                     child: Text(
                                       '$day',
                                       style: TextStyle(
-                                        color: isCollected ? Colors.black : AppColors.textMuted,
+                                        color: isCollected
+                                            ? Colors.black
+                                            : AppColors.textMuted,
                                         fontSize: 13,
                                         fontWeight: FontWeight.w800,
                                       ),
@@ -873,7 +942,8 @@ class _HomePageState extends ConsumerState<HomePage>
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Text(day == 7 ? '🎁' : '💎', style: const TextStyle(fontSize: 10)),
+                                Text(day == 7 ? '🎁' : '💎',
+                                    style: const TextStyle(fontSize: 10)),
                               ],
                             );
                           }),
@@ -890,7 +960,8 @@ class _HomePageState extends ConsumerState<HomePage>
                   GestureDetector(
                     onTap: () {
                       ref.read(hapticProvider.notifier).lightImpact();
-                      showLoginRequiredSheet(context, reason: LoginRequiredReason.general);
+                      showLoginRequiredSheet(context,
+                          reason: LoginRequiredReason.general);
                     },
                     child: Container(
                       width: double.infinity,
@@ -906,26 +977,26 @@ class _HomePageState extends ConsumerState<HomePage>
                           ),
                         ],
                       ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Image.asset(
-                              'assets/google_logo.png',
-                              width: 22,
-                              height: 22,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/google_logo.png',
+                            width: 22,
+                            height: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Sign In with Google',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.3,
                             ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Sign In with Google',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
 
@@ -968,9 +1039,9 @@ class _HomePageState extends ConsumerState<HomePage>
                     color: AppColors.bg1,
                     borderRadius: BorderRadius.circular(28),
                     border: Border.all(
-                      color: isSubscribed 
-                          ? AppColors.goldMid.withAlpha(60) 
-                          : AppColors.glassBorder, 
+                      color: isSubscribed
+                          ? AppColors.goldMid.withAlpha(60)
+                          : AppColors.glassBorder,
                       width: 1.5,
                     ),
                     boxShadow: [
@@ -1000,9 +1071,12 @@ class _HomePageState extends ConsumerState<HomePage>
                                 height: 76,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  gradient: isSubscribed 
-                                      ? AppColors.goldRingGradient 
-                                      : LinearGradient(colors: [AppColors.bg3, AppColors.bg2]),
+                                  gradient: isSubscribed
+                                      ? AppColors.goldRingGradient
+                                      : LinearGradient(colors: [
+                                          AppColors.bg3,
+                                          AppColors.bg2
+                                        ]),
                                 ),
                               ),
                               Container(
@@ -1016,7 +1090,9 @@ class _HomePageState extends ConsumerState<HomePage>
                                   child: Text(
                                     (user?.name ?? 'G')[0].toUpperCase(),
                                     style: TextStyle(
-                                      color: isSubscribed ? AppColors.goldLight : AppColors.textPrimary,
+                                      color: isSubscribed
+                                          ? AppColors.goldLight
+                                          : AppColors.textPrimary,
                                       fontSize: 28,
                                       fontWeight: FontWeight.w900,
                                     ),
@@ -1033,7 +1109,8 @@ class _HomePageState extends ConsumerState<HomePage>
                                       color: AppColors.goldMid,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.check_rounded, color: Colors.black, size: 12),
+                                    child: const Icon(Icons.check_rounded,
+                                        color: Colors.black, size: 12),
                                   ),
                                 ),
                             ],
@@ -1061,10 +1138,12 @@ class _HomePageState extends ConsumerState<HomePage>
                                     if (isSubscribed) ...[
                                       const SizedBox(width: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
                                           gradient: AppColors.goldGradient,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                         child: const Text(
                                           'PRO',
@@ -1081,20 +1160,25 @@ class _HomePageState extends ConsumerState<HomePage>
                                 const SizedBox(height: 10),
                                 // Gmail account bar
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: AppColors.bg2.withAlpha(180),
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: AppColors.glassBorder, width: 0.8),
+                                    border: Border.all(
+                                        color: AppColors.glassBorder,
+                                        width: 0.8),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(Icons.alternate_email_rounded, size: 12, color: AppColors.goldMid),
+                                      const Icon(Icons.alternate_email_rounded,
+                                          size: 12, color: AppColors.goldMid),
                                       const SizedBox(width: 6),
                                       Flexible(
                                         child: Text(
-                                          user?.email ?? 'guest@royalpixels.app',
+                                          user?.email ??
+                                              'guest@royalpixels.app',
                                           style: const TextStyle(
                                             color: AppColors.textSecondary,
                                             fontSize: 12,
@@ -1112,18 +1196,28 @@ class _HomePageState extends ConsumerState<HomePage>
                           ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 24),
-                      Divider(color: AppColors.divider.withAlpha(50), height: 1),
+                      Divider(
+                          color: AppColors.divider.withAlpha(50), height: 1),
                       const SizedBox(height: 20),
-                      
+
                       // ── Stats row ───────────────────────────────────
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatItem('Diamonds', '${user?.diamonds ?? 0}', Icons.diamond_rounded, AppColors.goldMid),
-                          _buildStatItem('Streak', '${user?.streak ?? 0}d', Icons.local_fire_department_rounded, Colors.orangeAccent),
-                          _buildStatItem('Saved', '${user?.ownedWallpaperCount ?? 0}', Icons.download_done_rounded, Colors.blueAccent),
+                          _buildStatItem('Diamonds', '${user?.diamonds ?? 0}',
+                              Icons.diamond_rounded, AppColors.goldMid),
+                          _buildStatItem(
+                              'Streak',
+                              '${user?.streak ?? 0}d',
+                              Icons.local_fire_department_rounded,
+                              Colors.orangeAccent),
+                          _buildStatItem(
+                              'Saved',
+                              '${user?.ownedWallpaperCount ?? 0}',
+                              Icons.download_done_rounded,
+                              Colors.blueAccent),
                         ],
                       ),
                     ],
@@ -1142,17 +1236,22 @@ class _HomePageState extends ConsumerState<HomePage>
                       : 'Unlock 1000+ premium wallpapers',
                   isGold: true,
                   trailingWidget: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       gradient: isSubscribed ? null : AppColors.goldGradient,
-                      color: isSubscribed ? AppColors.goldMid.withAlpha(40) : null,
+                      color:
+                          isSubscribed ? AppColors.goldMid.withAlpha(40) : null,
                       borderRadius: BorderRadius.circular(12),
-                      border: isSubscribed ? Border.all(color: AppColors.goldMid.withAlpha(100)) : null,
+                      border: isSubscribed
+                          ? Border.all(color: AppColors.goldMid.withAlpha(100))
+                          : null,
                     ),
                     child: Text(
                       isSubscribed ? 'ACTIVE' : 'UPGRADE',
                       style: TextStyle(
-                        color: isSubscribed ? AppColors.goldLight : Colors.black,
+                        color:
+                            isSubscribed ? AppColors.goldLight : Colors.black,
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,
@@ -1172,7 +1271,8 @@ class _HomePageState extends ConsumerState<HomePage>
                       subtitle: 'Current balance: 💎 $diamonds',
                       isGold: false,
                       trailingWidget: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: AppColors.bg2,
                           borderRadius: BorderRadius.circular(10),
@@ -1220,7 +1320,8 @@ class _HomePageState extends ConsumerState<HomePage>
                 // ── Admin section ────────────────────────────────────
                 if (user?.email == 'subhamsoudeep@gmail.com') ...[
                   const SizedBox(height: 32),
-                  const _ProfileGroupLabel(label: 'ADMIN CONTROL', color: AppColors.goldMid),
+                  const _ProfileGroupLabel(
+                      label: 'ADMIN CONTROL', color: AppColors.goldMid),
                   const SizedBox(height: 12),
                   _ProfileMenuTile(
                     icon: Icons.admin_panel_settings_rounded,
@@ -1239,7 +1340,9 @@ class _HomePageState extends ConsumerState<HomePage>
                         : 'Currently: FREE',
                     isGold: true,
                     onTap: () {
-                      ref.read(authProvider.notifier).toggleAdminPremiumOverride();
+                      ref
+                          .read(authProvider.notifier)
+                          .toggleAdminPremiumOverride();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(user?.isSubscribed == true
@@ -1289,7 +1392,8 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String label, String value, IconData icon, Color color) {
     return Column(
       children: [
         Container(
@@ -1321,7 +1425,6 @@ class _HomePageState extends ConsumerState<HomePage>
       ],
     );
   }
-
 
   String _getAppBarTitle() {
     switch (_navIndex) {
@@ -1360,8 +1463,8 @@ class _HomePageState extends ConsumerState<HomePage>
                   decoration: BoxDecoration(
                     color: Colors.white.withAlpha(12),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: Colors.white.withAlpha(30), width: 1),
+                    border:
+                        Border.all(color: Colors.white.withAlpha(30), width: 1),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1436,7 +1539,7 @@ class _HomePageState extends ConsumerState<HomePage>
         ),
       ];
     }
-    
+
     // For other tabs, maybe just search or nothing
     if (_navIndex == 1 || _navIndex == 2 || _navIndex == 3) {
       return [
@@ -1532,9 +1635,8 @@ class _ProfileMenuTile extends ConsumerWidget {
                     Text(
                       label,
                       style: TextStyle(
-                        color: isDanger
-                            ? Colors.redAccent
-                            : AppColors.textPrimary,
+                        color:
+                            isDanger ? Colors.redAccent : AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
                         letterSpacing: -0.2,
@@ -1608,4 +1710,3 @@ class _SkeletonCard extends StatelessWidget {
     );
   }
 }
-

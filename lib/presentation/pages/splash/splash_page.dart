@@ -70,7 +70,6 @@ class _SplashPageState extends ConsumerState<SplashPage>
 
   static const _totalDuration = Duration(milliseconds: 2800);
 
-
   @override
   void initState() {
     super.initState();
@@ -171,9 +170,8 @@ class _SplashPageState extends ConsumerState<SplashPage>
         speed: 0.12 + _rng.nextDouble() * 0.30,
         size: 2.0 + _rng.nextDouble() * 4.0,
         fadeStart: 0.50 + _rng.nextDouble() * 0.25,
-        color: _rng.nextBool()
-            ? const Color(0xFFD4A017)
-            : const Color(0xFFFDDB6A),
+        color:
+            _rng.nextBool() ? const Color(0xFFD4A017) : const Color(0xFFFDDB6A),
       ));
     }
 
@@ -264,7 +262,9 @@ class _SplashPageState extends ConsumerState<SplashPage>
             try {
               await launchUrl(url, mode: LaunchMode.externalApplication);
             } catch (e) {
-              if (kDebugMode) debugPrint('[UpdateDialog] Could not open store: $e');
+              if (kDebugMode) {
+                debugPrint('[UpdateDialog] Could not open store: $e');
+              }
             }
           }
         },
@@ -605,11 +605,8 @@ class _ParticlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ParticlePainter old) =>
-      old.progress != progress;
+  bool shouldRepaint(_ParticlePainter old) => old.progress != progress;
 }
-
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHIMMER SWEEP LINE
@@ -685,127 +682,131 @@ class _PrivacyPolicyDialog extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF141420),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 20,
-              spreadRadius: 5,
-            )
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141420),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 20,
+                spreadRadius: 5,
+              )
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.privacy_tip_rounded,
+                    color: Colors.amber, size: 36),
               ),
-              child: const Icon(Icons.privacy_tip_rounded, color: Colors.amber, size: 36),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Privacy Policy',
-              style: GoogleFonts.outfit(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+              const SizedBox(height: 20),
+              Text(
+                'Privacy Policy',
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Welcome to ${AppConstants.appName}! Before you proceed, please review and accept our Privacy Policy to understand how we handle your data and ensure a secure experience.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(
-                color: Colors.white70,
-                fontSize: 14,
-                height: 1.5,
+              const SizedBox(height: 16),
+              Text(
+                'Welcome to ${AppConstants.appName}! Before you proceed, please review and accept our Privacy Policy to understand how we handle your data and ensure a secure experience.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            InkWell(
-              onTap: () async {
-                final url = Uri.parse('https://sites.google.com/view/royal-pixels-privacy/home');
-                try {
-                  await launchUrl(url, mode: LaunchMode.externalApplication);
-                } catch (e) {
-                  if (kDebugMode) {
-                    debugPrint('Could not launch $url');
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: () async {
+                  final url = Uri.parse(
+                      'https://sites.google.com/view/royal-pixels-privacy/home');
+                  try {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } catch (e) {
+                    if (kDebugMode) {
+                      debugPrint('Could not launch $url');
+                    }
                   }
-                }
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-                child: Text(
-                  'Read Full Privacy Policy here',
-                  style: GoogleFonts.outfit(
-                    color: Colors.amberAccent,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    decoration: TextDecoration.underline,
-                    decorationColor: Colors.amberAccent,
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 8.0, horizontal: 12.0),
+                  child: Text(
+                    'Read Full Privacy Policy here',
+                    style: GoogleFonts.outfit(
+                      color: Colors.amberAccent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
+                      decorationColor: Colors.amberAccent,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: onDecline,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: onDecline,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      'Decline',
-                      style: GoogleFonts.outfit(
-                        color: Colors.white54,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: onAccept,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      'Accept',
-                      style: GoogleFonts.outfit(
-                        color: Colors.black,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+                      child: Text(
+                        'Decline',
+                        style: GoogleFonts.outfit(
+                          color: Colors.white54,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: onAccept,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        'Accept',
+                        style: GoogleFonts.outfit(
+                          color: Colors.black,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 }
@@ -868,7 +869,9 @@ class _UpdateDialog extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isForced ? Icons.system_update_rounded : Icons.new_releases_rounded,
+                  isForced
+                      ? Icons.system_update_rounded
+                      : Icons.new_releases_rounded,
                   color: isForced ? const Color(0xFFD4A017) : Colors.blueAccent,
                   size: 36,
                 ),
@@ -889,7 +892,8 @@ class _UpdateDialog extends StatelessWidget {
               // Version tag
               if (result.latestVersionName.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFFD4A017).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -930,7 +934,8 @@ class _UpdateDialog extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.07)),
                   ),
                   child: Text(
                     result.releaseNotes,

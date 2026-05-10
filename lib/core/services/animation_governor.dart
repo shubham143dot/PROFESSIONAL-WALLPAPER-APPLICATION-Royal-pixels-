@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'adaptive_performance.dart';
 
 enum AnimationQuality { full, reduced, none }
 
 class AnimationGovernor {
   static AnimationQuality getQuality() {
+    if (AdaptivePerformance.isLow) return AnimationQuality.none;
+    if (AdaptivePerformance.isStandard) return AnimationQuality.reduced;
     return AnimationQuality.full;
   }
 

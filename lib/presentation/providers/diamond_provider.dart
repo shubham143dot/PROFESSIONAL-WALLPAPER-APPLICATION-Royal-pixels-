@@ -5,12 +5,10 @@ import '../../domain/repositories/diamond_repository.dart';
 import '../../domain/entities/notification_type.dart';
 import 'notification_provider.dart';
 
-
 // ── Diamond state ──────────────────────────────────────────────────────────────
 class DiamondState {
   final int diamonds;
   final int streak;
-  final int adsWatchedToday;
   final int smallRewardEarnedToday; // combined download+set-as, daily cap: 80
   final bool canClaimToday;
   final bool isLoading;
@@ -20,7 +18,6 @@ class DiamondState {
   const DiamondState({
     this.diamonds = 0,
     this.streak = 0,
-    this.adsWatchedToday = 0,
     this.smallRewardEarnedToday = 0,
     this.canClaimToday = false,
     this.isLoading = false,
@@ -28,19 +25,19 @@ class DiamondState {
     this.pendingReward,
   });
 
-  static const int dailyAdLimit        = 5;
+
   static const int dailySmallRewardCap = 80;
 
-  bool get canWatchAd   => adsWatchedToday       < dailyAdLimit;
+
   bool get canEarnSmall => smallRewardEarnedToday < dailySmallRewardCap;
 
-  int get remainingAdsToday    => dailyAdLimit        - adsWatchedToday;
+
   int get remainingSmallReward => dailySmallRewardCap - smallRewardEarnedToday;
 
   DiamondState copyWith({
     int? diamonds,
     int? streak,
-    int? adsWatchedToday,
+
     int? smallRewardEarnedToday,
     bool? canClaimToday,
     bool? isLoading,
@@ -50,12 +47,13 @@ class DiamondState {
     bool clearError = false,
   }) {
     return DiamondState(
-      diamonds:               diamonds               ?? this.diamonds,
-      streak:                 streak                 ?? this.streak,
-      adsWatchedToday:        adsWatchedToday        ?? this.adsWatchedToday,
-      smallRewardEarnedToday: smallRewardEarnedToday ?? this.smallRewardEarnedToday,
-      canClaimToday:          canClaimToday          ?? this.canClaimToday,
-      isLoading:              isLoading              ?? this.isLoading,
+      diamonds: diamonds ?? this.diamonds,
+      streak: streak ?? this.streak,
+
+      smallRewardEarnedToday:
+          smallRewardEarnedToday ?? this.smallRewardEarnedToday,
+      canClaimToday: canClaimToday ?? this.canClaimToday,
+      isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       pendingReward: clearReward ? null : (pendingReward ?? this.pendingReward),
     );
@@ -92,11 +90,11 @@ class DiamondNotifier extends Notifier<DiamondState> {
           );
         }
         state = state.copyWith(
-          diamonds:               data.diamonds,
-          streak:                 data.streak,
-          adsWatchedToday:        data.adsWatchedToday,
+          diamonds: data.diamonds,
+          streak: data.streak,
+
           smallRewardEarnedToday: data.smallRewardEarnedToday,
-          canClaimToday:          data.canClaimToday,
+          canClaimToday: data.canClaimToday,
           isLoading: false,
           pendingReward: pending,
         );
@@ -122,39 +120,17 @@ class DiamondNotifier extends Notifier<DiamondState> {
           clearReward: true,
         );
         ref.read(notificationProvider.notifier).addNotification(
-          title: 'Daily Reward Claimed!',
-          message: 'You\'ve received ${reward.diamonds} diamonds for Day ${reward.day}. Keep the streak going!',
-          type: NotificationType.reward,
-        );
-
+              title: 'Daily Reward Claimed!',
+              message:
+                  'You\'ve received ${reward.diamonds} diamonds for Day ${reward.day}. Keep the streak going!',
+              type: NotificationType.reward,
+            );
       },
     );
     return claimed;
   }
 
-  // ── Watch ad reward ───────────────────────────────────────────────────────
-  Future<bool> addAdReward(String userId) async {
-    if (!state.canWatchAd) return false;
-    final result = await _repo.addAdReward(userId);
-    bool success = false;
-    result.fold(
-      (failure) => state = state.copyWith(error: failure.message),
-      (newBalance) {
-        success = true;
-        state = state.copyWith(
-          diamonds: newBalance,
-          adsWatchedToday: state.adsWatchedToday + 1,
-        );
-        ref.read(notificationProvider.notifier).addNotification(
-          title: 'Diamond Reward!',
-          message: 'You earned 10 diamonds bonus.',
-          type: NotificationType.reward,
-        );
 
-      },
-    );
-    return success;
-  }
 
   // ── Spend diamonds to unlock ──────────────────────────────────────────────
   Future<bool> spendDiamonds(
@@ -168,12 +144,12 @@ class DiamondNotifier extends Notifier<DiamondState> {
         success = true;
         state = state.copyWith(diamonds: newBalance);
         ref.read(notificationProvider.notifier).addNotification(
-          title: 'Wallpaper Unlocked!',
-          message: 'Successfully spent $cost diamonds to unlock a premium wallpaper.',
-          type: NotificationType.purchase,
-        );
+              title: 'Wallpaper Unlocked!',
+              message:
+                  'Successfully spent $cost diamonds to unlock a premium wallpaper.',
+              type: NotificationType.purchase,
+            );
       },
-
     );
     return success;
   }
@@ -189,8 +165,8 @@ class DiamondNotifier extends Notifier<DiamondState> {
           SmallRewardDenyReason.dailyCapReached);
     }
     final result = await _repo.addSmallReward(userId, wallpaperId);
-    SmallRewardResult outcome = const SmallRewardResult.denied(
-        SmallRewardDenyReason.dailyCapReached);
+    SmallRewardResult outcome =
+        const SmallRewardResult.denied(SmallRewardDenyReason.dailyCapReached);
     result.fold(
       (failure) => state = state.copyWith(error: failure.message),
       (reward) {
@@ -202,15 +178,34 @@ class DiamondNotifier extends Notifier<DiamondState> {
                 state.smallRewardEarnedToday + DiamondData.smallRewardAmount,
           );
           ref.read(notificationProvider.notifier).addNotification(
-            title: 'Gems Collected!',
-            message: 'You received 5 bonus diamonds for downloading/setting a wallpaper.',
-            type: NotificationType.reward,
-          );
+                title: 'Gems Collected!',
+                message:
+                    'You received 5 bonus diamonds for downloading/setting a wallpaper.',
+                type: NotificationType.reward,
+              );
         }
-
       },
     );
     return outcome;
+  }
+
+  // ── Purchase diamonds ───────────────────────────────────────────────────
+  Future<bool> addDiamonds(String userId, int amount) async {
+    final result = await _repo.addDiamonds(userId, amount);
+    bool success = false;
+    result.fold(
+      (failure) => state = state.copyWith(error: failure.message),
+      (newBalance) {
+        success = true;
+        state = state.copyWith(diamonds: newBalance);
+        ref.read(notificationProvider.notifier).addNotification(
+              title: 'Purchase Successful!',
+              message: 'Successfully added $amount diamonds to your wallet.',
+              type: NotificationType.purchase,
+            );
+      },
+    );
+    return success;
   }
 
   // ── Dismiss popup without claiming ───────────────────────────────────────

@@ -9,10 +9,6 @@ abstract class DiamondRepository {
   /// Claims the daily streak reward.
   Future<Either<Failure, DailyRewardResult>> claimDailyReward(String userId);
 
-  /// Awards 💎10 for watching a rewarded ad (max 5/day).
-  /// Returns the new diamond balance.
-  Future<Either<Failure, int>> addAdReward(String userId);
-
   /// Deducts [cost] diamonds and unlocks [wallpaperId].
   /// Returns the new diamond balance.
   Future<Either<Failure, int>> spendDiamonds(
@@ -32,4 +28,6 @@ abstract class DiamondRepository {
     String userId,
     String wallpaperId,
   );
+  /// Awards [amount] diamonds to the user.
+  Future<Either<Failure, int>> addDiamonds(String userId, int amount);
 }

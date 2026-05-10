@@ -3,8 +3,8 @@
 /// subsequent taps for a set duration.
 class SafeTap {
   static final Map<String, DateTime> _lastTapTimes = {};
-  
-  /// The default debounce duration. 500ms is usually enough to 
+
+  /// The default debounce duration. 500ms is usually enough to
   /// prevent accidental double-taps while feeling responsive.
   static const Duration defaultDuration = Duration(milliseconds: 500);
 
@@ -19,12 +19,13 @@ class SafeTap {
 
     if (lastTap == null || now.difference(lastTap) > effectiveDuration) {
       _lastTapTimes[effectiveKey] = now;
-      
+
       // Periodically clean up old entries to prevent memory leak
       if (_lastTapTimes.length > 100) {
-        _lastTapTimes.removeWhere((k, v) => now.difference(v) > const Duration(minutes: 5));
+        _lastTapTimes.removeWhere(
+            (k, v) => now.difference(v) > const Duration(minutes: 5));
       }
-      
+
       return true;
     }
     return false;

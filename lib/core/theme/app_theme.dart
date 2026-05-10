@@ -8,20 +8,69 @@ class AppTheme {
 
     // ── Outfit type scale ──────────────────────────────────────────────────
     final textTheme = GoogleFonts.outfitTextTheme(base.textTheme).copyWith(
-      displayLarge:  GoogleFonts.outfit(fontSize: 48, fontWeight: FontWeight.w900, letterSpacing: -1.0, color: AppColors.textPrimary),
-      displayMedium: GoogleFonts.outfit(fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: AppColors.textPrimary),
-      headlineLarge: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-      headlineMedium: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: 0.3, color: AppColors.textPrimary),
-      headlineSmall: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-      titleLarge:    GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: AppColors.textPrimary),
-      titleMedium:   GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-      titleSmall:    GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-      bodyLarge:     GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
-      bodyMedium:    GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
-      bodySmall:     GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textMuted),
-      labelLarge:    GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppColors.textPrimary),
-      labelMedium:   GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: AppColors.textSecondary),
-      labelSmall:    GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: AppColors.textSecondary),
+      displayLarge: GoogleFonts.outfit(
+          fontSize: 48,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -1.0,
+          color: AppColors.textPrimary),
+      displayMedium: GoogleFonts.outfit(
+          fontSize: 36,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.5,
+          color: AppColors.textPrimary),
+      headlineLarge: GoogleFonts.outfit(
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary),
+      headlineMedium: GoogleFonts.outfit(
+          fontSize: 26,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+          color: AppColors.textPrimary),
+      headlineSmall: GoogleFonts.outfit(
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary),
+      titleLarge: GoogleFonts.outfit(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+          color: AppColors.textPrimary),
+      titleMedium: GoogleFonts.outfit(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary),
+      titleSmall: GoogleFonts.outfit(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textSecondary),
+      bodyLarge: GoogleFonts.outfit(
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary),
+      bodyMedium: GoogleFonts.outfit(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary),
+      bodySmall: GoogleFonts.outfit(
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textMuted),
+      labelLarge: GoogleFonts.outfit(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+          color: AppColors.textPrimary),
+      labelMedium: GoogleFonts.outfit(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+          color: AppColors.textSecondary),
+      labelSmall: GoogleFonts.outfit(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.5,
+          color: AppColors.textSecondary),
     );
 
     return ThemeData(

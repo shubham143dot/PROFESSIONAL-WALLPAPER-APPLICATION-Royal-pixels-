@@ -28,13 +28,16 @@ class LikesState {
   }
 }
 
-final likesNotifierProvider = StateNotifierProvider<LikesNotifier, LikesState>((ref) {
+final likesNotifierProvider =
+    StateNotifierProvider<LikesNotifier, LikesState>((ref) {
   return LikesNotifier(ref);
 });
 
 // For backward compatibility and convenience
-final likesProvider = Provider<List<String>>((ref) => ref.watch(likesNotifierProvider).favorites);
-final feedLikesProvider = Provider<List<String>>((ref) => ref.watch(likesNotifierProvider).feedLikes);
+final likesProvider =
+    Provider<List<String>>((ref) => ref.watch(likesNotifierProvider).favorites);
+final feedLikesProvider =
+    Provider<List<String>>((ref) => ref.watch(likesNotifierProvider).feedLikes);
 
 class LikesNotifier extends StateNotifier<LikesState> {
   final Ref _ref;
@@ -49,7 +52,7 @@ class LikesNotifier extends StateNotifier<LikesState> {
         state = const LikesState();
       }
     });
-    
+
     // Initial load
     final authState = _ref.read(authProvider);
     if (authState.user != null) {
@@ -61,7 +64,8 @@ class LikesNotifier extends StateNotifier<LikesState> {
 
   Future<void> _loadLikes(String userId) async {
     try {
-      final doc = await sl<FirebaseFirestore>().collection('users').doc(userId).get();
+      final doc =
+          await sl<FirebaseFirestore>().collection('users').doc(userId).get();
       if (doc.exists) {
         final List<dynamic> liked = doc.data()?['liked_wallpapers'] ?? [];
         final List<dynamic> feedLiked = doc.data()?['feed_likes'] ?? [];
@@ -81,7 +85,8 @@ class LikesNotifier extends StateNotifier<LikesState> {
   Future<void> _loadLocalLikes() async {
     final prefs = await SharedPreferences.getInstance();
     final List<String> liked = prefs.getStringList(_guestLikesKey) ?? [];
-    final List<String> feedLiked = prefs.getStringList(_guestFeedLikesKey) ?? [];
+    final List<String> feedLiked =
+        prefs.getStringList(_guestFeedLikesKey) ?? [];
     state = LikesState(
       favorites: liked,
       feedLikes: feedLiked,
@@ -97,20 +102,28 @@ class LikesNotifier extends StateNotifier<LikesState> {
     final user = authState.user;
 
     _togglingIds.add(wallpaperId);
-    
+
     final currentList = isFavorite ? state.favorites : state.feedLikes;
     final wasLiked = currentList.contains(wallpaperId);
 
     // 1. Optimistic UI Update
     if (wasLiked) {
       final newList = currentList.where((id) => id != wallpaperId).toList();
-      state = isFavorite ? state.copyWith(favorites: newList) : state.copyWith(feedLikes: newList);
-      _ref.read(wallpaperProvider.notifier).incrementLikesLocally(wallpaperId, -1);
+      state = isFavorite
+          ? state.copyWith(favorites: newList)
+          : state.copyWith(feedLikes: newList);
+      _ref
+          .read(wallpaperProvider.notifier)
+          .incrementLikesLocally(wallpaperId, -1);
       _ref.read(trendingProvider.notifier).updateLikeCount(wallpaperId, -1);
     } else {
       final newList = [...currentList, wallpaperId];
-      state = isFavorite ? state.copyWith(favorites: newList) : state.copyWith(feedLikes: newList);
-      _ref.read(wallpaperProvider.notifier).incrementLikesLocally(wallpaperId, 1);
+      state = isFavorite
+          ? state.copyWith(favorites: newList)
+          : state.copyWith(feedLikes: newList);
+      _ref
+          .read(wallpaperProvider.notifier)
+          .incrementLikesLocally(wallpaperId, 1);
       _ref.read(trendingProvider.notifier).updateLikeCount(wallpaperId, 1);
     }
 
@@ -122,48 +135,72 @@ class LikesNotifier extends StateNotifier<LikesState> {
       } else {
         await prefs.setStringList(_guestFeedLikesKey, state.feedLikes);
       }
-      
+
       // Also notify the server anonymously to update global count
       final repo = sl<WallpaperRepository>();
       await repo.toggleLikeAnonymous(wallpaperId, !wasLiked);
-      
+
       _togglingIds.remove(wallpaperId);
       return;
     }
 
     // 2b. Remote Update (Authenticated Users)
     final repo = sl<WallpaperRepository>();
-    final result = await repo.toggleLike(user.uid, wallpaperId, isFavorite: isFavorite);
+    final result =
+        await repo.toggleLike(user.uid, wallpaperId, isFavorite: isFavorite);
 
     result.fold(
       (failure) {
         // Rollback on absolute failure (rare now with best-effort)
         if (wasLiked) {
           final newList = [...currentList, wallpaperId];
-          state = isFavorite ? state.copyWith(favorites: newList) : state.copyWith(feedLikes: newList);
-          _ref.read(wallpaperProvider.notifier).incrementLikesLocally(wallpaperId, 1);
+          state = isFavorite
+              ? state.copyWith(favorites: newList)
+              : state.copyWith(feedLikes: newList);
+          _ref
+              .read(wallpaperProvider.notifier)
+              .incrementLikesLocally(wallpaperId, 1);
           _ref.read(trendingProvider.notifier).updateLikeCount(wallpaperId, 1);
         } else {
           final newList = currentList.where((id) => id != wallpaperId).toList();
-          state = isFavorite ? state.copyWith(favorites: newList) : state.copyWith(feedLikes: newList);
-          _ref.read(wallpaperProvider.notifier).incrementLikesLocally(wallpaperId, -1);
+          state = isFavorite
+              ? state.copyWith(favorites: newList)
+              : state.copyWith(feedLikes: newList);
+          _ref
+              .read(wallpaperProvider.notifier)
+              .incrementLikesLocally(wallpaperId, -1);
           _ref.read(trendingProvider.notifier).updateLikeCount(wallpaperId, -1);
         }
-        
-        RoyalSnackBar.show(null, 'Could not update like: ${failure.message}', type: SnackBarType.error);
+
+        RoyalSnackBar.show(null, 'Could not update like: ${failure.message}',
+            type: SnackBarType.error);
       },
       (isLikedServer) {
         // Sync with server result
-        final locallyLiked = (isFavorite ? state.favorites : state.feedLikes).contains(wallpaperId);
+        final locallyLiked = (isFavorite ? state.favorites : state.feedLikes)
+            .contains(wallpaperId);
         if (isLikedServer && !locallyLiked) {
-          final newList = [...(isFavorite ? state.favorites : state.feedLikes), wallpaperId];
-          state = isFavorite ? state.copyWith(favorites: newList) : state.copyWith(feedLikes: newList);
-          _ref.read(wallpaperProvider.notifier).incrementLikesLocally(wallpaperId, 1);
+          final newList = [
+            ...(isFavorite ? state.favorites : state.feedLikes),
+            wallpaperId
+          ];
+          state = isFavorite
+              ? state.copyWith(favorites: newList)
+              : state.copyWith(feedLikes: newList);
+          _ref
+              .read(wallpaperProvider.notifier)
+              .incrementLikesLocally(wallpaperId, 1);
           _ref.read(trendingProvider.notifier).updateLikeCount(wallpaperId, 1);
         } else if (!isLikedServer && locallyLiked) {
-          final newList = (isFavorite ? state.favorites : state.feedLikes).where((id) => id != wallpaperId).toList();
-          state = isFavorite ? state.copyWith(favorites: newList) : state.copyWith(feedLikes: newList);
-          _ref.read(wallpaperProvider.notifier).incrementLikesLocally(wallpaperId, -1);
+          final newList = (isFavorite ? state.favorites : state.feedLikes)
+              .where((id) => id != wallpaperId)
+              .toList();
+          state = isFavorite
+              ? state.copyWith(favorites: newList)
+              : state.copyWith(feedLikes: newList);
+          _ref
+              .read(wallpaperProvider.notifier)
+              .incrementLikesLocally(wallpaperId, -1);
           _ref.read(trendingProvider.notifier).updateLikeCount(wallpaperId, -1);
         }
       },

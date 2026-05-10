@@ -53,13 +53,15 @@ class MoodEngine {
       case UserMood.calm:
         tags.addAll(['nature', 'ocean', 'soft', 'pastel', 'forest', 'minimal']);
       case UserMood.energetic:
-        tags.addAll(['cyberpunk', 'neon', 'cars', 'vibrant', 'fire', 'electric']);
+        tags.addAll(
+            ['cyberpunk', 'neon', 'cars', 'vibrant', 'fire', 'electric']);
       case UserMood.focus:
         tags.addAll(['minimal', 'abstract', 'gradient', 'clean', 'geometry']);
       case UserMood.dark:
         tags.addAll(['dark', 'amoled', 'space', 'black', 'night', 'horror']);
       case UserMood.festival:
-        tags.addAll(['diwali', 'festival', 'lights', 'golden', 'colorful', 'holi']);
+        tags.addAll(
+            ['diwali', 'festival', 'lights', 'golden', 'colorful', 'holi']);
       case UserMood.all:
         break; // no tag bias
     }
@@ -94,34 +96,52 @@ class MoodEngine {
 
   static String labelForMood(UserMood mood) {
     switch (mood) {
-      case UserMood.all: return 'All';
-      case UserMood.calm: return 'Calm';
-      case UserMood.energetic: return 'Energy';
-      case UserMood.focus: return 'Focus';
-      case UserMood.dark: return 'Dark';
-      case UserMood.festival: return 'Festival';
+      case UserMood.all:
+        return 'All';
+      case UserMood.calm:
+        return 'Calm';
+      case UserMood.energetic:
+        return 'Energy';
+      case UserMood.focus:
+        return 'Focus';
+      case UserMood.dark:
+        return 'Dark';
+      case UserMood.festival:
+        return 'Festival';
     }
   }
 
   static String emojiForMood(UserMood mood) {
     switch (mood) {
-      case UserMood.all: return '✨';
-      case UserMood.calm: return '🌿';
-      case UserMood.energetic: return '⚡';
-      case UserMood.focus: return '🧘';
-      case UserMood.dark: return '🌌';
-      case UserMood.festival: return '🎉';
+      case UserMood.all:
+        return '✨';
+      case UserMood.calm:
+        return '🌿';
+      case UserMood.energetic:
+        return '⚡';
+      case UserMood.focus:
+        return '🧘';
+      case UserMood.dark:
+        return '🌌';
+      case UserMood.festival:
+        return '🎉';
     }
   }
 
   static Color accentForMood(UserMood mood) {
     switch (mood) {
-      case UserMood.all: return const Color(0xFFD4A017);
-      case UserMood.calm: return const Color(0xFF34D399);
-      case UserMood.energetic: return const Color(0xFFEF4444);
-      case UserMood.focus: return const Color(0xFF818CF8);
-      case UserMood.dark: return const Color(0xFF6366F1);
-      case UserMood.festival: return const Color(0xFFF59E0B);
+      case UserMood.all:
+        return const Color(0xFFD4A017);
+      case UserMood.calm:
+        return const Color(0xFF34D399);
+      case UserMood.energetic:
+        return const Color(0xFFEF4444);
+      case UserMood.focus:
+        return const Color(0xFF818CF8);
+      case UserMood.dark:
+        return const Color(0xFF6366F1);
+      case UserMood.festival:
+        return const Color(0xFFF59E0B);
     }
   }
 }

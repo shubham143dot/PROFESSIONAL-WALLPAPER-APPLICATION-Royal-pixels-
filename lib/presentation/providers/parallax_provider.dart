@@ -11,7 +11,7 @@ final parallaxSupportProvider = FutureProvider<bool>((ref) async {
     // Some devices lack one but have the other.
     final accelStream = accelerometerEventStream();
     final gyroStream = gyroscopeEventStream();
-    
+
     final completer = Completer<bool>();
     StreamSubscription? subAccel;
     StreamSubscription? subGyro;
@@ -24,15 +24,11 @@ final parallaxSupportProvider = FutureProvider<bool>((ref) async {
       }
     }
 
-    subAccel = accelStream.listen((_) => onSensorData(), 
-      onError: (_) => null, 
-      cancelOnError: true
-    );
+    subAccel = accelStream.listen((_) => onSensorData(),
+        onError: (_) => null, cancelOnError: true);
 
     subGyro = gyroStream.listen((_) => onSensorData(),
-      onError: (_) => null,
-      cancelOnError: true
-    );
+        onError: (_) => null, cancelOnError: true);
 
     // Timeout fallback after 600ms
     Timer(const Duration(milliseconds: 600), () {

@@ -22,11 +22,12 @@ class AdHelper {
   /// Always returns false for Pro members.
   static Future<bool> shouldShowWallpaperActionAd({bool isPro = false}) async {
     if (isPro) return false;
-    
+
     final prefs = await SharedPreferences.getInstance();
     final count = prefs.getInt(_keyClickCount) ?? 0;
-    final threshold = prefs.getInt(_keyNextAdThreshold) ?? 4; // Default to 4 on first run
-    
+    final threshold =
+        prefs.getInt(_keyNextAdThreshold) ?? 4; // Default to 4 on first run
+
     // Rule 1: Show after reaching random threshold
     if (count < threshold) return false;
 
@@ -34,7 +35,7 @@ class AdHelper {
     final lastTimeMillis = prefs.getInt(_keyLastAdTime) ?? 0;
     final lastTime = DateTime.fromMillisecondsSinceEpoch(lastTimeMillis);
     final diff = DateTime.now().difference(lastTime);
-    
+
     return diff.inMinutes >= 2;
   }
 
@@ -42,10 +43,10 @@ class AdHelper {
   static Future<void> recordInterstitialAdShow() async {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
-    
+
     await prefs.setInt(_keyLastAdTime, now.millisecondsSinceEpoch);
     await prefs.setInt(_keyClickCount, 0); // Reset click counter
-    
+
     // Set next random threshold (between 3 and 15)
     final randomThreshold = 3 + Random().nextInt(13); // 3 to 15
     await prefs.setInt(_keyNextAdThreshold, randomThreshold);
@@ -60,14 +61,15 @@ class AdHelper {
     final lastTime = DateTime.fromMillisecondsSinceEpoch(lastTimeMillis);
     final diff = DateTime.now().difference(lastTime);
     final remaining = 60 - diff.inSeconds;
-    
+
     return remaining > 0 ? remaining : 0;
   }
 
   /// Updates the last shown timestamp for rewarded ads.
   static Future<void> recordRewardedAdShow() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_keyLastRewardedTime, DateTime.now().millisecondsSinceEpoch);
+    await prefs.setInt(
+        _keyLastRewardedTime, DateTime.now().millisecondsSinceEpoch);
   }
 
   static String get rewardedAdUnitId {
@@ -75,9 +77,10 @@ class AdHelper {
       final id = defaultTargetPlatform == TargetPlatform.android
           ? 'ca-app-pub-################/##########' // REPLACE WITH REAL ANDROID REWARDED ID
           : 'ca-app-pub-################/##########'; // REPLACE WITH REAL IOS REWARDED ID
-      
+
       if (id.contains('########')) {
-        debugPrint('⚠️ WARNING: AdMob Rewarded ID is still a placeholder in Release Mode!');
+        debugPrint(
+            '⚠️ WARNING: AdMob Rewarded ID is still a placeholder in Release Mode!');
       }
       return id;
     }
@@ -92,9 +95,10 @@ class AdHelper {
       final id = defaultTargetPlatform == TargetPlatform.android
           ? 'ca-app-pub-################/##########' // REPLACE WITH REAL ANDROID INTERSTITIAL ID
           : 'ca-app-pub-################/##########'; // REPLACE WITH REAL IOS INTERSTITIAL ID
-      
+
       if (id.contains('########')) {
-        debugPrint('⚠️ WARNING: AdMob Interstitial ID is still a placeholder in Release Mode!');
+        debugPrint(
+            '⚠️ WARNING: AdMob Interstitial ID is still a placeholder in Release Mode!');
       }
       return id;
     }
@@ -165,10 +169,11 @@ class AdHelper {
     );
   }
 
-  /// Specific helper for wallpaper actions. 
-  /// Although the user sees an "interstitial" like experience, 
+  /// Specific helper for wallpaper actions.
+  /// Although the user sees an "interstitial" like experience,
   /// we use RewardedAd internally to detect if they skipped (to fulfill the "no skip, no diamond" rule).
-  static void showWallpaperActionAd({required Function(bool rewardEarned) onCompleted}) {
+  static void showWallpaperActionAd(
+      {required Function(bool rewardEarned) onCompleted}) {
     showRewardedAd(onCompleted: (earned) {
       if (earned) {
         recordInterstitialAdShow();

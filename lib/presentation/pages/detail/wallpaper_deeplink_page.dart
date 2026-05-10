@@ -14,7 +14,8 @@ class WallpaperDeepLinkPage extends ConsumerStatefulWidget {
   const WallpaperDeepLinkPage({super.key, required this.wallpaperId});
 
   @override
-  ConsumerState<WallpaperDeepLinkPage> createState() => _WallpaperDeepLinkPageState();
+  ConsumerState<WallpaperDeepLinkPage> createState() =>
+      _WallpaperDeepLinkPageState();
 }
 
 class _WallpaperDeepLinkPageState extends ConsumerState<WallpaperDeepLinkPage> {
@@ -32,7 +33,7 @@ class _WallpaperDeepLinkPageState extends ConsumerState<WallpaperDeepLinkPage> {
     try {
       final dataSource = sl<FirestoreDataSource>();
       final wallpaper = await dataSource.getWallpaperById(widget.wallpaperId);
-      
+
       if (mounted) {
         if (wallpaper != null) {
           setState(() {
@@ -85,7 +86,8 @@ class _WallpaperDeepLinkPageState extends ConsumerState<WallpaperDeepLinkPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+              const Icon(Icons.error_outline,
+                  color: Colors.redAccent, size: 48),
               const SizedBox(height: 16),
               Text(
                 _error!,

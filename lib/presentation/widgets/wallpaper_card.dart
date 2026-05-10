@@ -1,502 +1,313 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:shimmer/shimmer.dart';
 import '../../domain/entities/wallpaper_entity.dart';
 import '../../core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/haptic_provider.dart';
-import '../../core/utils/safe_tap.dart';
-import 'dart:async';
-import 'package:sensors_plus/sensors_plus.dart';
-import '../providers/parallax_provider.dart';
-import '../providers/likes_provider.dart';
-import '../../../core/utils/royal_snack_bar.dart';
+import '../../core/services/adaptive_performance.dart';
+import '../../core/animations/liquid_rect_tween.dart';
+import '../../core/widgets/three_stage_image.dart';
+import '../../core/scroll/velocity_aware_controller.dart';
+import 'premium_glow_system.dart';
 
-
-class WallpaperCard extends ConsumerStatefulWidget {
-
+class WallpaperCard extends ConsumerWidget {
   final WallpaperEntity wallpaper;
   final VoidCallback onTap;
-  /// Optional long-press handler. When provided, a medium haptic fires
-  /// immediately on long-press start (before the callback), giving a
-  /// zero-lag premium feel.
   final VoidCallback? onLongPress;
+  final VelocityAwareScrollController? scrollController;
 
   const WallpaperCard({
     super.key,
     required this.wallpaper,
     required this.onTap,
     this.onLongPress,
+    this.scrollController,
   });
 
   @override
-  ConsumerState<WallpaperCard> createState() => _WallpaperCardState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPremium = wallpaper.isPremium;
+    final isUltraHD = wallpaper.isUltraHD;
+    final isEditorsChoice = wallpaper.isEditorsChoice;
+
+    final content = wallpaper.imageUrl.isEmpty
+        ? const _BrokenImagePlaceholder()
+        : _buildProgressiveImage();
+
+    // Use PremiumGlowSystem for the advanced glow and touch response
+    return PremiumGlowSystem(
+      imageUrl: wallpaper.optimizedUrl,
+      scrollController: scrollController,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      builder: (context, dominantColor) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            // Phase 7: Hero transitions are extremely expensive on budget GPUs during page push.
+            // We disable them on LOW tier to ensure the detail page opens instantly.
+            AdaptivePerformance.enableHeroTransitions
+                ? Hero(
+                    tag: 'wallpaper_${wallpaper.id}',
+                    createRectTween: (begin, end) =>
+                        LiquidSpringRectTween(begin: begin, end: end),
+                    child: content,
+                  )
+                : content,
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: RepaintBoundary(
+                child: _BottomInfo(wallpaper: wallpaper, dominantColor: dominantColor),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: RepaintBoundary(
+                child: _TopRightBadges(
+                  wallpaper: wallpaper,
+                  isPremium: isPremium,
+                  isUltraHD: isUltraHD,
+                  isEditorsChoice: isEditorsChoice,
+                ),
+              ),
+            ),
+            // Lock overlay for premium wallpapers
+            if (isPremium)
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(160),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.goldMid.withAlpha(100), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_rounded, color: AppColors.goldLight, size: 11),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${wallpaper.diamondCost}',
+                        style: TextStyle(
+                          color: AppColors.goldLight,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Text('💎', style: TextStyle(fontSize: 9)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildProgressiveImage() {
+    final gridResUrl = wallpaper.mediumUrl.isNotEmpty
+        ? wallpaper.mediumUrl
+        : wallpaper.optimizedUrl;
+    final thumbUrl = wallpaper.thumbnailUrl;
+
+    return ThreeStageImage(
+      imageUrl: gridResUrl,
+      thumbnailUrl: thumbUrl.isNotEmpty ? thumbUrl : null,
+      fit: BoxFit.cover,
+      memCacheWidth: 240, // Optimized for 2-column grid (2x density on 1080p is ~240-270px)
+      memCacheHeight: 480,
+      fadeInDuration: const Duration(milliseconds: 150), // Snappier feel
+      cacheKey: gridResUrl,
+      // Pass controller to pause high-res loading during active scroll
+      scrollController: scrollController,
+    );
+  }
 }
 
-class _WallpaperCardState extends ConsumerState<WallpaperCard>
-    with SingleTickerProviderStateMixin {
+// ── Broken image placeholder ─────────────────────────────────────────────────
 
-  bool _isPressed = false;
-  late final AnimationController _glowCtrl;
-  late final Animation<double> _glowAnim;
-  
-  final ValueNotifier<Offset> _tiltOffset = ValueNotifier(Offset.zero);
-  StreamSubscription? _accelSub;
+class _BrokenImagePlaceholder extends StatelessWidget {
+  const _BrokenImagePlaceholder();
 
   @override
-  void initState() {
-    super.initState();
-    _glowCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 130),
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: AppColors.bg2,
+      child: Icon(Icons.broken_image_outlined, color: Colors.white24, size: 24),
     );
-    _glowAnim = CurvedAnimation(parent: _glowCtrl, curve: Curves.easeOut);
-
-    _initParallax();
   }
+}
 
-  Future<void> _initParallax() async {
-    // 1. Check if hardware supports it
-    final isSupported = await ref.read(parallaxSupportProvider.future);
-    if (!isSupported) return;
+// ── Bottom info overlay ───────────────────────────────────────────────────────
 
-    // 2. Check if user enabled it in settings
-    final isEnabled = ref.read(parallaxProvider);
-    if (!isEnabled) return;
+class _BottomInfo extends StatelessWidget {
+  final WallpaperEntity wallpaper;
+  final Color? dominantColor;
 
-    // 3. Start listening to sensors
-    try {
-      _accelSub = accelerometerEventStream().listen(
-        (event) {
-          if (!mounted) return;
-          final tx = (event.x / 9.8).clamp(-1.0, 1.0);
-          final ty = (event.y / 9.8).clamp(-1.0, 1.0);
-          _tiltOffset.value = Offset(tx, ty);
-        },
-        onError: (e) {
-          // Silent fail for card grid (prevents spamming logs in grid)
-        },
-        cancelOnError: true,
-      );
-    } catch (_) {}
-  }
+  const _BottomInfo({required this.wallpaper, this.dominantColor});
 
   @override
-  void dispose() {
-    _accelSub?.cancel();
-    _glowCtrl.dispose();
-    super.dispose();
-  }
+  Widget build(BuildContext context) {
+    final bool isSmall = MediaQuery.sizeOf(context).width < 380;
+    final accentColor = dominantColor ?? AppColors.goldMid;
 
-  void _onTapDown(TapDownDetails _) {
-    ref.read(hapticProvider.notifier).lightImpact();
-    setState(() => _isPressed = true);
-    _glowCtrl.forward();
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmall ? 8 : 12,
+        vertical: isSmall ? 10 : 14,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.7),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(22),
+          bottomRight: Radius.circular(22),
+        ),
+        border: Border(
+          top: BorderSide(
+            color: accentColor.withValues(alpha: 0.4),
+            width: 1.0,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            (wallpaper.title.isNotEmpty ? wallpaper.title : wallpaper.category)
+                .toUpperCase(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: isSmall ? 10 : 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+              height: 1.2,
+              shadows: [
+                Shadow(
+                  color: accentColor.withValues(alpha: 0.5),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (!isSmall && wallpaper.category.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              wallpaper.category,
+              style: TextStyle(
+                color: AppColors.textSecondary.withValues(alpha: 0.7),
+                fontSize: 8,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
+}
 
-  void _onTapUp(TapUpDetails _) {
-    setState(() => _isPressed = false);
-    _glowCtrl.reverse();
-    SafeTap.run('wp_card_${widget.wallpaper.id}', () {
-      widget.onTap();
-    });
-  }
+// Removed _Stat and _CategoryChip to align with the cleaner, more premium "Gods" category style.
 
-  void _onTapCancel() {
-    setState(() => _isPressed = false);
-    _glowCtrl.reverse();
+// ── Top-right badges (PRO / 4K / PICK / NEW) ─────────────────────────────────
+
+class _TopRightBadges extends StatelessWidget {
+  final WallpaperEntity wallpaper;
+  final bool isPremium;
+  final bool isUltraHD;
+  final bool isEditorsChoice;
+
+  const _TopRightBadges({
+    required this.wallpaper,
+    required this.isPremium,
+    required this.isUltraHD,
+    required this.isEditorsChoice,
+  });
+
+  bool get _isNew {
+    final created = wallpaper.createdAt;
+    if (created == null) return false;
+    // Cache the "now" value for this build pass
+    return DateTime.now().difference(created).inHours < 24;
   }
 
   @override
   Widget build(BuildContext context) {
-    final isParallaxEnabled = ref.watch(parallaxProvider);
-    final isPremium = widget.wallpaper.isPremium;
-    final isUltraHD = widget.wallpaper.isUltraHD;
-    final isEditorsChoice = widget.wallpaper.isEditorsChoice;
-
-    // Determine border & glow colors
-    final Color borderColor = isPremium
-        ? AppColors.goldMid.withAlpha(110)
-        : AppColors.glassBorder;
-
-    final Color glowColor = isPremium ? AppColors.goldMid : Colors.black;
-
-    return RepaintBoundary(
-      child: GestureDetector(
-        onTapDown: _onTapDown,
-        onTapUp: _onTapUp,
-        onTapCancel: _onTapCancel,
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                SafeTap.run('wp_card_long_${widget.wallpaper.id}', () {
-                  // Haptic fires the moment the long-press is recognised (~300ms
-                  // after finger-down) — feels instant vs waiting for a callback.
-                  ref.read(hapticProvider.notifier).mediumImpact();
-                  widget.onLongPress!();
-                });
-              },
-        child: AnimatedBuilder(
-          animation: _glowAnim,
-          builder: (context, child) {
-            return AnimatedScale(
-              scale: _isPressed ? 0.97 : 1.0,
-              duration: const Duration(milliseconds: 200),
-              curve: _isPressed ? Curves.easeOutQuart : Curves.easeOutBack,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: isPremium ? borderColor : AppColors.glassBorder.withAlpha(50), 
-                    width: 1.3
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: glowColor.withAlpha(
-                        (_isPressed ? 140 : (isPremium ? 40 : 20)),
-                      ),
-                      blurRadius: _isPressed ? 32 : (isPremium ? 20 : 14),
-                      spreadRadius: _isPressed ? 4 : 0,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: child,
-              ),
-            );
-          },
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: ColoredBox(
-              color: isPremium ? AppColors.bg2 : AppColors.bg1,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // ── Wallpaper image ──────────────────────────────────
-                  ValueListenableBuilder<Offset>(
-                    valueListenable: _tiltOffset,
-                    builder: (context, tilt, child) {
-                      final activeTilt = isParallaxEnabled ? tilt : Offset.zero;
-                      return AnimatedScale(
-                        // Inner zoom up to 1.12 on press! 1.08 for parallax buffer
-                        scale: _isPressed ? 1.12 : (isParallaxEnabled ? 1.08 : 1.0), 
-                        duration: const Duration(milliseconds: 250),
-                        curve: _isPressed ? Curves.easeOutQuart : Curves.easeOut,
-                        child: AnimatedSlide(
-                          // Move opposite to device tilt, deep effect
-                          offset: Offset(-activeTilt.dx * 0.04, activeTilt.dy * 0.04),
-                          duration: const Duration(milliseconds: 150),
-                          child: child!,
-                        ),
-                      );
-                    },
-                    child: Hero(
-                      tag: 'wallpaper_${widget.wallpaper.id}',
-                      child: widget.wallpaper.imageUrl.isEmpty
-                          ? Container(
-                              color: AppColors.bg2,
-                              child: const Icon(Icons.broken_image_outlined,
-                                  color: Colors.white24, size: 24),
-                            )
-                          : CachedNetworkImage(
-                        imageUrl: widget.wallpaper.thumbnailUrl,
-                        fit: BoxFit.cover,
-                        // Optimize memory cache for buttery smooth scrolling
-                        memCacheHeight: 400,
-                        memCacheWidth: 260,
-                        maxWidthDiskCache: 600,
-                        maxHeightDiskCache: 1000,
-                        fadeInDuration: const Duration(milliseconds: 400),
-                        fadeOutDuration: const Duration(milliseconds: 200),
-                        placeholder: (context, url) => Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            // 1. Extreme low-res blurred background (Instagram style)
-                            if (widget.wallpaper.blurUrl.isNotEmpty)
-                              Image.network(
-                                widget.wallpaper.blurUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const SizedBox(),
-                              ),
-                            // 2. Subtle Shimmer overlay
-                            Shimmer.fromColors(
-                              baseColor: Colors.white.withAlpha(5),
-                              highlightColor: Colors.white.withAlpha(15),
-                              period: const Duration(milliseconds: 1500),
-                              child: Container(color: Colors.white),
-                            ),
-                          ],
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: AppColors.bg2,
-                          child: const Icon(Icons.broken_image_outlined,
-                              color: Colors.white24, size: 24),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ── Bottom gradient + title + category chip ──────────
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(10, 36, 10, 8),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withAlpha(180),
-                            Colors.black.withAlpha(240),
-                          ],
-                          stops: const [0.0, 0.6, 1.0],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (widget.wallpaper.category.isNotEmpty)
-                            Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                decoration: BoxDecoration(
-                                  // Simplified logic: High alpha transparency instead of blur.
-                                  // This is much cheaper on mobile GPUs.
-                                  color: Colors.black.withAlpha(160),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                      color: Colors.white.withAlpha(40),
-                                      width: 0.8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.category_rounded,
-                                      color: AppColors.goldLight.withAlpha(200),
-                                      size: 8,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      widget.wallpaper.category.toUpperCase(),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          // Title
-                          Text(
-                            widget.wallpaper.title.isNotEmpty
-                                ? widget.wallpaper.title
-                                : widget.wallpaper.category,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                              letterSpacing: 0.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // ── Top-left view count badge ───────────────────────
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withAlpha(120),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.white.withAlpha(30), width: 0.5),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.remove_red_eye_outlined, color: Colors.white70, size: 9),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _formatCount(widget.wallpaper.viewCount),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withAlpha(120),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.white.withAlpha(30), width: 0.5),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.favorite_rounded, color: Colors.pinkAccent, size: 9),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _formatCount(widget.wallpaper.likeCount),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Consumer(
-                            builder: (context, ref, _) {
-                              final likedIds = ref.watch(likesProvider);
-                              final isLiked = likedIds.contains(widget.wallpaper.id);
-                              
-                              return GestureDetector(
-                                onTap: () {
-                                  SafeTap.run('fav_card_${widget.wallpaper.id}', () {
-                                    ref.read(hapticProvider.notifier).lightImpact();
-                                    // Removed restrictive check: Allow guests to like locally.
-                                    // Testers and guests can now use the like feature.
-                                    ref.read(likesNotifierProvider.notifier).toggleLike(widget.wallpaper.id);
-                                    if (!isLiked) {
-                                      RoyalSnackBar.show(context, 'Added to favorites!', type: SnackBarType.info);
-                                    }
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withAlpha(120),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isLiked 
-                                          ? Colors.redAccent.withAlpha(100) 
-                                          : Colors.white.withAlpha(30), 
-                                      width: 0.5
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    isLiked ? Icons.favorite : Icons.favorite_border,
-                                    color: isLiked ? Colors.redAccent : Colors.white70,
-                                    size: 10,
-                                  ),
-                                ),
-                              );
-                            }
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  // ── Top-right badges stack ───────────────────────────
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_isNew) _buildNewBadge(),
-                        // PRO badge (gold)
-                        if (isPremium)
-                          _WallpaperBadge(
-                            gradient: AppColors.goldGradient,
-                            glowColor: AppColors.goldLight,
-                            icon: Icons.lock_rounded,
-                            iconColor: Colors.black,
-                            label: 'PRO',
-                            labelColor: Colors.black,
-                          ),
-
-                        // 4K / Ultra HD badge (cyan-teal)
-                        if (isUltraHD) ...[
-                          if (isPremium) const SizedBox(height: 4),
-                          _WallpaperBadge(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
-                            ),
-                            glowColor: const Color(0xFF22D3EE),
-                            icon: Icons.hd_rounded,
-                            iconColor: Colors.white,
-                            label: '4K',
-                            labelColor: Colors.white,
-                          ),
-                        ],
-
-                        // Editor's Choice badge (amber-orange)
-                        if (isEditorsChoice) ...[
-                          if (isPremium || isUltraHD) const SizedBox(height: 4),
-                          _WallpaperBadge(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
-                            ),
-                            glowColor: const Color(0xFFFBBF24),
-                            icon: Icons.star_rounded,
-                            iconColor: Colors.black,
-                            label: 'PICK',
-                            labelColor: Colors.black,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_isNew) _buildNewBadge(),
+        if (isPremium)
+          _WallpaperBadge(
+            gradient: AppColors.goldGradient,
+            glowColor: AppColors.goldLight,
+            icon: Icons.diamond,
+            iconColor: Colors.black,
+            label: 'ELITE',
+            labelColor: Colors.black,
           ),
-        ),
-      ),
+        if (isUltraHD) ...[
+          if (isPremium) const SizedBox(height: 4),
+          const _WallpaperBadge(
+            gradient: LinearGradient(
+              colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
+            ),
+            glowColor: Color(0xFF22D3EE),
+            icon: Icons.hd_rounded,
+            iconColor: Colors.white,
+            label: '4K',
+            labelColor: Colors.white,
+          ),
+        ],
+        if (isEditorsChoice) ...[
+          if (isPremium || isUltraHD) const SizedBox(height: 4),
+          const _WallpaperBadge(
+            gradient: LinearGradient(
+              colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
+            ),
+            glowColor: Color(0xFFFBBF24),
+            icon: Icons.star_rounded,
+            iconColor: Colors.black,
+            label: 'PICK',
+            labelColor: Colors.black,
+          ),
+        ],
+      ],
     );
   }
 
-  bool get _isNew {
-    if (widget.wallpaper.createdAt == null) return false;
-    final now = DateTime.now();
-    return now.difference(widget.wallpaper.createdAt!).inHours < 24;
-  }
-
   Widget _buildNewBadge() {
-    return _WallpaperBadge(
-      gradient: const LinearGradient(
+    return const _WallpaperBadge(
+      gradient: LinearGradient(
         colors: [Color(0xFF10B981), Color(0xFF059669)],
       ),
-      glowColor: const Color(0xFF10B981),
+      glowColor: Color(0xFF10B981),
       icon: Icons.new_releases_rounded,
       iconColor: Colors.white,
       label: 'NEW',
       labelColor: Colors.white,
     );
   }
-
-  String _formatCount(int count) {
-    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
-    return count.toString();
-  }
 }
 
-// ── Reusable badge widget ────────────────────────────────────────────────────
+// ─── Reusable badge widget ─────────────────────────────────────────────────────
 
 class _WallpaperBadge extends StatelessWidget {
   final LinearGradient gradient;
@@ -520,16 +331,17 @@ class _WallpaperBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        gradient: gradient,
+        color: Colors.black.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: glowColor.withValues(alpha: 0.6), width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: glowColor.withAlpha(80),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: glowColor.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
-      ),
+          ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

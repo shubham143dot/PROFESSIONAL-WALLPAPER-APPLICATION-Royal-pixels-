@@ -12,12 +12,10 @@ class UserModel extends UserEntity {
     super.photoUrl,
     super.totalSpent = 0.0,
     super.activityScore = 0,
-    super.isSubscribed = false,
-    super.subscriptionExpiry,
     super.diamonds = 0,
     super.streak = 0,
+    super.isSubscribed = false,
     super.appVersion,
-    super.adsWatchedToday = 0,
   });
 
   factory UserModel.fromFirestore(Map<String, dynamic> json, String uid) {
@@ -31,12 +29,10 @@ class UserModel extends UserEntity {
       ownedWallpaperCount: json['owned_wallpaper'] ?? 0,
       totalSpent: (json['total_spent'] ?? 0.0).toDouble(),
       activityScore: json['activity_score'] ?? 0,
-      isSubscribed: json['is_subscribed'] ?? false,
-      subscriptionExpiry: (json['subscription_expiry'] as Timestamp?)?.toDate(),
       diamonds: json['diamonds'] ?? 0,
       streak: json['streak'] ?? 0,
+      isSubscribed: json['is_subscribed'] ?? false,
       appVersion: json['app_version'] as String?,
-      adsWatchedToday: json['adsWatchedToday'] ?? 0,
     );
   }
 
@@ -46,12 +42,14 @@ class UserModel extends UserEntity {
       'email': email,
       if (photoUrl != null) 'photo_url': photoUrl,
       if (phoneNo != null) 'phone_no': phoneNo,
-      if (loginHistory != null) 'login_history': Timestamp.fromDate(loginHistory!),
+      if (loginHistory != null)
+        'login_history': Timestamp.fromDate(loginHistory!),
       'owned_wallpaper': ownedWallpaperCount,
       'total_spent': totalSpent,
       'activity_score': activityScore,
+      'diamonds': diamonds,
+      'streak': streak,
       'is_subscribed': isSubscribed,
-      if (subscriptionExpiry != null) 'subscription_expiry': Timestamp.fromDate(subscriptionExpiry!),
       if (appVersion != null) 'app_version': appVersion,
     };
   }

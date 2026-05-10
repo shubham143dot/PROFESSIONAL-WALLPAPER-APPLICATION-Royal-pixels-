@@ -46,22 +46,22 @@ class AppColors {
   );
 
   // ── Text ──────────────────────────────────────────────────────────────────
-  static const Color textPrimary   = Color(0xFFF1F5F9);
+  static const Color textPrimary = Color(0xFFF1F5F9);
   static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textMuted     = Color(0xFF475569);
+  static const Color textMuted = Color(0xFF475569);
 
   // ── UI helpers ────────────────────────────────────────────────────────────
   /// Subtle white for glass borders
-  static const Color glassBorder   = Color(0x28FFFFFF); // white @ ~16%
+  static const Color glassBorder = Color(0x28FFFFFF); // white @ ~16%
   /// Subtle white for glass fill
-  static const Color glassFill     = Color(0x12FFFFFF); // white @ ~7%
+  static const Color glassFill = Color(0x12FFFFFF); // white @ ~7%
   /// dividers / separators
-  static const Color divider       = Color(0x1FFFFFFF); // white @ ~12%
+  static const Color divider = Color(0x1FFFFFFF); // white @ ~12%
 
   // ── Special / Exclusive tier ──────────────────────────────────────────────
   /// Violet-to-pink gradient for "Special" wallpaper badges
-  static const Color accentPurple      = Color(0xFF7C3AED);
-  static const Color accentPink        = Color(0xFFDB2777);
+  static const Color accentPurple = Color(0xFF7C3AED);
+  static const Color accentPink = Color(0xFFDB2777);
   static const LinearGradient specialGradient = LinearGradient(
     colors: [Color(0xFF7C3AED), Color(0xFFDB2777)],
     begin: Alignment.topLeft,

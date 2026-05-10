@@ -1,5 +1,5 @@
 class DeepLinkUtils {
-  static const String baseUrl = 'https://royalpixels.app';
+  static const String baseUrl = 'https://royal-pixel.web.app';
   static const String customScheme = 'royalpixels';
 
   static String getWallpaperLink(String wallpaperId) {

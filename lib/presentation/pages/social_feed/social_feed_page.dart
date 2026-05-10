@@ -4,16 +4,19 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:ui';
-import 'dart:math';
+import '../../../core/services/adaptive_performance.dart';
 import '../../../domain/entities/wallpaper_entity.dart';
-import '../../providers/wallpaper_provider.dart';
-import '../../providers/trending_provider.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/safe_tap.dart';
-import '../../providers/likes_provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../../core/utils/royal_snack_bar.dart';
+import 'package:royal_pixels/presentation/providers/wallpaper_provider.dart';
+import 'package:royal_pixels/presentation/providers/trending_provider.dart';
+import 'package:royal_pixels/core/theme/app_colors.dart';
+import 'package:royal_pixels/core/utils/safe_tap.dart';
+import 'package:royal_pixels/presentation/providers/auth_provider.dart';
+import 'package:royal_pixels/core/services/image_prefetch_service.dart';
+import 'package:royal_pixels/presentation/providers/haptic_provider.dart';
+import 'package:royal_pixels/presentation/providers/likes_provider.dart';
+import 'package:royal_pixels/presentation/providers/navigation_provider.dart';
 
+enum FeedType { explore, live }
 
 class SocialFeedPage extends ConsumerStatefulWidget {
   final String? initialWallpaperId;
@@ -26,8 +29,8 @@ class SocialFeedPage extends ConsumerStatefulWidget {
 class _SocialFeedPageState extends ConsumerState<SocialFeedPage> {
   PageController? _pageController;
   bool _initialIncrementDone = false;
-  List<String>? _cachedOtherIds;
   final Set<String> _viewedIds = {};
+  FeedType _selectedFeed = FeedType.explore;
 
   @override
   Widget build(BuildContext context) {
@@ -53,117 +56,168 @@ class _SocialFeedPageState extends ConsumerState<SocialFeedPage> {
       right: 0,
       child: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: Colors.black.withAlpha(100),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white12),
+            color: Colors.black.withAlpha(120),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withAlpha(30), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(100),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ShaderMask(
-                shaderCallback: (bounds) => AppColors.trendingGradient.createShader(bounds),
-                child: const Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 18),
+              _buildFeedTab(
+                label: 'EXPLORE',
+                isSelected: _selectedFeed == FeedType.explore,
+                onTap: () {
+                  if (_selectedFeed != FeedType.explore) {
+                    ref.read(hapticProvider.notifier).selectionClick();
+                    setState(() {
+                      _selectedFeed = FeedType.explore;
+                      _pageController?.jumpToPage(0);
+                    });
+                  } else {
+                    // Force refresh if already on explore to "explore each time"
+                    ref.read(feedWallpapersProvider.notifier).refresh();
+                    _pageController?.jumpToPage(0);
+                  }
+                },
               ),
-              const SizedBox(width: 8),
-              Text(
-                'ROYAL FEED',
-                style: TextStyle(
-                  color: Colors.white.withAlpha(230),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
+              const SizedBox(width: 4),
+              _buildFeedTab(
+                label: 'LIVE',
+                isSelected: _selectedFeed == FeedType.live,
+                isLive: true,
+                onTap: () {
+                  if (_selectedFeed != FeedType.live) {
+                    ref.read(hapticProvider.notifier).selectionClick();
+                    setState(() {
+                      _selectedFeed = FeedType.live;
+                      _pageController?.jumpToPage(0);
+                    });
+                  }
+                },
               ),
             ],
           ),
         ),
+      ).animate(target: AdaptivePerformance.enableAnimations ? null : 1.0).fadeIn(delay: 800.ms).slideY(begin: -0.5),
+    );
+  }
+
+  Widget _buildFeedTab({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    bool isLive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: 300.ms,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: isSelected
+              ? (isLive ? AppColors.specialGradient : AppColors.goldGradient)
+              : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: (isLive ? AppColors.accentPink : AppColors.goldMid).withAlpha(80),
+                    blurRadius: 12,
+                    spreadRadius: -2,
+                  )
+                ]
+              : [],
+        ),
+        child: Row(
+          children: [
+            if (isSelected) ...[
+              Icon(
+                isLive ? Icons.sensors_rounded : Icons.local_fire_department_rounded,
+                size: 14,
+                color: Colors.black,
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white.withAlpha(150),
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
       ),
-    ).animate().fadeIn(delay: 800.ms).slideY(begin: -0.5);
+    );
   }
 
   Widget _buildBody(WallpaperState state) {
     final trendingAsync = ref.watch(trendingProvider);
+    final exploreWallpapers = ref.watch(feedWallpapersProvider);
+    final liveWallpapers = ref.watch(liveWallpapersProvider);
 
     return trendingAsync.when(
       data: (trendingWallpapers) {
-        // ── Combine and Deduplicate ─────────────────────────────────────
-        final List<WallpaperEntity> allWallpapers = [];
-        final Set<String> seenIds = {};
-
-        // 1. Add trending wallpapers first (these will have a rank)
-        // Sync each trending wallpaper with the main state if it exists there
-        for (final wp in trendingWallpapers) {
-          WallpaperEntity syncedWp = wp;
-          
-          // Try to find the latest version in the main state
-          final inFree = state.freeWallpapers.where((w) => w.id == wp.id);
-          if (inFree.isNotEmpty) {
-            syncedWp = inFree.first;
-          } else {
-            final inPrem = state.premiumWallpapers.where((w) => w.id == wp.id);
-            if (inPrem.isNotEmpty) {
-              syncedWp = inPrem.first;
+        final List<WallpaperEntity> allWallpapers = 
+            _selectedFeed == FeedType.explore ? exploreWallpapers : liveWallpapers;
+        
+        // Listen for external navigation requests to specific wallpapers (e.g. from Long Press Preview)
+        ref.listen<String?>(feedTargetWallpaperProvider, (previous, next) {
+          if (next != null && _pageController != null) {
+            final targetIndex = allWallpapers.indexWhere((w) => w.id == next);
+            if (targetIndex != -1) {
+              _pageController!.jumpToPage(targetIndex);
+              // Reset the target so it doesn't jump again on subsequent builds
+              Future.microtask(() {
+                ref.read(feedTargetWallpaperProvider.notifier).state = null;
+              });
             }
           }
+        });
 
-          if (syncedWp.id.isEmpty || seenIds.add(syncedWp.id)) {
-            allWallpapers.add(syncedWp);
-          }
+        if (allWallpapers.isEmpty && state.isLoading) {
+          return const Center(child: CircularProgressIndicator(color: AppColors.goldMid));
         }
-        
-        final int trendingCount = allWallpapers.length;
 
-        // 2. Collect all other wallpapers
-        final List<WallpaperEntity> others = [];
-        for (final wp in state.freeWallpapers) {
-          if (!seenIds.contains(wp.id)) {
-            others.add(wp);
-          }
-        }
-        for (final wp in state.premiumWallpapers) {
-          if (!seenIds.contains(wp.id)) {
-            others.add(wp);
-          }
-        }
+        // Calculate initial page based on optional ID or external navigation target
+        int initialPage = 0;
+        final targetId = ref.read(feedTargetWallpaperProvider);
         
-        // Cache the shuffled order to prevent reshuffling on every rebuild (e.g. when liking)
-        if (_cachedOtherIds == null) {
-          final toShuffle = others.map((e) => e.id).toList();
-          toShuffle.shuffle(Random());
-          _cachedOtherIds = toShuffle;
-        } else {
-          // Stable append: Find IDs in 'others' that aren't in '_cachedOtherIds' yet
-          final currentIds = _cachedOtherIds!.toSet();
-          final newIds = others
-              .map((w) => w.id)
-              .where((id) => !currentIds.contains(id))
-              .toList();
+        if (targetId != null) {
+          final foundIndex = allWallpapers.indexWhere((w) => w.id == targetId);
+          if (foundIndex != -1) initialPage = foundIndex;
+          // Clear it so we don't re-use it on accidental rebuilds
+          Future.microtask(() => ref.read(feedTargetWallpaperProvider.notifier).state = null);
+        } else if (widget.initialWallpaperId != null) {
+          final foundIndex = allWallpapers.indexWhere((w) => w.id == widget.initialWallpaperId);
+          if (foundIndex != -1) initialPage = foundIndex;
+        }
+
+        // Initialize PageController
+        _pageController ??= PageController(initialPage: initialPage);
           
-          if (newIds.isNotEmpty) {
-            _cachedOtherIds = [..._cachedOtherIds!, ...newIds];
+        // Initial Prefetch
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ImagePrefetchService.prefetchReel(
+              context, 
+              allWallpapers, 
+              initialPage, 
+              lookAhead: 4,
+            );
           }
-        }
-
-        final Map<String, WallpaperEntity> othersMap = { for (var w in others) w.id: w };
-        for (final id in _cachedOtherIds!) {
-          if (othersMap.containsKey(id)) {
-            allWallpapers.add(othersMap[id]!);
-          }
-        }
-
-        // Initialize PageController with correct initial page
-        if (_pageController == null) {
-          int initialPage = 0;
-          if (widget.initialWallpaperId != null) {
-            final idx = allWallpapers.indexWhere((w) => w.id == widget.initialWallpaperId);
-            if (idx != -1) {
-              initialPage = idx;
-            }
-          }
-          _pageController = PageController(initialPage: initialPage);
-        }
+        });
 
         // Increment view for the very first wallpaper on load
         if (!_initialIncrementDone && allWallpapers.isNotEmpty) {
@@ -185,10 +239,7 @@ class _SocialFeedPageState extends ConsumerState<SocialFeedPage> {
             );
           }
           return const Center(
-            child: Text(
-              'No wallpapers found',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
+            child: Text('No wallpapers found', style: TextStyle(color: Colors.white)),
           );
         }
 
@@ -204,91 +255,136 @@ class _SocialFeedPageState extends ConsumerState<SocialFeedPage> {
                 ref.read(wallpaperProvider.notifier).incrementViews(id, userId: userId);
                 ref.read(trendingProvider.notifier).incrementViews(id, userId: userId);
               }
+              ImagePrefetchService.prefetchReel(context, allWallpapers, index);
             }
           },
           itemBuilder: (context, index) {
             final wp = allWallpapers[index];
-            // Only assign rank to the actual trending wallpapers at the top
-            final int? displayRank = index < trendingCount ? index + 1 : null;
-            
-            return WallpaperReelCard(
-              wallpaper: wp, 
-              rank: displayRank,
-            );
+            return WallpaperReelCard(wallpaper: wp);
           },
         );
       },
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.goldMid),
       ),
-      error: (err, _) => Center(
-        child: Text(
-          'Error loading reel: $err',
-          style: const TextStyle(color: Colors.white),
-        ),
+      error: (err, stack) => Center(
+        child: Text('Error: $err', style: const TextStyle(color: Colors.white)),
       ),
     );
   }
 }
 
-class WallpaperReelCard extends ConsumerWidget {
+class WallpaperReelCard extends ConsumerStatefulWidget {
   final WallpaperEntity wallpaper;
-  final int? rank;
 
-  const WallpaperReelCard({super.key, required this.wallpaper, this.rank});
+  const WallpaperReelCard({super.key, required this.wallpaper});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WallpaperReelCard> createState() => _WallpaperReelCardState();
+}
+
+class _WallpaperReelCardState extends ConsumerState<WallpaperReelCard>
+    with TickerProviderStateMixin {
+  final List<Offset> _hearts = [];
+
+  void _handleDoubleTap() {
+    // 1. Trigger Haptics
+    ref.read(hapticProvider.notifier).mediumImpact();
+
+    // 2. Perform Like Logic (ensure it's liked)
+    final isLiked = ref.read(likesNotifierProvider.notifier).isFavorite(widget.wallpaper.id);
+    if (!isLiked) {
+      ref.read(likesNotifierProvider.notifier).toggleLike(widget.wallpaper.id);
+    }
+
+    // 3. Add Heart Animation Instance
+    setState(() {
+      _hearts.add(Offset.zero); // Center-based for now
+    });
+
+    // 4. Cleanup after animation finishes
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (mounted && _hearts.isNotEmpty) {
+        setState(() {
+          _hearts.removeAt(0);
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Full screen background image (Optimized for speed)
-        CachedNetworkImage(
-          imageUrl: wallpaper.optimizedUrl,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            color: AppColors.bg0,
-            child: const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.goldMid, 
-                strokeWidth: 2
+    return GestureDetector(
+      onDoubleTap: _handleDoubleTap,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Full screen background image (Optimized for speed)
+          CachedNetworkImage(
+            imageUrl: widget.wallpaper.blurUrl,
+            fit: BoxFit.cover,
+            memCacheWidth: 100,
+            memCacheHeight: 200,
+            placeholder: (context, url) => Container(color: AppColors.bg0),
+            errorWidget: (context, url, error) => Container(color: AppColors.bg0),
+          ),
+
+          CachedNetworkImage(
+            imageUrl: widget.wallpaper.getAdaptiveReelUrl(AdaptivePerformance.tier),
+            fit: BoxFit.cover,
+            fadeInDuration: 300.ms,
+            fadeOutDuration: 300.ms,
+            memCacheWidth: (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio).round(),
+            placeholder: (context, url) => const SizedBox.shrink(),
+            errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white54),
+          ),
+
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black45,
+                  Colors.transparent,
+                  Colors.transparent,
+                  Colors.black54,
+                  Colors.black87,
+                ],
+                stops: [0.0, 0.2, 0.6, 0.8, 1.0],
               ),
             ),
           ),
-          errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white54),
-        ),
 
-        // Multi-stop gradient for premium feel and text legibility
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black45,
-                Colors.transparent,
-                Colors.transparent,
-                Colors.black54,
-                Colors.black87,
-              ],
-              stops: [0.0, 0.2, 0.6, 0.8, 1.0],
-            ),
-          ),
-        ),
+        if (AdaptivePerformance.enableAnimations)
+          ..._hearts.map((_) => Center(
+            child: Icon(
+              Icons.favorite_rounded,
+              color: Colors.redAccent.withValues(alpha: 0.9),
+              size: 110,
+            ).animate()
+             .scale(
+               begin: const Offset(0.3, 0.3),
+               end: const Offset(1.2, 1.2),
+               duration: 400.ms,
+               curve: Curves.elasticOut,
+             )
+             .fadeOut(delay: 400.ms, duration: 300.ms)
+             .moveY(begin: 0, end: -80, delay: 400.ms, duration: 400.ms, curve: Curves.easeOut),
+          )),
 
-        // Content
         Positioned(
-          bottom: 40 + bottomPadding,
+          bottom: 120 + bottomPadding,
           left: 20,
           right: 85,
-          child: Column(
+          child: RepaintBoundary(
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Premium Title
               Text(
-                wallpaper.title,
+                widget.wallpaper.title,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 28,
@@ -299,170 +395,188 @@ class WallpaperReelCard extends ConsumerWidget {
                     Shadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 2)),
                   ],
                 ),
-              ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.2, curve: Curves.easeOutExpo),
+              ).animate(target: AdaptivePerformance.enableAnimations ? null : 1.0)
+                  .fade(duration: 400.ms)
+                  .slideY(begin: 0.2, curve: Curves.easeOutExpo),
               
               const SizedBox(height: 12),
               
-              // Tags with Glassmorphism
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (rank != null)
-                    _buildGlassTag('#$rank', color: const Color(0xFFFF6B00), isGold: true),
-
-                  if (wallpaper.isPremium) 
+                  if (widget.wallpaper.isPremium) 
                     _buildGlassTag('PREMIUM', color: AppColors.goldMid, isGold: true)
                   else
                     _buildGlassTag('FREE', color: Colors.greenAccent, isGold: false),
                   
-                  if (wallpaper.isUltraHD)
+                  if (widget.wallpaper.isUltraHD)
                     _buildGlassTag('4K', color: const Color(0xFF22D3EE)),
-                  if (wallpaper.isEditorsChoice)
+                  if (widget.wallpaper.isEditorsChoice)
                     _buildGlassTag('EDITOR\'S PICK', color: const Color(0xFFFBBF24)),
                 ],
-              ).animate().fadeIn(delay: 300.ms, duration: 600.ms),
-              
-              const SizedBox(height: 20),
-              
-              // Creator Info
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white24, width: 1),
-                    ),
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Colors.white.withAlpha(20),
-                      child: const Icon(Icons.person, size: 18, color: Colors.white70),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '@royal_creator',
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(200),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
-              ).animate().fadeIn(delay: 500.ms),
+              ).animate(target: AdaptivePerformance.enableAnimations ? null : 1.0)
+                        .fade(delay: 100.ms, duration: 400.ms),
             ],
           ),
         ),
+      ),
 
-        // Side Actions
         Positioned(
           right: 15,
-          bottom: 100 + bottomPadding,
-          child: Column(
-            children: [
-              Consumer(
-                builder: (context, ref, _) {
-                  final likedIds = ref.watch(feedLikesProvider);
-                  final isLiked = likedIds.contains(wallpaper.id);
-                  
-                  return _buildActionButton(
-                    Icons.favorite_rounded, 
-                    _formatCount(wallpaper.likeCount),
-                    onTap: () {
-                      // Decoupled: Liking in feed does not add to favorites
-                      ref.read(likesNotifierProvider.notifier).toggleLike(wallpaper.id, isFavorite: false);
-                      if (!isLiked) {
-                        RoyalSnackBar.show(context, 'Liked!', type: SnackBarType.info);
-                      }
-                    },
-                    color: isLiked ? Colors.pink : Colors.grey,
-                  );
-                },
+          bottom: 160 + bottomPadding,
+          child: RepaintBoundary(
+            child: Column(
+              children: [
+                _buildLikeButton(context, ref),
+                const SizedBox(height: 20),
+                _buildStatItem(Icons.visibility_rounded, widget.wallpaper.viewCount.toString()),
+                const SizedBox(height: 20),
+                _buildMainActionButton(context),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  Widget _buildLikeButton(BuildContext context, WidgetRef ref) {
+    final isLiked = ref.watch(likesNotifierProvider.notifier).isFavorite(widget.wallpaper.id);
+    
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () {
+            ref.read(hapticProvider.notifier).lightImpact();
+            ref.read(likesNotifierProvider.notifier).toggleLike(widget.wallpaper.id);
+          },
+          child: Container(
+            height: 54,
+            width: 54,
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(80),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isLiked ? Colors.redAccent.withAlpha(200) : Colors.white.withAlpha(40),
+                width: 1.5,
               ),
-              _buildActionButton(
-                Icons.remove_red_eye_rounded, 
-                _formatCount(wallpaper.viewCount),
-                color: Colors.white,
-              ),
-              const SizedBox(height: 24),
-              _buildMainActionButton(context),
-            ],
-          ).animate().fadeIn(delay: 400.ms).slideX(begin: 0.5),
+              boxShadow: isLiked ? [
+                BoxShadow(
+                  color: Colors.redAccent.withAlpha(60),
+                  blurRadius: 15,
+                  spreadRadius: 2,
+                )
+              ] : [],
+            ),
+            child: ClipOval(
+              child: AdaptivePerformance.enableBackdropBlur
+                ? BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Icon(
+                      isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                      color: isLiked ? Colors.redAccent : Colors.white,
+                      size: 26,
+                    ),
+                  )
+                : Icon(
+                    isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    color: isLiked ? Colors.redAccent : Colors.white,
+                    size: 26,
+                  ).animate(target: (isLiked && AdaptivePerformance.enableAnimations) ? null : 1.0)
+                   .scale(begin: const Offset(1, 1), end: const Offset(1.2, 1.2), duration: 200.ms, curve: Curves.elasticOut)
+                   .then()
+                   .scale(begin: const Offset(1.2, 1.2), end: const Offset(1, 1), duration: 200.ms),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          widget.wallpaper.likeCount.toString(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+          ),
         ),
       ],
     );
   }
-  String _formatCount(int count) {
-    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
-    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
-    return count.toString();
+
+  Widget _buildStatItem(IconData icon, String value) {
+    return Column(
+      children: [
+        Container(
+          height: 54,
+          width: 54,
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(80),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withAlpha(40), width: 1.5),
+          ),
+          child: ClipOval(
+            child: AdaptivePerformance.enableBackdropBlur
+                ? BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Icon(icon, color: Colors.white, size: 26),
+                  )
+                : Icon(icon, color: Colors.white, size: 26),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildGlassTag(String text, {Color? color, bool isGold = false}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: (color ?? Colors.white).withAlpha(isGold ? 40 : 25),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: (color ?? Colors.white).withAlpha(isGold ? 80 : 40),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            text.toUpperCase(),
-            style: TextStyle(
-              color: color ?? Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-      ),
+      child: AdaptivePerformance.enableBackdropBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: _buildGlassTagContainer(text, color, isGold),
+            )
+          : _buildGlassTagContainer(text, color, isGold, opaque: true),
     );
   }
 
-  Widget _buildActionButton(IconData icon, String label, {VoidCallback? onTap, Color? color}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.black.withAlpha(40),
-              ),
-              child: Icon(icon, color: color ?? Colors.white, size: 28),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
-              ),
-            ),
-          ],
+  Widget _buildGlassTagContainer(String text, Color? color, bool isGold, {bool opaque = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: (color ?? Colors.white).withAlpha(opaque ? 200 : (isGold ? 40 : 25)),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: (color ?? Colors.white).withAlpha(isGold ? 80 : 40),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          color: color ?? Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.8,
         ),
       ),
     );
   }
 
   Widget _buildMainActionButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () => SafeTap.run('reel_action_${wallpaper.id}', () => context.push('/detail', extra: wallpaper)),
+    final button = GestureDetector(
+      onTap: () => SafeTap.run('reel_action_${widget.wallpaper.id}', () => context.push('/detail', extra: widget.wallpaper)),
       child: Container(
         height: 62,
         width: 62,
@@ -479,7 +593,12 @@ class WallpaperReelCard extends ConsumerWidget {
         ),
         child: const Icon(Icons.download_rounded, color: Colors.black, size: 30),
       ),
-    ).animate(onPlay: (controller) => controller.repeat())
-     .shimmer(duration: 2.seconds, color: Colors.white38);
+    );
+
+    if (AdaptivePerformance.isLow) return button;
+
+    return button
+        .animate(onPlay: (controller) => controller.repeat(), target: AdaptivePerformance.enableAnimations ? null : 1.0)
+        .shimmer(duration: 2.seconds, color: Colors.white38);
   }
 }

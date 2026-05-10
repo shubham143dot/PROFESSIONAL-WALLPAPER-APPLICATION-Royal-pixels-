@@ -6,6 +6,7 @@ import '../../providers/notification_provider.dart';
 import '../../../domain/entities/notification_type.dart';
 import '../../../domain/entities/notification_item.dart';
 import '../../../core/utils/safe_tap.dart';
+import '../../../core/scroll/elite_scroll_physics.dart';
 
 class NotificationsPage extends ConsumerWidget {
   const NotificationsPage({super.key});
@@ -32,7 +33,8 @@ class NotificationsPage extends ConsumerWidget {
           notificationsAsync.maybeWhen(
             data: (notifications) => notifications.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.delete_sweep_outlined, color: Colors.amber),
+                    icon: const Icon(Icons.delete_sweep_outlined,
+                        color: Colors.amber),
                     onPressed: () => _showClearAllConfirm(context, ref),
                     tooltip: 'Clear All',
                   )
@@ -50,16 +52,25 @@ class NotificationsPage extends ConsumerWidget {
             onRefresh: () async => ref.invalidate(notificationProvider),
             color: Colors.amber,
             backgroundColor: Colors.grey[900],
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: notifications.length,
-              itemBuilder: (context, index) {
-                final notification = notifications[index];
-                return _NotificationItemCard(notification: notification)
-                    .animate(delay: (index * 50).ms)
-                    .fadeIn()
-                    .slideY(begin: 0.1, end: 0);
-              },
+            child: CustomScrollView(
+              physics: const EliteAlwaysScrollPhysics(),
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final notification = notifications[index];
+                        return _NotificationItemCard(notification: notification)
+                            .animate(delay: (index * 50).ms)
+                            .fadeIn()
+                            .slideY(begin: 0.1, end: 0);
+                      },
+                      childCount: notifications.length,
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         },
@@ -81,7 +92,8 @@ class NotificationsPage extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_none_outlined, size: 80, color: Colors.grey[800]),
+          Icon(Icons.notifications_none_outlined,
+              size: 80, color: Colors.grey[800]),
           const SizedBox(height: 16),
           const Text(
             'Nothing to see here',
@@ -106,7 +118,8 @@ class NotificationsPage extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        title: const Text('Clear All Notifications?', style: TextStyle(color: Colors.white)),
+        title: const Text('Clear All Notifications?',
+            style: TextStyle(color: Colors.white)),
         content: const Text(
           'This action cannot be undone.',
           style: TextStyle(color: Colors.grey),
@@ -123,7 +136,8 @@ class NotificationsPage extends ConsumerWidget {
                 Navigator.pop(context);
               });
             },
-            child: const Text('CLEAR ALL', style: TextStyle(color: Colors.amber)),
+            child:
+                const Text('CLEAR ALL', style: TextStyle(color: Colors.amber)),
           ),
         ],
       ),
@@ -141,10 +155,14 @@ class _NotificationItemCard extends ConsumerWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: notification.isRead ? Colors.grey[900]!.withValues(alpha: 0.5) : Colors.grey[900],
+        color: notification.isRead
+            ? Colors.grey[900]!.withValues(alpha: 0.5)
+            : Colors.grey[900],
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: notification.isRead ? Colors.transparent : Colors.amber.withValues(alpha: 0.3),
+          color: notification.isRead
+              ? Colors.transparent
+              : Colors.amber.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -152,7 +170,9 @@ class _NotificationItemCard extends ConsumerWidget {
         onTap: () {
           SafeTap.run('notification_tap_${notification.id}', () {
             if (!notification.isRead) {
-              ref.read(notificationProvider.notifier).markAsRead(notification.id);
+              ref
+                  .read(notificationProvider.notifier)
+                  .markAsRead(notification.id);
             }
             // Deep link logic could go here
           });
@@ -175,14 +195,19 @@ class _NotificationItemCard extends ConsumerWidget {
                         Text(
                           notification.title,
                           style: TextStyle(
-                            color: notification.isRead ? Colors.grey[300] : Colors.white,
-                            fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
+                            color: notification.isRead
+                                ? Colors.grey[300]
+                                : Colors.white,
+                            fontWeight: notification.isRead
+                                ? FontWeight.normal
+                                : FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
                         Text(
                           _formatDate(notification.timestamp),
-                          style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                          style:
+                              TextStyle(color: Colors.grey[600], fontSize: 11),
                         ),
                       ],
                     ),
@@ -190,7 +215,9 @@ class _NotificationItemCard extends ConsumerWidget {
                     Text(
                       notification.message,
                       style: TextStyle(
-                        color: notification.isRead ? Colors.grey[500] : Colors.grey[400],
+                        color: notification.isRead
+                            ? Colors.grey[500]
+                            : Colors.grey[400],
                         fontSize: 14,
                         height: 1.4,
                       ),
@@ -207,10 +234,15 @@ class _NotificationItemCard extends ConsumerWidget {
                     color: Colors.amber,
                     shape: BoxShape.circle,
                   ),
-                ).animate(onPlay: (controller) => controller.repeat())
-                 .scale(begin: const Offset(1, 1), end: const Offset(1.2, 1.2), duration: 1.seconds)
-                 .then()
-                 .scale(begin: const Offset(1.2, 1.2), end: const Offset(1, 1)),
+                )
+                    .animate(onPlay: (controller) => controller.repeat())
+                    .scale(
+                        begin: const Offset(1, 1),
+                        end: const Offset(1.2, 1.2),
+                        duration: 1.seconds)
+                    .then()
+                    .scale(
+                        begin: const Offset(1.2, 1.2), end: const Offset(1, 1)),
             ],
           ),
         ),

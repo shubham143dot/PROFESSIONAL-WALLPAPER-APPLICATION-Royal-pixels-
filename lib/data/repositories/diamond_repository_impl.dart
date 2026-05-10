@@ -14,14 +14,12 @@ class DiamondRepositoryImpl implements DiamondRepository {
     try {
       final data = await dataSource.getDiamondData(userId);
       return Right(DiamondData(
-        diamonds:               data['diamonds']               as int,
-        streak:                 data['streak']                 as int,
-        adsWatchedToday:        data['adsWatchedToday']        as int,
+        diamonds: data['diamonds'] as int,
+        streak: data['streak'] as int,
         smallRewardEarnedToday: data['smallRewardEarnedToday'] as int? ?? 0,
-        canClaimToday:          data['canClaimToday']          as bool,
-        lastRewardDate:         data['lastRewardDate']         as String,
-        lastAdDate:             data['lastAdDate']             as String,
-        lastSmallRewardDate:    data['lastSmallRewardDate']    as String? ?? '',
+        canClaimToday: data['canClaimToday'] as bool,
+        lastRewardDate: data['lastRewardDate'] as String,
+        lastSmallRewardDate: data['lastSmallRewardDate'] as String? ?? '',
       ));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -34,20 +32,10 @@ class DiamondRepositoryImpl implements DiamondRepository {
     try {
       final data = await dataSource.claimDailyReward(userId);
       return Right(DailyRewardResult(
-        day:     data['day']     as int,
-        diamonds:data['diamonds']as int,
+        day: data['day'] as int,
+        diamonds: data['diamonds'] as int,
         isBonus: data['isBonus'] as bool,
       ));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, int>> addAdReward(String userId) async {
-    try {
-      final newBalance = await dataSource.addAdReward(userId);
-      return Right(newBalance);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
@@ -79,6 +67,16 @@ class DiamondRepositoryImpl implements DiamondRepository {
           ? SmallRewardDenyReason.wallpaperAlreadyRewarded
           : SmallRewardDenyReason.dailyCapReached;
       return Right(SmallRewardResult.denied(denyReason));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, int>> addDiamonds(String userId, int amount) async {
+    try {
+      final newBalance = await dataSource.addDiamonds(userId, amount);
+      return Right(newBalance);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
