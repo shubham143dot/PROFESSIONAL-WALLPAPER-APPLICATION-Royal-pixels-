@@ -3,8 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/iap_constants.dart';
-import '../../domain/repositories/payment_repository.dart';
-import '../../domain/repositories/diamond_repository.dart';
 import '../../presentation/providers/auth_provider.dart';
 import '../../presentation/providers/diamond_provider.dart';
 import '../../presentation/providers/payment_provider.dart';
@@ -17,7 +15,7 @@ final iapServiceProvider = Provider<IapService>((ref) {
 });
 
 class IapService {
-  final ProviderRef _ref;
+  final Ref _ref;
   final InAppPurchase _iap = InAppPurchase.instance;
   late StreamSubscription<List<PurchaseDetails>> _subscription;
 

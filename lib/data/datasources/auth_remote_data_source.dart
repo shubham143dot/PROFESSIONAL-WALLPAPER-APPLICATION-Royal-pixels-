@@ -8,6 +8,7 @@ abstract class AuthRemoteDataSource {
   Future<UserModel> signInWithGoogle();
   Future<void> signOut();
   Future<UserModel?> getCurrentUser();
+  Stream<UserModel?> watchUser(String userId);
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -22,39 +23,65 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   });
 
   @override
+  Stream<UserModel?> watchUser(String userId) {
+    return firestore
+        .collection('users')
+        .doc(userId)
+        .snapshots()
+        .map((doc) => doc.exists ? UserModel.fromFirestore(doc.data()!, doc.id) : null);
+  }
+
+  @override
   Future<UserModel> signInWithGoogle() async {
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    final GoogleSignInAccount? googleUser;
+    try {
+      googleUser = await googleSignIn.signIn();
+    } catch (e) {
+      throw Exception('Google Sign-In failed to open: $e');
+    }
+
     if (googleUser == null) {
       throw Exception('Google Sign-In was cancelled by the user');
     }
 
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
+    final GoogleSignInAuthentication googleAuth;
+    try {
+      googleAuth = await googleUser.authentication;
+    } catch (e) {
+      throw Exception('Failed to get Google Authentication: $e');
+    }
 
     // idToken can be null if serverClientId is not configured in GoogleSignIn.
     // Ensure the service_locator.dart passes serverClientId to GoogleSignIn().
     if (googleAuth.idToken == null) {
       throw Exception(
         'Google Sign-In failed: idToken is null. '
-        'Make sure serverClientId is set in GoogleSignIn().',
+        'This usually means the SHA-1 fingerprint of your app is not registered in the Firebase Console, '
+        'or the serverClientId is incorrect.',
       );
     }
 
     final auth.OAuthCredential credential = auth.GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
       idToken: googleAuth.idToken,
+      accessToken: googleAuth.accessToken,
     );
 
-    final auth.UserCredential userCredential =
-        await firebaseAuth.signInWithCredential(credential);
+    final auth.UserCredential userCredential;
+    try {
+      userCredential = await firebaseAuth.signInWithCredential(credential);
+    } catch (e) {
+      throw Exception('Firebase authentication failed: $e');
+    }
+
     final auth.User? user = userCredential.user;
 
     if (user == null) {
       throw Exception('Failed to get Firebase user');
     }
 
-    // Check if user exists in Firestore
-    final userDoc = await firestore.collection('users').doc(user.uid).get();
+    try {
+      // Check if user exists in Firestore
+      final userDoc = await firestore.collection('users').doc(user.uid).get();
 
     UserModel userModel;
     if (userDoc.exists) {
@@ -86,7 +113,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       });
     }
 
-    return userModel;
+      return userModel;
+    } catch (e) {
+      if (e.toString().contains('permission-denied') || e.toString().contains('app-check')) {
+        throw Exception(
+          'Firestore access denied. This is likely due to Firebase App Check. '
+          'Please ensure the app is registered in Play Integrity and the SHA-256 fingerprint is added to the Google Play Console.',
+        );
+      }
+      throw Exception('Failed to sync user data with Firestore: $e');
+    }
   }
 
   @override

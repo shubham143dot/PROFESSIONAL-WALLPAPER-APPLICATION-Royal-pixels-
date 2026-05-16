@@ -20,7 +20,19 @@ class DiamondRepositoryImpl implements DiamondRepository {
         canClaimToday: data['canClaimToday'] as bool,
         lastRewardDate: data['lastRewardDate'] as String,
         lastSmallRewardDate: data['lastSmallRewardDate'] as String? ?? '',
+        adsWatchedToday: data['adsWatchedToday'] as int? ?? 0,
+        lastAdRewardDate: data['lastAdRewardDate'] as String? ?? '',
       ));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, int>> incrementAdsWatchedToday(String userId) async {
+    try {
+      final newCount = await dataSource.incrementAdsWatchedToday(userId);
+      return Right(newCount);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }

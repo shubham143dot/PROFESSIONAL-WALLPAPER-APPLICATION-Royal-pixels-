@@ -49,8 +49,6 @@ class _CategoriesListPageState extends ConsumerState<CategoriesListPage>
     final wallpaperState = ref.watch(wallpaperProvider);
     final userState = ref.watch(authProvider);
     final isAdmin = userState.user?.email == 'subhamsoudeep@gmail.com';
-    final categoryCoversAsync = ref.watch(categoryCoverProvider);
-    final categoryCovers = categoryCoversAsync.value ?? {};
 
     final grouped = ref.watch(groupedCategoriesProvider);
     final categories = grouped.keys.toList()..sort();
@@ -75,10 +73,10 @@ class _CategoriesListPageState extends ConsumerState<CategoriesListPage>
               builder: (context) {
                 final content = Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.04 : 0.08),
+                    color: Colors.white.withValues(alpha: AdaptivePerformance.enableBackdropBlur ? 0.04 : 0.08),
                     border: Border(
                       bottom: BorderSide(
-                        color: Colors.white.withOpacity(0.12),
+                        color: Colors.white.withValues(alpha: 0.12),
                         width: 0.8,
                       ),
                     ),
@@ -86,8 +84,8 @@ class _CategoriesListPageState extends ConsumerState<CategoriesListPage>
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.08 : 0.15),
-                        Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.01 : 0.05),
+                        Colors.white.withValues(alpha: AdaptivePerformance.enableBackdropBlur ? 0.08 : 0.15),
+                        Colors.white.withValues(alpha: AdaptivePerformance.enableBackdropBlur ? 0.01 : 0.05),
                       ],
                     ),
                   ),
@@ -118,7 +116,7 @@ class _CategoriesListPageState extends ConsumerState<CategoriesListPage>
                 foreground: Paint()
                   ..style = PaintingStyle.stroke
                   ..strokeWidth = 3
-                  ..color = AppColors.goldMid.withOpacity(0.25),
+                  ..color = AppColors.goldMid.withValues(alpha: 0.25),
               ),
             ),
             ShaderMask(

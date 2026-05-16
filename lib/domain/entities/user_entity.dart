@@ -13,6 +13,8 @@ class UserEntity extends Equatable {
   // ── Diamond System fields ─────────────────────────────────────────────────
   final int diamonds;
   final int streak;
+  final int smallRewardEarnedToday;
+  final int adsWatchedToday;
   final String? appVersion;
 
   final bool isSubscribed;
@@ -30,6 +32,8 @@ class UserEntity extends Equatable {
     this.activityScore = 0,
     this.diamonds = 0,
     this.streak = 0,
+    this.smallRewardEarnedToday = 0,
+    this.adsWatchedToday = 0,
     this.isSubscribed = false,
     this.appVersion,
   });
@@ -46,6 +50,8 @@ class UserEntity extends Equatable {
     int? activityScore,
     int? diamonds,
     int? streak,
+    int? smallRewardEarnedToday,
+    int? adsWatchedToday,
     bool? isSubscribed,
     String? appVersion,
   }) {
@@ -61,6 +67,9 @@ class UserEntity extends Equatable {
       activityScore: activityScore ?? this.activityScore,
       diamonds: diamonds ?? this.diamonds,
       streak: streak ?? this.streak,
+      smallRewardEarnedToday:
+          smallRewardEarnedToday ?? this.smallRewardEarnedToday,
+      adsWatchedToday: adsWatchedToday ?? this.adsWatchedToday,
       isSubscribed: isSubscribed ?? this.isSubscribed,
       appVersion: appVersion ?? this.appVersion,
     );
@@ -79,6 +88,8 @@ class UserEntity extends Equatable {
         activityScore,
         diamonds,
         streak,
+        smallRewardEarnedToday,
+        adsWatchedToday,
         isSubscribed,
         appVersion,
       ];

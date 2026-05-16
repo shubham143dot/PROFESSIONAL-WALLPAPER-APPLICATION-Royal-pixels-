@@ -36,10 +36,10 @@ class CategoryPage extends ConsumerWidget {
               builder: (context) {
                 final content = Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.04 : 0.08),
+                    color: Colors.white.withValues(alpha: AdaptivePerformance.enableBackdropBlur ? 0.04 : 0.08),
                     border: Border(
                       bottom: BorderSide(
-                        color: Colors.white.withOpacity(0.12),
+                        color: Colors.white.withValues(alpha: 0.12),
                         width: 0.8,
                       ),
                     ),
@@ -47,8 +47,8 @@ class CategoryPage extends ConsumerWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.08 : 0.15),
-                        Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.01 : 0.05),
+                        Colors.white.withValues(alpha: AdaptivePerformance.enableBackdropBlur ? 0.08 : 0.15),
+                        Colors.white.withValues(alpha: AdaptivePerformance.enableBackdropBlur ? 0.01 : 0.05),
                       ],
                     ),
                   ),

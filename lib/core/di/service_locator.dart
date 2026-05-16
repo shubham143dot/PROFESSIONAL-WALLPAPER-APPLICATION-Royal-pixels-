@@ -38,6 +38,10 @@ Future<void> setupLocator() async {
   // The serverClientId (web client ID) is required so that googleAuth.idToken
   // is always populated. Without it, Firebase credential creation will fail.
   sl.registerLazySingleton(() => GoogleSignIn(
+        scopes: [
+          'email',
+          'https://www.googleapis.com/auth/userinfo.profile',
+        ],
         serverClientId:
             '871231257178-vtn84glpkom9qtrg075tt4hs7uhp0a6h.apps.googleusercontent.com',
       ));

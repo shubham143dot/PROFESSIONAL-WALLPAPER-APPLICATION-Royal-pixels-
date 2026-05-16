@@ -15,6 +15,7 @@ import '../../../core/scroll/elite_scroll_physics.dart';
 import '../../widgets/premium_touch_tile.dart';
 import '../../../core/services/iap_service.dart';
 import '../../../core/constants/iap_constants.dart';
+import 'watch_earn_section.dart';
 
 class DiamondStorePage extends ConsumerStatefulWidget {
   const DiamondStorePage({super.key});
@@ -232,9 +233,16 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                   _buildStreakCard(diamondState),
                   const SizedBox(height: 28),
 
+                  // ── Watch & Earn ───────────────────────────────────────────
+                  _buildSectionLabel('📺 Watch & Earn',
+                      subtitle: 'Watch ads · earn diamonds · max 100/day · resets midnight'),
+                  const SizedBox(height: 12),
+                  const WatchEarnSection(),
+                  const SizedBox(height: 28),
+
                   // ── How to Earn ──────────────────────────────────────────
                   _buildSectionLabel('💰 How to Earn',
-                      subtitle: 'Earn diamonds from actions'),
+                      subtitle: 'All the ways to earn Royal Diamonds'),
                   const SizedBox(height: 12),
                   _buildEarnCard(),
                   const SizedBox(height: 36),
@@ -742,10 +750,36 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
   // ── Earn Card ──────────────────────────────────────────────────────────────
   Widget _buildEarnCard() {
     final items = [
-      (Icons.local_fire_department_rounded, 'Daily Login Streak', 'Earn up to 50 diamonds per day'),
-      (Icons.file_download_rounded, 'Download Wallpaper', '+5 diamonds · free & premium · 80/day cap'),
-      (Icons.wallpaper_rounded, 'Set as Wallpaper', '+5 diamonds · free & premium · 80/day cap'),
-      (Icons.emoji_events_rounded, 'Daily Maximum', 'Earn up to 80 diamonds daily from all actions'),
+      (
+        Icons.local_fire_department_rounded,
+        'Daily Login Streak',
+        'Up to +50 💎 per day · resets at midnight',
+        const Color(0xFFFF6B00),
+      ),
+      (
+        Icons.smart_display_rounded,
+        'Watch & Earn',
+        '+20 💎 per ad · 5 ads/day · 100 💎/day · resets midnight',
+        const Color(0xFF7C3AED),
+      ),
+      (
+        Icons.file_download_rounded,
+        'Download Wallpaper',
+        '+20 💎 total from download & set wallpaper actions',
+        const Color(0xFF2266DD),
+      ),
+      (
+        Icons.wallpaper_rounded,
+        'Set as Wallpaper',
+        'Included in the +20 💎 combined download/set limit',
+        const Color(0xFF22AA66),
+      ),
+      (
+        Icons.emoji_events_rounded,
+        'Daily Maximum',
+        'Earn up to 120 💎/day (100 from ads + 20 from actions)',
+        AppColors.goldMid,
+      ),
     ];
 
     return Container(
@@ -769,16 +803,13 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF141830),
+                        color: item.$4.withAlpha(20),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: const Color(0xFF1E2840), width: 1),
+                            color: item.$4.withAlpha(60), width: 1),
                       ),
                       child: Center(
-                        child: ShaderMask(
-                          shaderCallback: (b) => AppColors.goldGradient.createShader(b),
-                          child: Icon(item.$1, color: Colors.white, size: 20),
-                        ),
+                        child: Icon(item.$1, color: item.$4, size: 20),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -791,18 +822,18 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                          const SizedBox(height: 1),
                           Text(
                             item.$3,
                             style: const TextStyle(
-                                color: Color(0xFF5577AA), fontSize: 11),
+                                color: Color(0xFF5577AA), fontSize: 10.5),
                           ),
                         ],
                       ),
                     ),
-                    // Gold chevron for the last "max" item
                     if (i == items.length - 1)
                       ShaderMask(
                         shaderCallback: (b) =>

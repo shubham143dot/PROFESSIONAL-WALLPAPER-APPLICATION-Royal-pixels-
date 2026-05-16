@@ -48,7 +48,7 @@ abstract class FirestoreDataSource {
   Future<Map<String, dynamic>> claimDailyReward(String userId);
   Future<int> spendDiamonds(String userId, String wallpaperId, int cost);
 
-  /// Awards +5 diamonds for download/set-as (unified, per-wallpaper dedup + 80/day cap).
+  /// Awards +5 diamonds for download/set-as (unified, per-wallpaper dedup + 20/day cap).
   /// Returns a map: { 'granted': bool, 'newBalance': int, 'reason': String? }
   Future<Map<String, dynamic>> addSmallReward(
       String userId, String wallpaperId);
@@ -66,12 +66,23 @@ abstract class FirestoreDataSource {
 
   /// Awards [amount] diamonds to the user.
   Future<int> addDiamonds(String userId, int amount);
+
+  /// Increments the daily rewarded ad count for the user.
+  Future<int> incrementAdsWatchedToday(String userId);
+
+  /// Streams the user document for real-time updates.
+  Stream<Map<String, dynamic>> watchUser(String userId);
 }
 
 class FirestoreDataSourceImpl implements FirestoreDataSource {
   final FirebaseFirestore firestore;
 
   FirestoreDataSourceImpl({required this.firestore});
+
+  @override
+  Stream<Map<String, dynamic>> watchUser(String userId) {
+    return firestore.collection('users').doc(userId).snapshots().map((doc) => doc.data() ?? {});
+  }
 
   @override
   Future<List<WallpaperModel>> getWallpapers(
@@ -337,10 +348,15 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
     final today = _todayString();
     final lastRewardDate = data['lastRewardDate'] as String? ?? '';
     final lastSmallRewardDate = data['lastSmallRewardDate'] as String? ?? '';
+    final lastAdRewardDate = data['lastAdRewardDate'] as String? ?? '';
 
     // Reset counters when the date changes
     final smallRewardEarnedToday = (lastSmallRewardDate == today)
         ? (data['smallRewardEarnedToday'] as int? ?? 0)
+        : 0;
+
+    final adsWatchedToday = (lastAdRewardDate == today)
+        ? (data['adsWatchedToday'] as int? ?? 0)
         : 0;
 
     int streak = data['streak'] as int? ?? 0;
@@ -377,7 +393,35 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
       'lastRewardDate': lastRewardDate,
       'lastSmallRewardDate': lastSmallRewardDate,
       'canClaimToday': canClaimToday,
+      'adsWatchedToday': adsWatchedToday,
+      'lastAdRewardDate': lastAdRewardDate,
     };
+  }
+
+  @override
+  Future<int> incrementAdsWatchedToday(String userId) async {
+    final userRef = firestore.collection('users').doc(userId);
+    late int newCount;
+
+    await firestore.runTransaction((transaction) async {
+      final snap = await transaction.get(userRef);
+      if (!snap.exists) throw Exception('User not found');
+
+      final data = snap.data()!;
+      final today = _todayString();
+      final lastAdRewardDate = data['lastAdRewardDate'] as String? ?? '';
+      final isNewDay = lastAdRewardDate != today;
+
+      final currentCount = isNewDay ? 0 : (data['adsWatchedToday'] as int? ?? 0);
+      newCount = currentCount + 1;
+
+      transaction.update(userRef, {
+        'adsWatchedToday': newCount,
+        'lastAdRewardDate': today,
+      });
+    });
+
+    return newCount;
   }
 
   @override

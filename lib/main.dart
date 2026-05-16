@@ -9,12 +9,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:screen_protector/screen_protector.dart';
 
 import 'package:royal_pixels/core/constants/app_constants.dart';
 import 'package:royal_pixels/core/di/service_locator.dart';
 import 'package:royal_pixels/core/scroll/scroll.dart';
 import 'package:royal_pixels/core/services/adaptive_performance.dart';
+import 'package:royal_pixels/core/services/ad_service.dart';
+import 'package:royal_pixels/core/services/reward_ad_service.dart';
 import 'package:royal_pixels/core/services/notification_service.dart';
 import 'package:royal_pixels/core/services/wallpaper_scheduler.dart';
 import 'package:royal_pixels/core/theme/app_theme.dart';
@@ -43,6 +46,7 @@ void main() async {
     _initScreenProtector(),
     WallpaperScheduler.init(),
     AdaptivePerformance.initialize(), // Phase 3: detect device tier at startup
+    _initMobileAds(),              // AdMob SDK + AdService preload
   ]);
 
   // Phase 7: Even more aggressive image cache sizing for 2GB-4GB stability
@@ -70,7 +74,9 @@ Future<void> _initFirebase() async {
   try {
     await Firebase.initializeApp();
     await FirebaseAppCheck.instance.activate(
+      // ignore: deprecated_member_use
       androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+      // ignore: deprecated_member_use
       appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.deviceCheck,
     );
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
@@ -104,6 +110,18 @@ Future<void> _initDisplayMode() async {
       await FlutterDisplayMode.setHighRefreshRate();
     }
   } catch (_) {}
+}
+
+Future<void> _initMobileAds() async {
+  try {
+    await MobileAds.instance.initialize();
+    // Pre-load the first interstitial so it's ready when the user first taps.
+    await AdService.instance.initialize();
+    await RewardAdService.instance.initialize();
+    if (kDebugMode) debugPrint('[AdMob] SDK initialized ✓');
+  } catch (e) {
+    if (kDebugMode) debugPrint('[AdMob] Initialization failed: $e');
+  }
 }
 
 class RoyalPixelsApp extends ConsumerStatefulWidget {
@@ -156,12 +174,27 @@ class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp>
     }
   }
 
+  void _updateAdServices(AuthState authState) {
+    final isPremium = authState.user?.isSubscribed ?? false;
+    AdService.instance.isPremium = isPremium;
+    RewardAdService.instance.isPremium = isPremium;
+    if (kDebugMode) {
+      debugPrint('[AdServices] Premium status updated: $isPremium');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authProvider, (previous, next) {
+      _updateAdServices(next);
       if (previous?.user?.email != next.user?.email) {
         _applyScreenshotPolicy(next);
       }
+    });
+
+    // Initial sync
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+       _updateAdServices(ref.read(authProvider));
     });
 
     return MaterialApp.router(

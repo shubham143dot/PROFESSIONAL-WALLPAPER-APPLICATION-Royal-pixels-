@@ -213,7 +213,7 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
         final dayNum = i + 1;
         final isDone = dayNum < currentDay || (dayNum == currentDay && _claimed);
         final isActive = dayNum == currentDay && !_claimed;
-        final isFuture = dayNum > currentDay;
+        // isFuture: dayNum > currentDay (used implicitly via !isDone && !isActive)
 
         Color borderColor;
         Color? bgColor;

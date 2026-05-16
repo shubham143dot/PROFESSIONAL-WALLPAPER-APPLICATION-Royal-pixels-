@@ -2,10 +2,12 @@
 class DiamondData {
   final int diamonds;
   final int streak; // 1–7
-  final int smallRewardEarnedToday; // combined download+set-as cap: max 80
+  final int smallRewardEarnedToday; // combined download+set-as cap: max 20
   final bool canClaimToday;
   final String lastRewardDate; // "YYYY-MM-DD"
   final String lastSmallRewardDate; // date when smallRewardEarnedToday was set
+  final int adsWatchedToday; // max 5/day
+  final String lastAdRewardDate; // date when adsWatchedToday was set
 
   const DiamondData({
     required this.diamonds,
@@ -14,14 +16,19 @@ class DiamondData {
     required this.canClaimToday,
     required this.lastRewardDate,
     this.lastSmallRewardDate = '',
+    this.adsWatchedToday = 0,
+    this.lastAdRewardDate = '',
   });
 
-  static const int dailySmallRewardCap = 80; // combined cap for download+set-as
+  static const int dailySmallRewardCap = 20; // combined cap for download+set-as
   static const int smallRewardAmount = 5;
+  static const int maxAdsPerDay = 5;
 
   bool get canEarnSmall => smallRewardEarnedToday < dailySmallRewardCap;
+  bool get canWatchAds => adsWatchedToday < maxAdsPerDay;
 
   int get remainingSmallReward => dailySmallRewardCap - smallRewardEarnedToday;
+  int get adsRemainingToday => (maxAdsPerDay - adsWatchedToday).clamp(0, maxAdsPerDay);
 
   DiamondData copyWith({
     int? diamonds,
@@ -30,6 +37,8 @@ class DiamondData {
     bool? canClaimToday,
     String? lastRewardDate,
     String? lastSmallRewardDate,
+    int? adsWatchedToday,
+    String? lastAdRewardDate,
   }) {
     return DiamondData(
       diamonds: diamonds ?? this.diamonds,
@@ -39,6 +48,8 @@ class DiamondData {
       canClaimToday: canClaimToday ?? this.canClaimToday,
       lastRewardDate: lastRewardDate ?? this.lastRewardDate,
       lastSmallRewardDate: lastSmallRewardDate ?? this.lastSmallRewardDate,
+      adsWatchedToday: adsWatchedToday ?? this.adsWatchedToday,
+      lastAdRewardDate: lastAdRewardDate ?? this.lastAdRewardDate,
     );
   }
 }

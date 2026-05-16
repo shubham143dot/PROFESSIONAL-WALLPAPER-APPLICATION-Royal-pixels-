@@ -3,17 +3,19 @@ import '../../core/di/service_locator.dart';
 import '../../domain/entities/diamond_data.dart';
 import '../../domain/repositories/diamond_repository.dart';
 import '../../domain/entities/notification_type.dart';
+import '../../domain/entities/user_entity.dart';
 import 'notification_provider.dart';
 
 // ── Diamond state ──────────────────────────────────────────────────────────────
 class DiamondState {
   final int diamonds;
   final int streak;
-  final int smallRewardEarnedToday; // combined download+set-as, daily cap: 80
+  final int smallRewardEarnedToday; // combined download+set-as, daily cap: 20
   final bool canClaimToday;
   final bool isLoading;
   final String? error;
   final DailyRewardResult? pendingReward; // non-null when popup should show
+  final int adsWatchedToday;
 
   const DiamondState({
     this.diamonds = 0,
@@ -23,10 +25,11 @@ class DiamondState {
     this.isLoading = false,
     this.error,
     this.pendingReward,
+    this.adsWatchedToday = 0,
   });
 
 
-  static const int dailySmallRewardCap = 80;
+  static const int dailySmallRewardCap = 20;
 
 
   bool get canEarnSmall => smallRewardEarnedToday < dailySmallRewardCap;
@@ -37,25 +40,25 @@ class DiamondState {
   DiamondState copyWith({
     int? diamonds,
     int? streak,
-
     int? smallRewardEarnedToday,
     bool? canClaimToday,
     bool? isLoading,
     String? error,
     DailyRewardResult? pendingReward,
+    int? adsWatchedToday,
     bool clearReward = false,
     bool clearError = false,
   }) {
     return DiamondState(
       diamonds: diamonds ?? this.diamonds,
       streak: streak ?? this.streak,
-
       smallRewardEarnedToday:
           smallRewardEarnedToday ?? this.smallRewardEarnedToday,
       canClaimToday: canClaimToday ?? this.canClaimToday,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       pendingReward: clearReward ? null : (pendingReward ?? this.pendingReward),
+      adsWatchedToday: adsWatchedToday ?? this.adsWatchedToday,
     );
   }
 }
@@ -92,14 +95,29 @@ class DiamondNotifier extends Notifier<DiamondState> {
         state = state.copyWith(
           diamonds: data.diamonds,
           streak: data.streak,
-
           smallRewardEarnedToday: data.smallRewardEarnedToday,
           canClaimToday: data.canClaimToday,
+          adsWatchedToday: data.adsWatchedToday,
           isLoading: false,
           pendingReward: pending,
         );
       },
     );
+  }
+
+  /// Updates local state from a [UserEntity] received via real-time stream.
+  void updateFromUser(UserEntity user) {
+    if (state.diamonds != user.diamonds ||
+        state.streak != user.streak ||
+        state.smallRewardEarnedToday != user.smallRewardEarnedToday ||
+        state.adsWatchedToday != user.adsWatchedToday) {
+      state = state.copyWith(
+        diamonds: user.diamonds,
+        streak: user.streak,
+        smallRewardEarnedToday: user.smallRewardEarnedToday,
+        adsWatchedToday: user.adsWatchedToday,
+      );
+    }
   }
 
   /// Alias for [load] — used after diamond pack purchase to refresh balance.
@@ -154,7 +172,7 @@ class DiamondNotifier extends Notifier<DiamondState> {
     return success;
   }
 
-  // ── Small reward (download / set-as) — per-wallpaper dedup + 80/day cap ──
+  // ── Small reward (download / set-as) — per-wallpaper dedup + 20/day cap ──
   /// Returns [SmallRewardResult] with granted=true and updated balance,
   /// or granted=false with the [SmallRewardDenyReason].
   Future<SmallRewardResult> addSmallReward(
@@ -180,7 +198,7 @@ class DiamondNotifier extends Notifier<DiamondState> {
           ref.read(notificationProvider.notifier).addNotification(
                 title: 'Gems Collected!',
                 message:
-                    'You received 5 bonus diamonds for downloading/setting a wallpaper.',
+                    'You received 5 bonus diamonds for downloading/setting a wallpaper. (Max 20/day)',
                 type: NotificationType.reward,
               );
         }

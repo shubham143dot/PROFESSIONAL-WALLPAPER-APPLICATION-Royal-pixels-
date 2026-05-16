@@ -398,7 +398,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
                                   letterSpacing: 2.0,
                                   shadows: [
                                     Shadow(
-                                      color: AppColors.goldMid.withOpacity(0.5),
+                                      color: AppColors.goldMid.withValues(alpha: 0.5),
                                       blurRadius: 10,
                                     ),
                                   ],
@@ -532,10 +532,10 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
               builder: (context) {
                 final content = Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.04 : 0.08),
+                    color: Colors.white.withValues(alpha: AdaptivePerformance.enableBackdropBlur ? 0.04 : 0.08),
                     border: Border(
                       bottom: BorderSide(
-                        color: Colors.white.withOpacity(0.12),
+                        color: Colors.white.withValues(alpha: 0.12),
                         width: 0.8,
                       ),
                     ),
@@ -543,8 +543,8 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.08 : 0.15),
-                        Colors.white.withOpacity(AdaptivePerformance.enableBackdropBlur ? 0.01 : 0.05),
+                        Colors.white.withValues(alpha: AdaptivePerformance.enableBackdropBlur ? 0.08 : 0.15),
+                        Colors.white.withValues(alpha: AdaptivePerformance.enableBackdropBlur ? 0.01 : 0.05),
                       ],
                     ),
                   ),

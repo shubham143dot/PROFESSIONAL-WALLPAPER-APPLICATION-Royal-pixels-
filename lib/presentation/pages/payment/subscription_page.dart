@@ -8,7 +8,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/safe_tap.dart';
 import '../../../core/utils/royal_snack_bar.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/payment_provider.dart';
 import '../../../core/services/adaptive_performance.dart';
 import '../../../core/widgets/login_required_sheet.dart';
 import '../../../core/services/iap_service.dart';
@@ -152,6 +151,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
         // is verified and delivered by IapService, which refreshes the user.
         
       } catch (e) {
+        if (!mounted) return;
         RoyalSnackBar.show(
           context,
           '❌ Could not initiate purchase: $e',
@@ -513,10 +513,13 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
     return TextButton(
       onPressed: () async {
         HapticFeedback.lightImpact();
+        if (!mounted) return;
         try {
           RoyalSnackBar.show(context, 'Checking for past purchases...', type: SnackBarType.info);
           await ref.read(iapServiceProvider).restorePurchases();
+          if (!mounted) return;
         } catch (e) {
+          if (!mounted) return;
           RoyalSnackBar.show(context, 'Restore failed: $e', type: SnackBarType.error);
         }
       },

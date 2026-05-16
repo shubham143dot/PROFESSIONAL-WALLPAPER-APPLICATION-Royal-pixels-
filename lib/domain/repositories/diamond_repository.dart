@@ -30,4 +30,7 @@ abstract class DiamondRepository {
   );
   /// Awards [amount] diamonds to the user.
   Future<Either<Failure, int>> addDiamonds(String userId, int amount);
+
+  /// Increments the daily rewarded ad count for the user.
+  Future<Either<Failure, int>> incrementAdsWatchedToday(String userId);
 }

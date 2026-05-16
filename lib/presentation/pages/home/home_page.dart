@@ -531,10 +531,10 @@ class _HomePageState extends ConsumerState<HomePage>
         bottom: 12,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.02),
+        color: Colors.white.withValues(alpha: 0.02),
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
             width: 0.5,
           ),
         ),
@@ -593,12 +593,12 @@ class _HomePageState extends ConsumerState<HomePage>
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         gradient: chipGradient,
-                        color: isActive ? null : Colors.white.withOpacity(0.06),
+                        color: isActive ? null : Colors.white.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isActive 
-                              ? Colors.white.withOpacity(0.3) 
-                              : Colors.white.withOpacity(0.1),
+                              ? Colors.white.withValues(alpha: 0.3) 
+                              : Colors.white.withValues(alpha: 0.1),
                           width: 0.8,
                         ),
                       ),
@@ -647,18 +647,18 @@ class _HomePageState extends ConsumerState<HomePage>
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         gradient: chipGradient,
-                        color: isActive ? null : Colors.white.withOpacity(0.06),
+                        color: isActive ? null : Colors.white.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isActive 
-                              ? Colors.white.withOpacity(0.3) 
-                              : Colors.white.withOpacity(0.1),
+                              ? Colors.white.withValues(alpha: 0.3) 
+                              : Colors.white.withValues(alpha: 0.1),
                           width: 0.8,
                         ),
                         boxShadow: isActive
                             ? [
                                 BoxShadow(
-                                  color: chipColor.withOpacity(0.3),
+                                  color: chipColor.withValues(alpha: 0.3),
                                   blurRadius: 15,
                                   spreadRadius: -2,
                                   offset: const Offset(0, 4),
@@ -1021,10 +1021,10 @@ class _HomePageState extends ConsumerState<HomePage>
   Widget _buildAppBarBackground({bool opaque = false}) {
     return Container(
       decoration: BoxDecoration(
-        color: opaque ? AppColors.bg1 : Colors.white.withOpacity(0.04),
+        color: opaque ? AppColors.bg1 : Colors.white.withValues(alpha: 0.04),
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             width: 0.8,
           ),
         ),
@@ -1034,8 +1034,8 @@ class _HomePageState extends ConsumerState<HomePage>
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.white.withOpacity(0.08),
-                  Colors.white.withOpacity(0.01),
+                  Colors.white.withValues(alpha: 0.08),
+                  Colors.white.withValues(alpha: 0.01),
                 ],
               ),
       ),
@@ -2305,7 +2305,7 @@ class _AppBarTitleText extends StatelessWidget {
             foreground: Paint()
               ..style = PaintingStyle.stroke
               ..strokeWidth = 3
-              ..color = AppColors.goldMid.withOpacity(0.25),
+              ..color = AppColors.goldMid.withValues(alpha: 0.25),
           ),
         ),
         // Main Text with Gradient and Shadows
@@ -2351,10 +2351,10 @@ class _PremiumSearchBar extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 260),
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(19),
           border: Border.all(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             width: 0.8,
           ),
         ),
@@ -2362,12 +2362,12 @@ class _PremiumSearchBar extends StatelessWidget {
           children: [
             Icon(Icons.search_rounded, 
                  size: 18, 
-                 color: AppColors.goldMid.withOpacity(0.8)),
+                 color: AppColors.goldMid.withValues(alpha: 0.8)),
             const SizedBox(width: 10),
             Text(
               'Search Wallpapers...',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+                color: Colors.white.withValues(alpha: 0.4),
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.3,

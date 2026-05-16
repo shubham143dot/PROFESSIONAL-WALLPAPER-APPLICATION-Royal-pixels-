@@ -186,14 +186,14 @@ class _GlassContainer extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(35),
           // Phase 9: Added subtle transparency even for low-tier devices
-          color: AppColors.bg1.withOpacity(0.92),
+          color: AppColors.bg1.withValues(alpha: 0.92),
           border: Border.all(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             width: 0.8,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.35),
+              color: Colors.black.withValues(alpha: 0.35),
               blurRadius: 30,
               spreadRadius: -5,
               offset: const Offset(0, 12),
@@ -212,29 +212,29 @@ class _GlassContainer extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(35),
             // Premium glass effect with variable opacity
-            color: Colors.white.withOpacity(0.06), 
+            color: Colors.white.withValues(alpha: 0.06), 
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withOpacity(0.10),
-                Colors.white.withOpacity(0.01),
+                Colors.white.withValues(alpha: 0.10),
+                Colors.white.withValues(alpha: 0.01),
               ],
             ),
             border: Border.all(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               width: 0.8,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
                 blurRadius: 40,
                 spreadRadius: -5,
                 offset: const Offset(0, 15),
               ),
               // Subtlest gold highlight for premium feel
               BoxShadow(
-                color: AppColors.goldMid.withOpacity(0.04),
+                color: AppColors.goldMid.withValues(alpha: 0.04),
                 blurRadius: 15,
                 spreadRadius: -1,
                 offset: const Offset(0, -1),
@@ -329,7 +329,7 @@ class _ContinuousPill extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.goldMid.withOpacity(0.18),
+                              color: AppColors.goldMid.withValues(alpha: 0.18),
                               blurRadius: 35,
                               spreadRadius: 4,
                             ),
@@ -346,7 +346,7 @@ class _ContinuousPill extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.goldMid.withOpacity(selectionOpacity * 0.6),
+                              color: AppColors.goldMid.withValues(alpha: selectionOpacity * 0.6),
                               blurRadius: 40 * (1.0 + glowVal),
                               spreadRadius: 8 * glowVal,
                             ),

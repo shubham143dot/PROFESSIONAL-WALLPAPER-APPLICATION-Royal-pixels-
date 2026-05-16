@@ -68,6 +68,11 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/ic_launcher" />
+        <!-- Google AdMob App ID — Royal Pixels production app -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-7067800299420686~7301084757"/>
+
         <!-- Enable Impeller rendering on Android 12+ (Vulkan backend)
              Eliminates shader compilation jank — biggest source of first-frame drops on Android -->
         <meta-data

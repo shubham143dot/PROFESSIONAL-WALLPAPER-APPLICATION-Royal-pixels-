@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -16,6 +17,8 @@ import '../../data/models/notification_model.dart';
 import '../../core/services/notification_service.dart';
 import 'dart:convert';
 import '../../core/constants/app_constants.dart';
+import '../../core/services/reward_ad_service.dart';
+import '../../core/services/ad_service.dart';
 
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
   return AuthNotifier();
@@ -57,6 +60,7 @@ class AuthState {
 
 class AuthNotifier extends Notifier<AuthState> {
   static const _guestKey = 'guest_mode';
+  StreamSubscription? _userSubscription;
 
   @override
   AuthState build() {
@@ -69,6 +73,8 @@ class AuthNotifier extends Notifier<AuthState> {
             sl<FirestoreDataSource>().updateUserActivity(currentUser.uid);
             // Upload FCM token for testers and reliable notifications
             await NotificationService.uploadFCMToken(currentUser.uid);
+            
+            // Initial fetch to get the user data immediately
             final result = await sl<AuthRepository>().getCurrentUser();
             result.fold(
               (_) => null,
@@ -79,8 +85,17 @@ class AuthNotifier extends Notifier<AuthState> {
                 }
               },
             );
+
+            // Start real-time listener
+            _startUserListener(currentUser.uid);
+            
+            // Sync Ad Services with current user
+            RewardAdService.instance.updateUserId(currentUser.uid);
+            AdService.instance.updateUserId(currentUser.uid);
           } catch (_) {}
         });
+
+        // Return a temporary state with ID so we don't flash "Not Logged In" if user exists
         return AuthState(
           user: UserEntity(
             uid: currentUser.uid,
@@ -101,7 +116,30 @@ class AuthNotifier extends Notifier<AuthState> {
 
     // Check if user previously chose guest mode (persists across restarts)
     _restoreGuestMode();
+    
+    // Ensure we cancel any existing subscription on rebuild if user is null
+    ref.onDispose(() => _userSubscription?.cancel());
+    
     return AuthState();
+  }
+
+  void _startUserListener(String userId) {
+    _userSubscription?.cancel();
+    _userSubscription = sl<AuthRepository>().watchUser(userId).listen((result) {
+      result.fold(
+        (failure) {
+          if (kDebugMode) debugPrint('User listener error: ${failure.message}');
+        },
+        (user) {
+          if (user != null) {
+            state = state.copyWith(user: user);
+            // Also sync diamonds to diamondProvider if they changed
+            // This ensures both providers see the real-time update
+            ref.read(diamondProvider.notifier).updateFromUser(user);
+          }
+        },
+      );
+    });
   }
 
   /// Reads SharedPreferences asynchronously and sets guest mode if needed.
@@ -138,7 +176,16 @@ class AuthNotifier extends Notifier<AuthState> {
           sl<FirestoreDataSource>().updateUserActivity(user.uid);
           // Upload FCM token upon login
           await NotificationService.uploadFCMToken(user.uid);
+          
+          // Sync Ad Services with current user
+          await RewardAdService.instance.updateUserId(user.uid);
+          AdService.instance.updateUserId(user.uid);
+          
           state = AuthState(user: user); // clear guest flag
+          
+          // Start real-time listener
+          _startUserListener(user.uid);
+          
           ref.read(diamondProvider.notifier).load(user.uid);
         },
       );
@@ -166,7 +213,6 @@ class AuthNotifier extends Notifier<AuthState> {
         );
 
         // Also update the global like_count for each wallpaper in the batch
-        // Note: Batch limit is 500, we expect guestFavs to be much smaller usually.
         for (var id in guestFavs) {
           batch.update(
             firestore.collection('wallpapers').doc(id),
@@ -235,21 +281,27 @@ class AuthNotifier extends Notifier<AuthState> {
       (userData) {
         if (userData != null) {
           state = state.copyWith(user: userData);
+          ref.read(diamondProvider.notifier).updateFromUser(userData);
         }
       },
     );
   }
 
   Future<void> logout() async {
+    _userSubscription?.cancel();
+    _userSubscription = null;
+    
     try {
       final googleSignIn = sl<GoogleSignIn>();
       await googleSignIn.signOut();
     } catch (_) {}
-    await FirebaseAuth.instance.signOut();
-
     // Also clear guest mode flag
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_guestKey);
+
+    // Clear Ad Services state
+    RewardAdService.instance.updateUserId(null);
+    AdService.instance.updateUserId(null);
 
     state = AuthState(); // Clear all state
   }

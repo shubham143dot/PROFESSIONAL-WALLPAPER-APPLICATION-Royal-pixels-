@@ -33,7 +33,7 @@ class NotificationService {
     const iosSettings = DarwinInitializationSettings();
 
     await _localNotifications.initialize(
-      const InitializationSettings(android: androidSettings, iOS: iosSettings),
+      settings: const InitializationSettings(android: androidSettings, iOS: iosSettings),
       onDidReceiveNotificationResponse: (details) {
         // Handle notification click if needed
       },
@@ -112,10 +112,10 @@ class NotificationService {
     const iosDetails = DarwinNotificationDetails();
 
     await _localNotifications.show(
-      message.hashCode,
-      message.notification?.title ?? AppConstants.appName,
-      message.notification?.body ?? '',
-      const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      id: message.hashCode,
+      title: message.notification?.title ?? AppConstants.appName,
+      body: message.notification?.body ?? '',
+      notificationDetails: NotificationDetails(android: androidDetails, iOS: iosDetails),
     );
   }
 

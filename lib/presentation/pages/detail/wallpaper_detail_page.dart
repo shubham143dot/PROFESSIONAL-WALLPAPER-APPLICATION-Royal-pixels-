@@ -20,7 +20,6 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/animations/liquid_rect_tween.dart';
 import '../../../core/utils/royal_snack_bar.dart';
-import '../../../domain/entities/diamond_data.dart';
 import '../../../domain/entities/wallpaper_entity.dart';
 import '../../../domain/repositories/payment_repository.dart';
 import '../../../core/constants/app_constants.dart';
@@ -40,6 +39,7 @@ import '../../../core/scroll/elite_scroll_physics.dart';
 import '../../../core/widgets/premium_glass_container.dart';
 import '../../../core/widgets/login_required_sheet.dart';
 import '../../../core/utils/safe_tap.dart';
+import '../../../core/services/ad_service.dart';
 
 class WallpaperDetailPage extends ConsumerStatefulWidget {
   final WallpaperEntity wallpaper;
@@ -596,27 +596,37 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
 
   Future<void> _downloadWallpaper() async {
     SafeTap.run('wp_download', () async {
-      final user = ref.read(authProvider).user;
+      final auth = ref.read(authProvider);
+      final user = auth.user;
+      final isPremiumUser = user?.isSubscribed ?? false;
 
-      await _performDownload();
+      // ── Ad gate: skip entirely for premium users ────────────────────────────
+      if (!isPremiumUser) {
+        // Perform download first, then potentially show ad
+        await _performDownload();
 
-      if (user != null) {
-        final result = await ref
-            .read(diamondProvider.notifier)
-            .addSmallReward(user.uid, widget.wallpaper.id);
+        // Diamond reward (skip if premium as they have unlimited access)
+        if (user != null) {
+          await ref
+              .read(diamondProvider.notifier)
+              .addSmallReward(user.uid, widget.wallpaper.id);
+        }
 
-        if (mounted && !result.granted) {
-          final msg = result.denyReason ==
-                  SmallRewardDenyReason.wallpaperAlreadyRewarded
-              ? 'Already earned reward for this wallpaper today'
-              : 'Daily reward cap reached (80/day). Come back tomorrow!';
-          RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+        // Record click — shows interstitial after every 3rd combined tap.
+        if (mounted) {
+          AdService.instance.recordActionAndMaybeShowAd();
+        }
+      } else {
+        // Premium User: Smooth, ad-free experience
+        await _performDownload(isSilent: true);
+        if (mounted) {
+          RoyalSnackBar.show(context, 'Saved to Gallery! ✨');
         }
       }
     });
   }
 
-  Future<void> _performDownload() async {
+  Future<void> _performDownload({bool isSilent = false}) async {
     try {
       if (Platform.isAndroid) {
         final hasAccess = await Gal.hasAccess();
@@ -633,7 +643,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
         }
       }
 
-      if (mounted) {
+      if (mounted && !isSilent) {
         RoyalSnackBar.show(context, 'Downloading…', type: SnackBarType.info);
       }
 
@@ -667,7 +677,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
           .addDownload(widget.wallpaper.id);
 
       if (mounted) {
-        RoyalSnackBar.show(context, 'Saved to Gallery! 💎 +5');
+        if (!isSilent) RoyalSnackBar.show(context, 'Saved to Gallery! ✨');
         ref.read(notificationProvider.notifier).addNotification(
               title: 'Download Successful',
               message:
@@ -688,30 +698,40 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
     SafeTap.run('wp_set', () async {
       if (!mounted) return;
 
-      final user = ref.read(authProvider).user;
+      final auth = ref.read(authProvider);
+      final user = auth.user;
+      final isPremiumUser = user?.isSubscribed ?? false;
 
-      await _performSetWallpaper(choice);
+      // ── Ad gate: skip entirely for premium users ────────────────────────────
+      if (!isPremiumUser) {
+        // Perform the wallpaper set first
+        await _performSetWallpaper(choice);
 
-      if (user != null) {
-        final result = await ref
-            .read(diamondProvider.notifier)
-            .addSmallReward(user.uid, widget.wallpaper.id);
+        // Diamond reward
+        if (user != null) {
+          await ref
+              .read(diamondProvider.notifier)
+              .addSmallReward(user.uid, widget.wallpaper.id);
+        }
 
-        if (mounted && !result.granted) {
-          final msg = result.denyReason ==
-                  SmallRewardDenyReason.wallpaperAlreadyRewarded
-              ? 'Already earned reward for this wallpaper today'
-              : 'Daily reward cap reached (80/day). Come back tomorrow!';
-          RoyalSnackBar.show(context, msg, type: SnackBarType.info);
+        // Record click — shows interstitial after every 3rd combined tap.
+        if (mounted) {
+          AdService.instance.recordActionAndMaybeShowAd();
+        }
+      } else {
+        // Premium User: Smooth, ad-free experience
+        await _performSetWallpaper(choice, isSilent: true);
+        if (mounted) {
+          RoyalSnackBar.show(context, 'Wallpaper Applied! ✨');
         }
       }
     });
   }
 
-  Future<void> _performSetWallpaper(int choice) async {
+  Future<void> _performSetWallpaper(int choice, {bool isSilent = false}) async {
     setState(() => _isSetting = true);
     try {
-      if (mounted) {
+      if (mounted && !isSilent) {
         RoyalSnackBar.show(context, 'Setting wallpaper…',
             type: SnackBarType.info);
       }
@@ -739,7 +759,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       await WallpaperManagerPlus().setWallpaper(tempFile, choice);
 
       if (mounted) {
-        RoyalSnackBar.show(context, 'Wallpaper set successfully!');
+        if (!isSilent) RoyalSnackBar.show(context, 'Wallpaper set successfully!');
         ref.read(notificationProvider.notifier).addNotification(
               title: 'Wallpaper Applied',
               message:
@@ -971,7 +991,6 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authProvider).user;
     final likedIds = ref.watch(likesProvider);
     final isLiked = likedIds.contains(widget.wallpaper.id);
 
@@ -1760,52 +1779,4 @@ class _DialogSwitch extends StatelessWidget {
   }
 }
 
-class _ActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  final bool isOutlined;
-
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-    this.isOutlined = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isOutlined ? Colors.transparent : color.withAlpha(40),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isOutlined ? color.withAlpha(80) : color.withAlpha(120),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 

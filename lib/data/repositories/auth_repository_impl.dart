@@ -38,4 +38,13 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(AuthFailure(e.toString()));
     }
   }
+
+  @override
+  Stream<Either<Failure, UserEntity?>> watchUser(String userId) async* {
+    try {
+      yield* remoteDataSource.watchUser(userId).map((user) => Right<Failure, UserEntity?>(user));
+    } catch (e) {
+      yield Left(AuthFailure(e.toString()));
+    }
+  }
 }
