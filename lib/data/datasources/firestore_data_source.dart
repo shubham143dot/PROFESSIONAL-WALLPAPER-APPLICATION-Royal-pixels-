@@ -1,6 +1,10 @@
+import 'dart:async';
+
+import 'package:async/async.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/wallpaper_model.dart';
+
 
 abstract class FirestoreDataSource {
   Future<List<WallpaperModel>> getWallpapers(
@@ -72,6 +76,31 @@ abstract class FirestoreDataSource {
 
   /// Streams the user document for real-time updates.
   Stream<Map<String, dynamic>> watchUser(String userId);
+
+  /// Records this user/guest as active today, then streams
+  /// the last [days] days of DAU counts (admin-only).
+  /// Returns a list of [DauDayRecord] sorted oldest-first.
+  Stream<List<DauDayRecord>> getDailyActiveUsersCounts({int days = 7});
+}
+
+/// Holds DAU data for a single calendar day.
+class DauDayRecord {
+  final String dateKey; // 'YYYY-MM-DD'
+  final int count;
+
+  const DauDayRecord({required this.dateKey, required this.count});
+
+  /// Returns the day label: 'Mon', 'Tue', etc., or 'Today'.
+  String get label {
+    final now = DateTime.now();
+    final todayKey =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    if (dateKey == todayKey) return 'Today';
+    final parts = dateKey.split('-');
+    final dt = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[dt.weekday - 1];
+  }
 }
 
 class FirestoreDataSourceImpl implements FirestoreDataSource {
@@ -280,6 +309,7 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   @override
   Future<void> updateUserActivity(String userId) async {
     final userRef = firestore.collection('users').doc(userId);
+    final today = _dauDateKey(DateTime.now());
 
     await firestore.runTransaction((transaction) async {
       final userSnapshot = await transaction.get(userRef);
@@ -298,6 +328,16 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
           'streak': 0,
         };
         transaction.set(userRef, updates);
+        // Record as first-time active today
+        final dauRef = firestore.collection('daily_active_users').doc(today);
+        transaction.set(
+          dauRef,
+          {
+            'count': FieldValue.increment(1),
+            'uids': {userId: true},
+          },
+          SetOptions(merge: true),
+        );
         return;
       }
 
@@ -331,6 +371,37 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
       if (updates.isNotEmpty) {
         transaction.update(userRef, updates);
       }
+
+      // ── DAU: record this uid as active today (idempotent via merge) ──
+      // We always try to record the UID. The Firestore document uses a
+      // map {uid: true} so duplicate writes are harmless.
+      final dauRef = firestore.collection('daily_active_users').doc(today);
+      final dauKey = 'uids.$userId';
+      // Only increment count if uid is NOT already recorded today
+      final dauSnap = await transaction.get(dauRef);
+      final alreadyCounted = dauSnap.exists &&
+          (dauSnap.data()?['uids'] as Map<String, dynamic>? ?? {})
+              .containsKey(userId);
+      if (!alreadyCounted) {
+        transaction.set(
+          dauRef,
+          {
+            'count': FieldValue.increment(1),
+            'uids': {userId: true},
+          },
+          SetOptions(merge: true),
+        );
+      } else {
+        // Still mark uid present (no-op if already set)
+        transaction.set(
+          dauRef,
+          {'uids': {userId: true}},
+          SetOptions(merge: true),
+        );
+      }
+      // Suppress unused variable warning
+      // ignore: unused_local_variable
+      final _ = dauKey;
     });
   }
 
@@ -339,6 +410,69 @@ class FirestoreDataSourceImpl implements FirestoreDataSource {
   String _todayString() {
     final now = DateTime.now();
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  static String _dauDateKey(DateTime dt) {
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Stream<List<DauDayRecord>> getDailyActiveUsersCounts({int days = 7}) {
+    // Build list of date keys for the last [days] days
+    final now = DateTime.now();
+    final dateKeys = List.generate(
+      days,
+      (i) => _dauDateKey(now.subtract(Duration(days: days - 1 - i))),
+    );
+
+    // Stream each day's document and combine them
+    final streams = dateKeys
+        .map((key) => firestore
+            .collection('daily_active_users')
+            .doc(key)
+            .snapshots()
+            .map((snap) => DauDayRecord(
+                  dateKey: key,
+                  count: snap.exists ? (snap.data()?['count'] as int? ?? 0) : 0,
+                )))
+        .toList();
+
+    // Zip all per-day streams into one combined list stream
+    return _zipDauStreams(streams);
+  }
+
+  /// Combines N independent streams into one stream that emits
+  /// a complete list every time any source emits.
+  Stream<List<DauDayRecord>> _zipDauStreams(
+    List<Stream<DauDayRecord>> streams,
+  ) async* {
+    final latest = List<DauDayRecord?>.filled(streams.length, null);
+    final controllers =
+        List.generate(streams.length, (_) => StreamController<DauDayRecord>());
+    final subs = <StreamSubscription>[];
+
+    for (var i = 0; i < streams.length; i++) {
+      final idx = i;
+      subs.add(streams[idx].listen((record) {
+        latest[idx] = record;
+        controllers[idx].add(record);
+      }));
+    }
+
+    // Emit whenever any controller fires
+    final merged = StreamGroup.merge(controllers.map((c) => c.stream).toList());
+    await for (final _ in merged) {
+      if (latest.every((r) => r != null)) {
+        yield latest.map((r) => r!).toList();
+      }
+    }
+
+    for (final sub in subs) {
+      await sub.cancel();
+    }
+    for (final c in controllers) {
+      await c.close();
+    }
   }
 
   @override

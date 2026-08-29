@@ -37,6 +37,13 @@ import 'package:royal_pixels/core/services/image_prefetch_service.dart';
 import 'package:royal_pixels/domain/entities/haptic_level.dart';
 import '../../../core/scroll/elite_scroll_physics.dart';
 import '../../../core/services/adaptive_performance.dart';
+import 'package:royal_pixels/presentation/providers/admin_stats_provider.dart';
+import 'package:royal_pixels/data/datasources/firestore_data_source.dart';
+import 'dart:typed_data';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
 
 // â”€â”€â”€ Filter enum â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 enum WallpaperFilter { all, newlyAdded, free, premium, editorsChoice, ultraHD }
@@ -1505,6 +1512,9 @@ class _HomePageState extends ConsumerState<HomePage>
                         useCardStyle: false,
                         onTap: () => context.push('/upload-category-cover'),
                       ),
+
+                      // ── Daily Active Users card ──────────────────────
+                      const _DauStatsCard(),
                     ],
                   ),
                 ],
@@ -2377,5 +2387,615 @@ class _PremiumSearchBar extends StatelessWidget {
         ),
       ),
     ).animate(target: AdaptivePerformance.enableAnimations ? null : 1.0).fadeIn(duration: 400.ms).scale(begin: const Offset(0.95, 0.95));
+  }
+}
+
+// ─── Daily Active Users Card ──────────────────────────────────────────────────
+
+// ─── Admin: Daily Active Users ──────────────────────────────────────────────
+// Shows per-day user counts as number rows (no chart) with PDF export.
+// Guard: only rendered when user email == admin email.
+
+class _DauStatsCard extends ConsumerWidget {
+  const _DauStatsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dauAsync = ref.watch(dauProvider);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.goldMid.withValues(alpha: 0.12),
+              AppColors.bg2.withValues(alpha: 0.9),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.goldMid.withValues(alpha: 0.35),
+            width: 1,
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: dauAsync.when(
+          loading: () => const _DauLoadingState(),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'DAU data unavailable',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            ),
+          ),
+          data: (records) => _DauNumberContent(records: records),
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(duration: 500.ms, delay: 150.ms)
+        .slideY(begin: 0.1, end: 0, duration: 400.ms, curve: Curves.easeOutCubic);
+  }
+}
+
+// ─── Number-only content (no chart) ─────────────────────────────────────────
+class _DauNumberContent extends StatefulWidget {
+  final List<DauDayRecord> records;
+  const _DauNumberContent({required this.records});
+
+  @override
+  State<_DauNumberContent> createState() => _DauNumberContentState();
+}
+
+class _DauNumberContentState extends State<_DauNumberContent> {
+  bool _isGeneratingPdf = false;
+
+  int get _weekTotal => widget.records.fold(0, (sum, r) => sum + r.count);
+
+  Future<void> _downloadPdf() async {
+    setState(() => _isGeneratingPdf = true);
+    try {
+      final pdfBytes = await _generateDauPdf(widget.records);
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'royal_pixels_dau_report_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to generate PDF: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isGeneratingPdf = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.records.isEmpty) return const SizedBox.shrink();
+
+    final today = widget.records.isNotEmpty ? widget.records.last : null;
+    final maxCount = widget.records.map((r) => r.count).fold(0, (a, b) => a > b ? a : b);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Header ─────────────────────────────────────────────────────────
+        Row(
+          children: [
+            const Icon(Icons.people_alt_rounded, color: AppColors.goldLight, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Daily Active Users',
+              style: const TextStyle(
+                color: AppColors.goldLight,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+            const Spacer(),
+            // Today's count badge
+            if (today != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.goldMid.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.goldMid.withValues(alpha: 0.5)),
+                ),
+                child: Text(
+                  'Today: ${today.count}',
+                  style: const TextStyle(
+                    color: AppColors.goldLight,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+          ],
+        ),
+
+        const SizedBox(height: 4),
+        Text(
+          '7-day total: $_weekTotal users',
+          style: TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 10,
+            letterSpacing: 0.3,
+          ),
+        ),
+
+        const SizedBox(height: 14),
+        Divider(color: AppColors.divider.withAlpha(40), height: 1),
+        const SizedBox(height: 10),
+
+        // ── Per-day number rows ─────────────────────────────────────────────
+        ...widget.records.reversed.map((record) {
+          final isToday = record == widget.records.last;
+          final fillRatio = maxCount > 0 ? record.count / maxCount : 0.0;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                // Day label
+                SizedBox(
+                  width: 38,
+                  child: Text(
+                    record.label,
+                    style: TextStyle(
+                      color: isToday ? AppColors.goldLight : AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Progress bar (thin, decorative only)
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: AppColors.bg3.withAlpha(120),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: fillRatio.clamp(0.02, 1.0),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 700),
+                          curve: Curves.easeOutCubic,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: isToday
+                                  ? [AppColors.goldLight, AppColors.goldMid]
+                                  : [
+                                      AppColors.goldMid.withValues(alpha: 0.6),
+                                      AppColors.goldMid.withValues(alpha: 0.25),
+                                    ],
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // User count — big, bold number
+                Container(
+                  width: 42,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${record.count}',
+                    style: TextStyle(
+                      color: isToday ? AppColors.goldLight : AppColors.textPrimary,
+                      fontSize: isToday ? 16 : 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'users',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+
+        const SizedBox(height: 12),
+        Divider(color: AppColors.divider.withAlpha(40), height: 1),
+        const SizedBox(height: 14),
+
+        // ── Download PDF button ─────────────────────────────────────────────
+        SizedBox(
+          width: double.infinity,
+          child: GestureDetector(
+            onTap: _isGeneratingPdf ? null : _downloadPdf,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              decoration: BoxDecoration(
+                gradient: _isGeneratingPdf
+                    ? null
+                    : const LinearGradient(
+                        colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                color: _isGeneratingPdf ? AppColors.bg3 : null,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: _isGeneratingPdf
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: AppColors.goldMid.withAlpha(80),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_isGeneratingPdf)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(AppColors.goldMid),
+                      ),
+                    )
+                  else
+                    const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Colors.black),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isGeneratingPdf ? 'Generating PDF...' : 'Download PDF Report',
+                    style: TextStyle(
+                      color: _isGeneratingPdf ? AppColors.textMuted : Colors.black,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── PDF generation helper ───────────────────────────────────────────────────
+Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
+  final doc = pw.Document();
+  final now = DateTime.now();
+  final dateStr =
+      '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+  final weekTotal = records.fold(0, (sum, r) => sum + r.count);
+
+  doc.addPage(
+    pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
+      build: (pw.Context ctx) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // ── Title / Header ──────────────────────────────────────────────
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+              decoration: pw.BoxDecoration(
+                color: const PdfColor.fromInt(0xFF1a1a2e),
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'ROYAL PIXELS',
+                        style: pw.TextStyle(
+                          fontSize: 20,
+                          fontWeight: pw.FontWeight.bold,
+                          color: const PdfColor.fromInt(0xFFFBBF24),
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Admin — Daily Active Users Report',
+                        style: pw.TextStyle(
+                          fontSize: 11,
+                          color: const PdfColor.fromInt(0xFFCCCCCC),
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Text(
+                    'Generated: $dateStr',
+                    style: pw.TextStyle(
+                      fontSize: 9,
+                      color: const PdfColor.fromInt(0xFFAAAAAA),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            pw.SizedBox(height: 24),
+
+            // ── Summary stats ───────────────────────────────────────────────
+            pw.Row(
+              children: [
+                _pdfStatBox('7-Day Total', '$weekTotal users'),
+                pw.SizedBox(width: 12),
+                _pdfStatBox('Today', '${records.isNotEmpty ? records.last.count : 0} users'),
+                pw.SizedBox(width: 12),
+                _pdfStatBox(
+                  'Peak Day',
+                  records.isEmpty
+                      ? '—'
+                      : '${records.reduce((a, b) => a.count > b.count ? a : b).label}: '
+                          '${records.map((r) => r.count).fold(0, (a, b) => a > b ? a : b)} users',
+                ),
+              ],
+            ),
+
+            pw.SizedBox(height: 24),
+
+            // ── Table header ────────────────────────────────────────────────
+            pw.Text(
+              'PER-DAY BREAKDOWN (LAST 7 DAYS)',
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: const PdfColor.fromInt(0xFF888888),
+                letterSpacing: 1.2,
+              ),
+            ),
+            pw.SizedBox(height: 8),
+
+            // ── Data table ──────────────────────────────────────────────────
+            pw.Table(
+              border: pw.TableBorder.all(
+                color: const PdfColor.fromInt(0xFFDDDDDD),
+                width: 0.5,
+              ),
+              columnWidths: const {
+                0: pw.FlexColumnWidth(2),
+                1: pw.FlexColumnWidth(3),
+                2: pw.FlexColumnWidth(2),
+              },
+              children: [
+                // Header row
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColor.fromInt(0xFF1a1a2e),
+                  ),
+                  children: [
+                    _pdfTableHeader('Day'),
+                    _pdfTableHeader('Date'),
+                    _pdfTableHeader('Users'),
+                  ],
+                ),
+                // Data rows (newest first)
+                ...records.reversed.map((r) {
+                  final isToday = r == records.last;
+                  return pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                      color: isToday
+                          ? const PdfColor.fromInt(0xFFFFF9E6)
+                          : const PdfColor.fromInt(0xFFFFFFFF),
+                    ),
+                    children: [
+                      _pdfTableCell(
+                        isToday ? 'Today' : r.label,
+                        bold: isToday,
+                      ),
+                      _pdfTableCell(r.dateKey),
+                      _pdfTableCell(
+                        '${r.count}',
+                        bold: isToday,
+                      ),
+                    ],
+                  );
+                }),
+                // Total row
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColor.fromInt(0xFFF5F5F5),
+                  ),
+                  children: [
+                    _pdfTableCell('TOTAL', bold: true),
+                    _pdfTableCell(''),
+                    _pdfTableCell('$weekTotal', bold: true),
+                  ],
+                ),
+              ],
+            ),
+
+            pw.SizedBox(height: 32),
+
+            // ── Footer ──────────────────────────────────────────────────────
+            pw.Divider(color: const PdfColor.fromInt(0xFFDDDDDD)),
+            pw.SizedBox(height: 8),
+            pw.Text(
+              'Royal Pixels — Admin Report  •  Confidential  •  Do not distribute',
+              style: pw.TextStyle(
+                fontSize: 8,
+                color: const PdfColor.fromInt(0xFFAAAAAA),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  return Uint8List.fromList(await doc.save());
+}
+
+pw.Widget _pdfStatBox(String label, String value) {
+  return pw.Expanded(
+    child: pw.Container(
+      padding: const pw.EdgeInsets.all(10),
+      decoration: pw.BoxDecoration(
+        color: const PdfColor.fromInt(0xFFF9FAFB),
+        border: pw.Border.all(
+          color: const PdfColor.fromInt(0xFFE5E7EB),
+          width: 0.5,
+        ),
+        borderRadius: pw.BorderRadius.circular(6),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            label.toUpperCase(),
+            style: pw.TextStyle(
+              fontSize: 8,
+              color: const PdfColor.fromInt(0xFF9CA3AF),
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 13,
+              fontWeight: pw.FontWeight.bold,
+              color: const PdfColor.fromInt(0xFF111827),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+pw.Widget _pdfTableHeader(String text) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    child: pw.Text(
+      text.toUpperCase(),
+      style: pw.TextStyle(
+        fontSize: 9,
+        fontWeight: pw.FontWeight.bold,
+        color: const PdfColor.fromInt(0xFFFBBF24),
+      ),
+    ),
+  );
+}
+
+pw.Widget _pdfTableCell(String text, {bool bold = false}) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    child: pw.Text(
+      text,
+      style: pw.TextStyle(
+        fontSize: 10,
+        fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+        color: const PdfColor.fromInt(0xFF374151),
+      ),
+    ),
+  );
+}
+
+// ─── Loading state (shimmer rows instead of shimmer bars) ────────────────────
+class _DauLoadingState extends StatelessWidget {
+  const _DauLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header shimmer
+        Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: AppColors.goldMid.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 140,
+              height: 14,
+              decoration: BoxDecoration(
+                color: AppColors.goldMid.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Divider(color: AppColors.divider.withAlpha(40), height: 1),
+        const SizedBox(height: 10),
+        // Row shimmers
+        ...List.generate(7, (i) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: AppColors.goldMid.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: AppColors.bg3.withAlpha(120),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 32,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: AppColors.goldMid.withValues(alpha: i == 0 ? 0.2 : 0.08),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
   }
 }

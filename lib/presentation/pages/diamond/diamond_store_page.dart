@@ -8,13 +8,10 @@ import '../../providers/auth_provider.dart';
 import '../../providers/diamond_provider.dart';
 import '../../../core/utils/royal_snack_bar.dart';
 import 'package:flutter/services.dart';
-import '../../../core/utils/safe_tap.dart';
 
 import '../../../core/widgets/login_required_sheet.dart';
 import '../../../core/scroll/elite_scroll_physics.dart';
 import '../../widgets/premium_touch_tile.dart';
-import '../../../core/services/iap_service.dart';
-import '../../../core/constants/iap_constants.dart';
 import 'watch_earn_section.dart';
 
 class DiamondStorePage extends ConsumerStatefulWidget {
@@ -39,46 +36,6 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
     'Day 7'
   ];
 
-  // ── Diamond Packs ──────────────────────────────────────────────────────────
-  static const List<_DiamondPack> _packs = [
-    _DiamondPack(
-      id: IapConstants.pack300,
-      diamonds: 300,
-      price: 49,
-      tier: _PackTier.small,
-    ),
-    _DiamondPack(
-      id: IapConstants.pack800,
-      diamonds: 800,
-      price: 99,
-      tier: _PackTier.medium,
-      badge: '⭐ MOST POPULAR',
-      isPopular: true,
-    ),
-    _DiamondPack(
-      id: IapConstants.pack2000,
-      diamonds: 2000,
-      price: 199,
-      tier: _PackTier.medium,
-      badge: '+20% EXTRA',
-    ),
-    _DiamondPack(
-      id: IapConstants.pack3500,
-      diamonds: 3500,
-      price: 299,
-      tier: _PackTier.large,
-      badge: 'LIMITED OFFER',
-    ),
-    _DiamondPack(
-      id: IapConstants.pack7000,
-      diamonds: 7000,
-      price: 499,
-      tier: _PackTier.mega,
-      badge: 'BEST VALUE 🔥',
-      isBestValue: true,
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -92,37 +49,6 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
   void dispose() {
     _glowController.dispose();
     super.dispose();
-  }
-
-
-
-  Future<void> _buyDiamondPack(_DiamondPack pack) async {
-    SafeTap.run('buy_diamond_pack_${pack.id}', () async {
-      final authState = ref.read(authProvider);
-      if (!authState.isAuthenticated) {
-        showLoginRequiredSheet(context, reason: LoginRequiredReason.diamonds);
-        return;
-      }
-
-      HapticFeedback.mediumImpact();
-      
-      try {
-        final iapService = ref.read(iapServiceProvider);
-        await iapService.buyProduct(pack.id);
-        
-        // Note: The UI will update automatically because IapService
-        // updates the diamondProvider which we are watching.
-      } catch (e) {
-        HapticFeedback.heavyImpact();
-        if (mounted) {
-          RoyalSnackBar.show(
-            context,
-            '❌ An error occurred initiating purchase.',
-            type: SnackBarType.error,
-          );
-        }
-      }
-    });
   }
 
   @override
@@ -189,7 +115,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                 ),
                 const SizedBox(width: 10),
                 const Text(
-                  'DIAMOND STORE',
+                  'EARN DIAMONDS',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -247,7 +173,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                   _buildEarnCard(),
                   const SizedBox(height: 36),
                 ] else ...[
-                  // Premium Status Card
+                  // ── PRO Member Status ──────────────────────────────────────
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -277,7 +203,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'You have unlimited access to all premium wallpapers. Diamonds and daily streaks are disabled as you no longer need them!',
+                          'You have unlimited access to all premium wallpapers. Enjoy your lifetime PRO membership!',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withAlpha(150),
@@ -290,9 +216,6 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                   ).animate().fadeIn().scale(),
                   const SizedBox(height: 36),
                 ],
-
-                // ── TOP-UP Section ───────────────────────────────────────
-                _buildTopUpSection(),
               ]),
             ),
           ),
@@ -745,8 +668,6 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
     ).animate().fade().slideY(begin: 0.1);
   }
 
-
-
   // ── Earn Card ──────────────────────────────────────────────────────────────
   Widget _buildEarnCard() {
     final items = [
@@ -856,493 +777,4 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
       ),
     ).animate().fade(delay: 150.ms).slideY(begin: 0.05);
   }
-
-  // ── TOP-UP Section ─────────────────────────────────────────────────────────
-  Widget _buildTopUpSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Section header ────────────────────────────────────────────────
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ShaderMask(
-                    shaderCallback: (b) =>
-                        AppColors.goldGradient.createShader(b),
-                    child: const Text(
-                      'AVAILABLE PACKS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Instant Delivery • Secure Digital Payments',
-                    style: TextStyle(
-                        color: Colors.white.withAlpha(70), fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-            // Secure badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.green.withAlpha(20),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.withAlpha(40), width: 1),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.verified_user_rounded, color: Colors.green, size: 14),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'SECURE',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 16),
-
-        // ── Pack grid ─────────────────────────────────────────────────────
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.64,
-          ),
-          itemCount: _packs.length,
-          itemBuilder: (context, i) {
-            return _DiamondPackCard(
-              pack: _packs[i],
-              onTap: () => _buyDiamondPack(_packs[i]),
-            ).animate().fade(delay: Duration(milliseconds: 60 * i)).scale(
-                  begin: const Offset(0.85, 0.85),
-                  duration: 350.ms,
-                  curve: Curves.easeOutBack,
-                );
-          },
-        ),
-
-        const SizedBox(height: 16),
-
-        // ── Secure footer ─────────────────────────────────────────────────
-        Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.shield_rounded,
-                  color: Colors.white.withAlpha(50), size: 12),
-              const SizedBox(width: 5),
-              Text(
-                'End-to-end encrypted transactions  •  Powered by Royal Payments',
-                style: TextStyle(
-                  color: Colors.white.withAlpha(50),
-                  fontSize: 10,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-      ],
-    );
-  }
-}
-
-// ─── Diamond Pack data model ────────────────────────────────────────────────
-enum _PackTier { small, medium, large, mega }
-
-class _DiamondPack {
-  final String id;
-  final int diamonds;
-  final int price;
-  final _PackTier tier;
-  final String? badge;
-  final bool isPopular;
-  final bool isBestValue;
-
-  const _DiamondPack({
-    required this.id,
-    required this.diamonds,
-    required this.price,
-    required this.tier,
-    this.badge,
-    this.isPopular = false,
-    this.isBestValue = false,
-  });
-}
-
-// ─── Diamond Pack Card (Ultra-premium) ───────────────────────────────────────
-class _DiamondPackCard extends StatefulWidget {
-  final _DiamondPack pack;
-  final VoidCallback onTap;
-
-  const _DiamondPackCard({required this.pack, required this.onTap});
-
-  @override
-  State<_DiamondPackCard> createState() => _DiamondPackCardState();
-}
-
-class _DiamondPackCardState extends State<_DiamondPackCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pressController;
-  late Animation<double> _scaleAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _pressController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 120));
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.94).animate(
-        CurvedAnimation(parent: _pressController, curve: Curves.easeOut));
-  }
-
-  @override
-  void dispose() {
-    _pressController.dispose();
-    super.dispose();
-  }
-
-  // ── Color scheme per tier ──────────────────────────────────────────────
-  _PackColors get _colors {
-    final p = widget.pack;
-    if (p.isBestValue) {
-      return const _PackColors(
-        border: Color(0xFFFF6600),
-        bgTop: Color(0xFF2A1200),
-        bgBottom: Color(0xFF100800),
-        btnTop: Color(0xFFFF8000),
-        btnBottom: Color(0xFFCC3300),
-        glow: Color(0x50FF5500),
-        badgeBg: Color(0xFFFF6600),
-        badgeText: Colors.white,
-      );
-    } else if (p.isPopular) {
-      return const _PackColors(
-        border: Color(0xFFFFD76A),
-        bgTop: Color(0xFF2A1E00),
-        bgBottom: Color(0xFF100C00),
-        btnTop: Color(0xFFFFD76A),
-        btnBottom: Color(0xFFFFAA00),
-        glow: Color(0x40FFC000),
-        badgeBg: Color(0xFFFFC000),
-        badgeText: Colors.black,
-      );
-    } else if (p.tier == _PackTier.mega) {
-      return const _PackColors(
-        border: Color(0xFFAA44FF),
-        bgTop: Color(0xFF240050),
-        bgBottom: Color(0xFF0E0030),
-        btnTop: Color(0xFF9933FF),
-        btnBottom: Color(0xFF5500AA),
-        glow: Color(0x40880088),
-        badgeBg: Color(0xFFAA44FF),
-        badgeText: Colors.white,
-      );
-    } else {
-      return const _PackColors(
-        border: Color(0xFF3A5AAA),
-        bgTop: Color(0xFF0E1A3A),
-        bgBottom: Color(0xFF060E20),
-        btnTop: Color(0xFF4477FF),
-        btnBottom: Color(0xFF1133CC),
-        glow: Color(0x30224499),
-        badgeBg: Color(0xFF3A5AAA),
-        badgeText: Colors.white,
-      );
-    }
-  }
-
-  Widget _buildDiamondArt() {
-    final p = widget.pack;
-    final size = p.tier == _PackTier.mega
-        ? 52.0
-        : p.tier == _PackTier.large
-            ? 44.0
-            : 36.0;
-
-    // Custom Gold Diamond Art using Icons and Gradients
-    Widget goldDiamond(double s) => ShaderMask(
-          shaderCallback: (b) => AppColors.goldGradient.createShader(b),
-          child: Icon(Icons.diamond_rounded, color: Colors.white, size: s),
-        );
-
-    if (p.tier == _PackTier.small) {
-      return goldDiamond(size);
-    } else if (p.tier == _PackTier.medium) {
-      return SizedBox(
-        width: 60,
-        height: 50,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(top: 0, child: goldDiamond(size * 0.8)),
-            Positioned(bottom: 0, left: 4, child: goldDiamond(size * 0.6)),
-            Positioned(bottom: 0, right: 4, child: goldDiamond(size * 0.6)),
-          ],
-        ),
-      );
-    } else if (p.tier == _PackTier.large) {
-      return SizedBox(
-        width: 70,
-        height: 60,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(top: 0, child: goldDiamond(size * 0.8)),
-            Positioned(bottom: 5, left: 0, child: goldDiamond(size * 0.6)),
-            Positioned(bottom: 5, right: 0, child: goldDiamond(size * 0.6)),
-            Positioned(bottom: 0, child: goldDiamond(size * 0.5)),
-          ],
-        ),
-      );
-    } else {
-      // Mega Pack - Treasure Chest style
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ShaderMask(
-            shaderCallback: (b) => AppColors.goldGradient.createShader(b),
-            child: Icon(Icons.inventory_2_rounded, color: Colors.white, size: size),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              goldDiamond(14),
-              goldDiamond(14),
-              goldDiamond(14),
-            ],
-          ),
-        ],
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = _colors;
-    final p = widget.pack;
-
-    return GestureDetector(
-      onTapDown: (_) => _pressController.forward(),
-      onTapUp: (_) {
-        _pressController.reverse();
-        SafeTap.run('pack_card_${widget.pack.id}', () {
-          widget.onTap();
-        });
-      },
-      onTapCancel: () => _pressController.reverse(),
-      child: ScaleTransition(
-        scale: _scaleAnim,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [c.bgTop, c.bgBottom],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: p.isBestValue || p.isPopular 
-                  ? c.border.withAlpha(180) 
-                  : AppColors.glassBorder, 
-              width: p.isBestValue ? 2 : 1.2
-            ),
-            boxShadow: [
-              if (p.isBestValue || p.isPopular)
-                BoxShadow(
-                  color: c.glow.withAlpha(40),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            children: [
-              // Subtle background pattern
-              Positioned(
-                right: -20,
-                top: -20,
-                child: Opacity(
-                  opacity: 0.05,
-                  child: Icon(Icons.diamond_outlined, size: 100, color: c.border),
-                ),
-              ),
-
-              Column(
-                children: [
-                  // ── Top: diamond count strip ──────────────────────────────
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: c.border.withAlpha(20),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          _formatDiamonds(p.diamonds),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        Text(
-                          'DIAMOND PACK',
-                          style: TextStyle(
-                            color: Colors.white.withAlpha(120),
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ── Diamond Art ─────────────────────────────────────────────
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      child: Center(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: _buildDiamondArt(),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ── Buy button ─────────────────────────────────────────────
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-                    height: 38,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [c.btnTop, c.btnBottom],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: c.btnBottom.withAlpha(100),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        '₹${p.price}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              // ── Badge ──────────────────────────────────────────────────
-              if (p.badge != null)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Transform.translate(
-                      offset: const Offset(0, -6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [c.badgeBg, c.badgeBg.withAlpha(200)]),
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            )
-                          ],
-                        ),
-                        child: Text(
-                          p.badge!,
-                          style: TextStyle(
-                            color: c.badgeText,
-                            fontSize: 7,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _formatDiamonds(int d) {
-    if (d >= 1000) {
-      final k = d / 1000;
-      return '${k % 1 == 0 ? k.toInt() : k.toStringAsFixed(1)}K';
-    }
-    return '$d';
-  }
-}
-
-// ─── Pack color data class ───────────────────────────────────────────────────
-class _PackColors {
-  final Color border;
-  final Color bgTop;
-  final Color bgBottom;
-  final Color btnTop;
-  final Color btnBottom;
-  final Color glow;
-  final Color badgeBg;
-  final Color badgeText;
-
-  const _PackColors({
-    required this.border,
-    required this.bgTop,
-    required this.bgBottom,
-    required this.btnTop,
-    required this.btnBottom,
-    required this.glow,
-    required this.badgeBg,
-    required this.badgeText,
-  });
 }

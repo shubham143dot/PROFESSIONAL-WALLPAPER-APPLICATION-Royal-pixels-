@@ -17,6 +17,10 @@
     <!-- Required for Google Play Billing (One-time products and subscriptions) -->
     <uses-permission android:name="com.android.vending.BILLING" />
 
+    <!-- Required for AdMob on Android 13+ (API 33) — without this, the advertising
+         identifier is zeroed out, breaking ad targeting and causing revenue loss -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
+
     <application
         android:label="Royal Pixels"
         android:name="${applicationName}"

@@ -1,4 +1,4 @@
-import java.util.Properties
+ import java.util.Properties
 import java.io.FileInputStream
 
 plugins {
@@ -73,7 +73,7 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    implementation("com.android.billingclient:billing:7.1.1")
+    implementation("com.android.billingclient:billing:9.0.0")
 }
 
 flutter {

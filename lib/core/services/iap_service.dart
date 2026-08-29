@@ -4,7 +4,6 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/iap_constants.dart';
 import '../../presentation/providers/auth_provider.dart';
-import '../../presentation/providers/diamond_provider.dart';
 import '../../presentation/providers/payment_provider.dart';
 
 // Provider for the IAP Service
@@ -32,6 +31,9 @@ class IapService {
     }, onError: (error) {
       debugPrint('IAP Stream error: $error');
     });
+
+    // Proactively query and cache available products
+    _loadProducts();
   }
 
   void dispose() {
@@ -41,7 +43,6 @@ class IapService {
   Future<void> _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
     for (var purchaseDetails in purchaseDetailsList) {
       if (purchaseDetails.status == PurchaseStatus.pending) {
-        // Show pending UI if needed
         debugPrint('Purchase pending: ${purchaseDetails.productID}');
       } else {
         if (purchaseDetails.status == PurchaseStatus.error) {
@@ -68,22 +69,8 @@ class IapService {
     try {
       final productId = purchaseDetails.productID;
 
-      // 1. Consumable (Diamonds)
-      if (productId.startsWith('pack_')) {
-        int amount = int.parse(productId.split('_')[1]);
-        
-        // Use DiamondNotifier to add diamonds so UI updates automatically
-        final success = await _ref.read(diamondProvider.notifier).addDiamonds(user.uid, amount);
-        return success;
-      }
-      
-      // 2. Non-Consumable / Subscription (PRO Membership)
-      if (productId == IapConstants.lifetime || 
-          productId == IapConstants.monthly || 
-          productId == IapConstants.semiAnnual || 
-          productId == IapConstants.annual) {
-        
-        // Update subscription status in backend
+      // PRO Membership (Lifetime non-consumable)
+      if (productId == IapConstants.lifetime) {
         final paymentRepo = _ref.read(paymentRepositoryProvider);
         final result = await paymentRepo.updateSubscription(
           userId: user.uid, 
@@ -107,12 +94,11 @@ class IapService {
     return false;
   }
 
-  /// Initiates the purchase flow
   Future<void> buyProduct(String productId) async {
     final bool available = await _iap.isAvailable();
     if (!available) {
-      debugPrint('Store not available');
-      return;
+      debugPrint('Google Play Store is not available on this device.');
+      throw Exception('Google Play Store is not available on this device.');
     }
 
     if (_products.isEmpty) {
@@ -125,14 +111,12 @@ class IapService {
       );
 
       final purchaseParam = PurchaseParam(productDetails: product);
-
-      if (productId.startsWith('pack_')) {
-        await _iap.buyConsumable(purchaseParam: purchaseParam);
-      } else {
-        await _iap.buyNonConsumable(purchaseParam: purchaseParam);
-      }
+      await _iap.buyNonConsumable(purchaseParam: purchaseParam);
     } catch (e) {
-      debugPrint('Product not found: $productId');
+      debugPrint('Product "$productId" not found in store response. Cached products: ${_products.map((p) => p.id).toList()}');
+      throw Exception(
+        'Product "$productId" is not available yet. Please ensure this product ID is Active in Google Play Console and your tester account is enabled in License Testing.',
+      );
     }
   }
 
@@ -150,8 +134,11 @@ class IapService {
     
     if (response.error == null) {
       _products = response.productDetails;
+      if (response.notFoundIDs.isNotEmpty) {
+        debugPrint('[IAP] Warning: Product IDs not found by Google Play: ${response.notFoundIDs}');
+      }
     } else {
-      debugPrint('Error loading products: ${response.error}');
+      debugPrint('[IAP] Error loading products: ${response.error}');
     }
   }
 }

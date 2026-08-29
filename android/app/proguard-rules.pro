@@ -47,3 +47,8 @@
 -keep class com.google.firebase.appcheck.** { *; }
 -keep class com.google.android.play.core.integrity.** { *; }
 -keep class com.google.android.play.core.appverify.** { *; }
+
+# Google Play Billing
+-keep class com.android.billingclient.** { *; }
+-dontwarn com.android.billingclient.**
+
