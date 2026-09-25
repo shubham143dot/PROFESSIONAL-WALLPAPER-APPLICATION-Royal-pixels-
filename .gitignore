@@ -65,7 +65,8 @@ key.properties
 !key.properties.example
 *.jks
 *.keystore
-scripts/service_account.json
+*service_account*.json
+!*service_account*.json.example
 
 # Scratch scripts, mappings, and logs
 scratch/

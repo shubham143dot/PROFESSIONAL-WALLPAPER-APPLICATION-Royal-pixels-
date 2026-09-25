@@ -12,22 +12,26 @@ import 'package:path/path.dart' as path;
 ///  - PREMIUM wallpapers: Upload directly to the Cloudinary premium account (unchanged).
 class ImageKitUpload {
   // ── ImageKit Credentials ────────────────────────────────────────────────
-  static const String _ikPrivateKey = 'private_dCLsGyTeX8HgyZx4hRVjQpexZdQ=';
-  // (public key & URL endpoint kept for reference / future SDK use)
-  // static const String _ikPublicKey   = 'public_kPHV5IKpt/mlf4QC9ghNWfpH5xo=';
-  // static const String _ikUrlEndpoint = 'https://ik.imagekit.io/vd1cklldj';
+  static const String _ikPrivateKey =
+      String.fromEnvironment('IMAGEKIT_PRIVATE_KEY', defaultValue: '');
   static const String _ikUploadUrl =
       'https://upload.imagekit.io/api/v1/files/upload';
 
   // ── Cloudinary Credentials (Free account — fallback) ───────────────────
-  static const String _clFreeCloudName = 'dl00rha3n';
-  static const String _clFreeApiKey = '837238164488567';
-  static const String _clFreeApiSecret = 'bdHDsHE2QyXzqt5UNLJMzxrrpu8';
+  static const String _clFreeCloudName =
+      String.fromEnvironment('CLOUDINARY_FREE_CLOUD_NAME', defaultValue: '');
+  static const String _clFreeApiKey =
+      String.fromEnvironment('CLOUDINARY_FREE_API_KEY', defaultValue: '');
+  static const String _clFreeApiSecret =
+      String.fromEnvironment('CLOUDINARY_FREE_API_SECRET', defaultValue: '');
 
   // ── Cloudinary Credentials (Premium account) ────────────────────────────
-  static const String _clPremiumCloudName = 'dmt6y2k6h';
-  static const String _clPremiumApiKey = '174456259398661';
-  static const String _clPremiumApiSecret = 'OxI0nRoL8RNK7xRJYVQJtX6cEhs';
+  static const String _clPremiumCloudName =
+      String.fromEnvironment('CLOUDINARY_PREMIUM_CLOUD_NAME', defaultValue: '');
+  static const String _clPremiumApiKey =
+      String.fromEnvironment('CLOUDINARY_PREMIUM_API_KEY', defaultValue: '');
+  static const String _clPremiumApiSecret =
+      String.fromEnvironment('CLOUDINARY_PREMIUM_API_SECRET', defaultValue: '');
 
   // ────────────────────────────────────────────────────────────────────────
   /// Public entry point.
@@ -114,6 +118,13 @@ class ImageKitUpload {
 
   // ── Private: ImageKit upload ─────────────────────────────────────────────
   static Future<String?> _uploadToImageKit(File imageFile) async {
+    if (_ikPrivateKey.isEmpty) {
+      if (kDebugMode) {
+        debugPrint(
+            '[ImageKit] IMAGEKIT_PRIVATE_KEY not set. Pass via --dart-define=IMAGEKIT_PRIVATE_KEY=...');
+      }
+      return null;
+    }
     try {
       final String fileName = path.basename(imageFile.path);
 
@@ -156,6 +167,13 @@ class ImageKitUpload {
     required String apiKey,
     required String apiSecret,
   }) async {
+    if (cloudName.isEmpty || apiKey.isEmpty || apiSecret.isEmpty) {
+      if (kDebugMode) {
+        debugPrint(
+            '[Cloudinary] Credentials not configured. Pass via --dart-define.');
+      }
+      return null;
+    }
     try {
       final String timestamp =
           DateTime.now().millisecondsSinceEpoch.toString().substring(0, 10);

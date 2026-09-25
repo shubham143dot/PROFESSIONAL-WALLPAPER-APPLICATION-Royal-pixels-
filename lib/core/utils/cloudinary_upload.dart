@@ -6,14 +6,20 @@ import 'package:http/http.dart' as http;
 
 class CloudinaryUpload {
   // Free Wallpapers Credentials
-  static const String _freeCloudName = 'dl00rha3n';
-  static const String _freeApiKey = '837238164488567';
-  static const String _freeApiSecret = 'bdHDsHE2QyXzqt5UNLJMzxrrpu8';
+  static const String _freeCloudName =
+      String.fromEnvironment('CLOUDINARY_FREE_CLOUD_NAME', defaultValue: '');
+  static const String _freeApiKey =
+      String.fromEnvironment('CLOUDINARY_FREE_API_KEY', defaultValue: '');
+  static const String _freeApiSecret =
+      String.fromEnvironment('CLOUDINARY_FREE_API_SECRET', defaultValue: '');
 
   // Premium & Special Wallpapers Credentials
-  static const String _premiumCloudName = 'dmt6y2k6h';
-  static const String _premiumApiKey = '174456259398661';
-  static const String _premiumApiSecret = 'OxI0nRoL8RNK7xRJYVQJtX6cEhs';
+  static const String _premiumCloudName =
+      String.fromEnvironment('CLOUDINARY_PREMIUM_CLOUD_NAME', defaultValue: '');
+  static const String _premiumApiKey =
+      String.fromEnvironment('CLOUDINARY_PREMIUM_API_KEY', defaultValue: '');
+  static const String _premiumApiSecret =
+      String.fromEnvironment('CLOUDINARY_PREMIUM_API_SECRET', defaultValue: '');
 
   /// Uploads an image file to Cloudinary using Signed API.
   /// If [isPremiumOrSpecial] is true, uses the premium Cloudinary account.
@@ -24,6 +30,14 @@ class CloudinaryUpload {
     final String apiKey = isPremiumOrSpecial ? _premiumApiKey : _freeApiKey;
     final String apiSecret =
         isPremiumOrSpecial ? _premiumApiSecret : _freeApiSecret;
+
+    if (cloudName.isEmpty || apiKey.isEmpty || apiSecret.isEmpty) {
+      if (kDebugMode) {
+        debugPrint(
+            'Cloudinary credentials not configured. Please supply via --dart-define or config.');
+      }
+      return null;
+    }
 
     final String timestamp =
         DateTime.now().millisecondsSinceEpoch.toString().substring(0, 10);
