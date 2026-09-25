@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../domain/entities/wallpaper_entity.dart';
 import '../../core/theme/app_colors.dart';
@@ -253,39 +254,39 @@ class _TopRightBadges extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (_isNew) _buildNewBadge(),
+        if (_isNew) _buildNewBadge(context),
         if (isPremium)
           _WallpaperBadge(
             gradient: AppColors.goldGradient,
             glowColor: AppColors.goldLight,
             icon: Icons.diamond,
             iconColor: Colors.black,
-            label: 'ELITE',
+            label: AppLocalizations.of(context)!.elite,
             labelColor: Colors.black,
           ),
         if (isUltraHD) ...[
           if (isPremium) const SizedBox(height: 4),
-          const _WallpaperBadge(
+          _WallpaperBadge(
             gradient: LinearGradient(
               colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
             ),
             glowColor: Color(0xFF22D3EE),
             icon: Icons.hd_rounded,
             iconColor: Colors.white,
-            label: '4K',
+            label: AppLocalizations.of(context)!.n4k,
             labelColor: Colors.white,
           ),
         ],
         if (isEditorsChoice) ...[
           if (isPremium || isUltraHD) const SizedBox(height: 4),
-          const _WallpaperBadge(
+          _WallpaperBadge(
             gradient: LinearGradient(
               colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
             ),
             glowColor: Color(0xFFFBBF24),
             icon: Icons.star_rounded,
             iconColor: Colors.black,
-            label: 'PICK',
+            label: AppLocalizations.of(context)!.pick,
             labelColor: Colors.black,
           ),
         ],
@@ -293,15 +294,15 @@ class _TopRightBadges extends StatelessWidget {
     );
   }
 
-  Widget _buildNewBadge() {
-    return const _WallpaperBadge(
-      gradient: LinearGradient(
+  Widget _buildNewBadge(BuildContext context) {
+    return _WallpaperBadge(
+      gradient: const LinearGradient(
         colors: [Color(0xFF10B981), Color(0xFF059669)],
       ),
-      glowColor: Color(0xFF10B981),
+      glowColor: const Color(0xFF10B981),
       icon: Icons.new_releases_rounded,
       iconColor: Colors.white,
-      label: 'NEW',
+      label: AppLocalizations.of(context)!.newItem,
       labelColor: Colors.white,
     );
   }

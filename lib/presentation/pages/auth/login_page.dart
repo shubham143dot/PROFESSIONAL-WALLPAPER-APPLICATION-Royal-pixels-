@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:ui';
 import '../../../core/services/adaptive_performance.dart';
 import 'package:flutter/material.dart';
@@ -110,8 +111,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ShaderMask(
                             shaderCallback: (bounds) =>
                                 AppColors.goldGradient.createShader(bounds),
-                            child: const Text(
-                              'Royal Pixels',
+                            child: Text(AppLocalizations.of(context)!.appName,
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 color: Colors.white,
@@ -129,8 +129,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   curve: Curves.easeOut),
                           const SizedBox(height: 10),
                           // ── Subtitle ───────────────────────────────────
-                          const Text(
-                            'Premium wallpapers for your device.',
+                          Text(AppLocalizations.of(context)!.premiumWallpapersForYourDevice1,
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 14,
@@ -203,8 +202,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                       height: 24,
                                     ),
                                     const SizedBox(width: 12),
-                                    const Text(
-                                      'Continue with Google',
+                                    Text(AppLocalizations.of(context)!.continueWithGoogle,
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w800,
@@ -254,8 +252,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                       size: 18,
                                     ),
                                     const SizedBox(width: 9),
-                                    const Text(
-                                      'Continue as Guest',
+                                    Text(AppLocalizations.of(context)!.continueAsGuest,
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
@@ -281,13 +278,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               _TrustBadge(
-                                  icon: Icons.lock_outline, label: 'Secure'),
+                                  icon: Icons.lock_outline, label: AppLocalizations.of(context)!.secure),
                               _TrustDot(),
                               _TrustBadge(
-                                  icon: Icons.shield_outlined, label: 'Private'),
+                                  icon: Icons.shield_outlined, label: AppLocalizations.of(context)!.private),
                               _TrustDot(),
                               _TrustBadge(
-                                  icon: Icons.block_outlined, label: 'No Spam'),
+                                  icon: Icons.block_outlined, label: AppLocalizations.of(context)!.noSpam),
                             ],
                           ).animate().fade(duration: 400.ms, delay: 550.ms),
 

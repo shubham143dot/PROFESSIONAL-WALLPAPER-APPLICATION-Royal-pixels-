@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -458,8 +459,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
       opacity: _taglineFade.value,
       child: SlideTransition(
         position: _taglineSlide,
-        child: Text(
-          'P R E M I U M  W A L L P A P E R S',
+        child: Text(AppLocalizations.of(context)!.pREMIUMWALLPAPERS,
           style: GoogleFonts.outfit(
             fontSize: 11,
             fontWeight: FontWeight.w300,
@@ -709,8 +709,7 @@ class _PrivacyPolicyDialog extends StatelessWidget {
                     color: Colors.amber, size: 36),
               ),
               const SizedBox(height: 20),
-              Text(
-                'Privacy Policy',
+              Text(AppLocalizations.of(context)!.privacyPolicy,
                 style: GoogleFonts.outfit(
                   color: Colors.white,
                   fontSize: 22,
@@ -744,8 +743,7 @@ class _PrivacyPolicyDialog extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                       vertical: 8.0, horizontal: 12.0),
-                  child: Text(
-                    'Read Full Privacy Policy here',
+                  child: Text(AppLocalizations.of(context)!.readFullPrivacyPolicyHere,
                     style: GoogleFonts.outfit(
                       color: Colors.amberAccent,
                       fontSize: 14,
@@ -768,8 +766,7 @@ class _PrivacyPolicyDialog extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text(
-                        'Decline',
+                      child: Text(AppLocalizations.of(context)!.decline,
                         style: GoogleFonts.outfit(
                           color: Colors.white54,
                           fontSize: 15,
@@ -791,8 +788,7 @@ class _PrivacyPolicyDialog extends StatelessWidget {
                         ),
                         elevation: 0,
                       ),
-                      child: Text(
-                        'Accept',
+                      child: Text(AppLocalizations.of(context)!.accept,
                         style: GoogleFonts.outfit(
                           color: Colors.black,
                           fontSize: 15,
@@ -963,8 +959,7 @@ class _UpdateDialog extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: Text(
-                          'Later',
+                        child: Text(AppLocalizations.of(context)!.later,
                           style: GoogleFonts.outfit(
                             color: Colors.white38,
                             fontSize: 15,
@@ -988,8 +983,7 @@ class _UpdateDialog extends StatelessWidget {
                         ),
                         elevation: 0,
                       ),
-                      child: Text(
-                        'Update Now',
+                      child: Text(AppLocalizations.of(context)!.updateNow,
                         style: GoogleFonts.outfit(
                           color: Colors.black,
                           fontSize: 15,

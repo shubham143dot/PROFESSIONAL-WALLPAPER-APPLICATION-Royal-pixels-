@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -155,8 +156,7 @@ class HapticSettingsSheet extends ConsumerWidget {
               children: [
                 _buildHeroIcon(level),
                 const SizedBox(height: 24),
-                const Text(
-                  'HAPTIC ENGINE',
+                Text(AppLocalizations.of(context)!.hapticEngine,
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 28,
@@ -165,8 +165,7 @@ class HapticSettingsSheet extends ConsumerWidget {
                   ),
                 ).animate().fade().scale(begin: const Offset(0.9, 0.9)),
                 const SizedBox(height: 8),
-                Text(
-                  'Precision-tuned vibration physics for Royal Pixels',
+                Text(AppLocalizations.of(context)!.precisiontunedVibrationPhysicsForRoyalPixels,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.textSecondary.withAlpha(150),
@@ -191,7 +190,7 @@ class HapticSettingsSheet extends ConsumerWidget {
 
         // Technical Note
         if (!isHardwareSupported)
-          _buildHardwareWarning()
+          _buildHardwareWarning(context)
         else
           _buildTestingSection(),
 
@@ -217,9 +216,8 @@ class HapticSettingsSheet extends ConsumerWidget {
                     ),
                   ],
                 ),
-                child: const Center(
-                  child: Text(
-                    'OPTIMIZE ENGINE',
+                child: Center(
+                  child: Text(AppLocalizations.of(context)!.optimizeEngine,
                     style: TextStyle(
                       color: Colors.black,
                       fontWeight: FontWeight.w900,
@@ -269,7 +267,7 @@ class HapticSettingsSheet extends ConsumerWidget {
      .scale(duration: 2.seconds, begin: const Offset(0.95, 0.95), end: const Offset(1.05, 1.05), curve: Curves.easeInOut);
   }
 
-  Widget _buildHardwareWarning() {
+  Widget _buildHardwareWarning(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(20),
@@ -286,16 +284,14 @@ class HapticSettingsSheet extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Hardware Limitation',
+                Text(AppLocalizations.of(context)!.hardwareLimitation,
                   style: TextStyle(
                     color: Colors.redAccent,
                     fontWeight: FontWeight.w900,
                     fontSize: 14,
                   ),
                 ),
-                Text(
-                  'Your device does not support precision haptics.',
+                Text(AppLocalizations.of(context)!.yourDeviceDoesNotSupportPrecisionHaptics,
                   style: TextStyle(
                     color: AppColors.textMuted.withAlpha(200),
                     fontSize: 12,
@@ -332,8 +328,7 @@ class HapticSettingsSheet extends ConsumerWidget {
                 children: [
                   const Icon(Icons.vibration_rounded, color: AppColors.goldLight, size: 18),
                   const SizedBox(width: 12),
-                  const Text(
-                    'TEST IMPULSE',
+                  Text(AppLocalizations.of(context)!.testImpulse,
                     style: TextStyle(
                       color: AppColors.goldLight,
                       fontWeight: FontWeight.w900,

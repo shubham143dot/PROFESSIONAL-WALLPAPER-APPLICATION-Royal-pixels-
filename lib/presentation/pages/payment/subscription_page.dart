@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -240,8 +241,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
                 ),
                 title: ShaderMask(
                   shaderCallback: (b) => AppColors.goldGradient.createShader(b),
-                  child: const Text(
-                    'PRO MEMBERSHIP',
+                  child: Text(AppLocalizations.of(context)!.proMembership,
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
@@ -266,8 +266,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
                       // ── Headline ─────────────────────────────────────────
                       ShaderMask(
                         shaderCallback: (b) => AppColors.goldGradient.createShader(b),
-                        child: const Text(
-                          'Unlock Everything',
+                        child: Text(AppLocalizations.of(context)!.unlockEverything,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 34,
@@ -280,8 +279,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
 
                       const SizedBox(height: 8),
 
-                      Text(
-                        'One-time payment. Lifetime access.\nNo subscriptions, no recurring charges.',
+                      Text(AppLocalizations.of(context)!.onetimePaymentLifetimeAccessnnoSubscriptionsNoRecurringCharges,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.textSecondary,
@@ -317,8 +315,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
 
                         const SizedBox(height: 14),
 
-                        Text(
-                          'Secure payment via Google Play · Instant activation',
+                        Text(AppLocalizations.of(context)!.securePaymentViaGooglePlayInstantActivation,
                           style: TextStyle(
                             color: AppColors.textMuted.withAlpha(140),
                             fontSize: 11,
@@ -464,8 +461,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
                   gradient: AppColors.goldGradient,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  '👑  LIFETIME PRO  ·  ONE-TIME PAYMENT',
+                child: Text(AppLocalizations.of(context)!.lifetimeProOnetimePayment,
                   style: TextStyle(
                     color: Colors.black,
                     fontSize: 11,
@@ -518,8 +514,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.greenAccent.withAlpha(60)),
                 ),
-                child: const Text(
-                  '🔥 You save ₹900 — 90% OFF',
+                child: Text(AppLocalizations.of(context)!.youSave90090Off,
                   style: TextStyle(
                     color: Colors.greenAccent,
                     fontSize: 12,
@@ -559,8 +554,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
               .animate(onPlay: (c) => c.repeat())
               .shimmer(duration: 2.seconds),
           const SizedBox(height: 16),
-          const Text(
-            'PRO MEMBERSHIP ACTIVE',
+          Text(AppLocalizations.of(context)!.proMembershipActive,
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -569,8 +563,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'You have lifetime access to all premium wallpapers. Enjoy Royal Pixels PRO!',
+          Text(AppLocalizations.of(context)!.youHaveLifetimeAccessToAllPremiumWallpapersEnjoyRoyalPixelsPro,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withAlpha(160),
@@ -739,7 +732,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
                   if (_isPurchasing)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
+                      children: [
                         SizedBox(
                           width: 20,
                           height: 20,
@@ -749,8 +742,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
                           ),
                         ),
                         SizedBox(width: 12),
-                        Text(
-                          'Connecting to Google Play…',
+                        Text(AppLocalizations.of(context)!.connectingToGooglePlay,
                           style: TextStyle(
                             color: Colors.black,
                             fontSize: 16,
@@ -781,8 +773,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'One-time payment · Never expires',
+                        Text(AppLocalizations.of(context)!.onetimePaymentNeverExpires,
                           style: TextStyle(
                             color: Colors.black.withAlpha(160),
                             fontSize: 12,
@@ -850,8 +841,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
         foregroundColor: AppColors.textMuted,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       ),
-      child: const Text(
-        'Restore Purchases',
+      child: Text(AppLocalizations.of(context)!.restorePurchases,
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,

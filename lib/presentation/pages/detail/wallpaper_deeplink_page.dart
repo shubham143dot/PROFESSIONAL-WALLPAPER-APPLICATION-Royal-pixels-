@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -68,8 +69,7 @@ class _WallpaperDeepLinkPageState extends ConsumerState<WallpaperDeepLinkPage> {
             children: [
               const DiamondLoader(size: 40),
               const SizedBox(height: 16),
-              Text(
-                'Opening wallpaper...',
+              Text(AppLocalizations.of(context)!.openingWallpaper,
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
             ],
@@ -96,7 +96,7 @@ class _WallpaperDeepLinkPageState extends ConsumerState<WallpaperDeepLinkPage> {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => context.go('/home'),
-                child: const Text('Go Home'),
+                child: Text(AppLocalizations.of(context)!.goHome),
               ),
             ],
           ),

@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -88,7 +89,7 @@ class CategoryPage extends ConsumerWidget {
         ],
       ),
       body: wallpapers.isEmpty 
-          ? const Center(child: Text('No Wallpapers Found', style: TextStyle(color: Colors.white)))
+          ? Center(child: Text(AppLocalizations.of(context)!.noWallpapersFound, style: TextStyle(color: Colors.white)))
           : GridView.builder(
               padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

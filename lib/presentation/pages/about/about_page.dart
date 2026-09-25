@@ -1,18 +1,20 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 
-class AboutPage extends StatefulWidget {
+class AboutPage extends ConsumerStatefulWidget {
   const AboutPage({super.key});
 
   @override
-  State<AboutPage> createState() => _AboutPageState();
+  ConsumerState<AboutPage> createState() => _AboutPageState();
 }
 
-class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
+class _AboutPageState extends ConsumerState<AboutPage> with TickerProviderStateMixin {
   late final AnimationController _rotateController;
   late final AnimationController _pulseController;
   late final AnimationController _fadeController;
@@ -73,13 +75,13 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 24),
-                    const _SectionLabel(label: 'LEGAL & POLICY'),
+                    _SectionLabel(label: AppLocalizations.of(context)!.legalPolicy),
                     const SizedBox(height: 16),
                     _buildLegalCard(),
                     const SizedBox(height: 12),
                     _buildPrivacyPolicyButton(),
                     const SizedBox(height: 32),
-                    const _SectionLabel(label: 'HELP & SUPPORT'),
+                    _SectionLabel(label: AppLocalizations.of(context)!.helpSupport),
                     const SizedBox(height: 16),
                     _buildContactSupportButton(),
                     const SizedBox(height: 48),
@@ -215,16 +217,14 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    'Premium wallpapers for your device',
+                  Text(AppLocalizations.of(context)!.premiumWallpapers,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.7),
                       fontSize: 13,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Developed by Royal Shubham Pixel Labs',
+                  Text(AppLocalizations.of(context)!.developedBy,
                     style: TextStyle(
                       color: Colors.amber,
                       fontSize: 14,
@@ -245,7 +245,7 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
     return _InfoCard(
       icon: Icons.gavel_rounded,
       iconColor: const Color(0xFF64B5F6),
-      title: 'Legal Information',
+      title: AppLocalizations.of(context)!.legalInfo,
       subtitle: null,
       isExpanded: _legalExpanded,
       onTap: () => setState(() => _legalExpanded = !_legalExpanded),
@@ -255,14 +255,12 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
           const SizedBox(height: 12),
           const Divider(color: Colors.white12),
           const SizedBox(height: 12),
-          _highlightText(
-            '© 2026 Royal Shubham Pixel Labs.',
+          _highlightText(AppLocalizations.of(context)!.n2026RoyalShubhamPixelLabs,
             ' All rights reserved.',
             highlight: const Color(0xFF64B5F6),
           ),
           const SizedBox(height: 10),
-          Text(
-            'All wallpapers, designs, and content are owned or licensed by Royal Shubham Pixel Labs and are protected under applicable copyright laws. These wallpapers are provided for personal use only. Unauthorized copying, reproduction, distribution, or resale is strictly prohibited.\n\nIf you believe any content violates copyright, please contact us for immediate removal.',
+          Text(AppLocalizations.of(context)!.allWallpapersDesignsAndContentAreOwnedOrLicensedByRoyalShubhamPixelLabsAndAreProtectedUnderApplicableCopyrightLawsTheseWallpapersAreProvidedForPersonalUseOnlyUnauthorizedCopyingReproductionDistributionOrResaleIsStrictlyProhibitednnifYouBelieveAnyContentViolatesCopyrightPleaseContactUsForImmediateRemoval,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.65),
               fontSize: 13.5,
@@ -287,8 +285,7 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                         color: Colors.redAccent.withValues(alpha: 0.85),
                         size: 14),
                     const SizedBox(width: 8),
-                    Text(
-                      'Restricted Usage',
+                    Text(AppLocalizations.of(context)!.restrictedUsage,
                       style: TextStyle(
                         color: Colors.redAccent.withValues(alpha: 0.85),
                         fontSize: 12,
@@ -370,13 +367,12 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
               child: const Icon(Icons.email_rounded,
                   color: Colors.greenAccent, size: 22),
             ),
-            const SizedBox(width: 16),
-            const Expanded(
+            SizedBox(width: 16),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Contact Support',
+                  Text(AppLocalizations.of(context)!.contactSupport,
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -402,7 +398,7 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                 border: Border.all(
                     color: Colors.greenAccent.withValues(alpha: 0.3)),
               ),
-              child: const Text('Contact Us',
+              child: Text(AppLocalizations.of(context)!.contactUs,
                   style: TextStyle(
                       color: Colors.greenAccent,
                       fontSize: 12,
@@ -449,12 +445,11 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                   color: Colors.blueAccent, size: 22),
             ),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Privacy Policy',
+                  Text(AppLocalizations.of(context)!.privacyPolicy,
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -462,8 +457,7 @@ class _AboutPageState extends State<AboutPage> with TickerProviderStateMixin {
                     ),
                   ),
                   SizedBox(height: 2),
-                  Text(
-                    'Open in browser',
+                  Text(AppLocalizations.of(context)!.openInBrowser,
                     style: TextStyle(
                       color: Colors.white54,
                       fontSize: 12,

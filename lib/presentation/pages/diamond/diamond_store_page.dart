@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:ui';
 import '../../../core/services/adaptive_performance.dart';
 import 'package:flutter/material.dart';
@@ -114,8 +115,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Text(
-                  'EARN DIAMONDS',
+                Text(AppLocalizations.of(context)!.earnDiamonds,
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -154,21 +154,21 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                 if (!isSubscribed) ...[
                   // ── Daily Streak ───────────────────────────────────────────
                   _buildSectionLabel('🔥 Daily Streak',
-                      subtitle: 'Login every day to grow your stash'),
+                      subtitle: AppLocalizations.of(context)!.loginEveryDayToGrowYourStash),
                   const SizedBox(height: 12),
                   _buildStreakCard(diamondState),
                   const SizedBox(height: 28),
 
                   // ── Watch & Earn ───────────────────────────────────────────
                   _buildSectionLabel('📺 Watch & Earn',
-                      subtitle: 'Watch ads · earn diamonds · max 100/day · resets midnight'),
+                      subtitle: AppLocalizations.of(context)!.watchAdsEarnDiamondsMax100dayResetsMidnight),
                   const SizedBox(height: 12),
                   const WatchEarnSection(),
                   const SizedBox(height: 28),
 
                   // ── How to Earn ──────────────────────────────────────────
                   _buildSectionLabel('💰 How to Earn',
-                      subtitle: 'All the ways to earn Royal Diamonds'),
+                      subtitle: AppLocalizations.of(context)!.allTheWaysToEarnRoyalDiamonds),
                   const SizedBox(height: 12),
                   _buildEarnCard(),
                   const SizedBox(height: 36),
@@ -192,8 +192,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                             .animate(onPlay: (c) => c.repeat())
                             .shimmer(duration: 2.seconds),
                         const SizedBox(height: 16),
-                        const Text(
-                          'PRO MEMBERSHIP ACTIVE',
+                        Text(AppLocalizations.of(context)!.proMembershipActive,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -202,8 +201,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          'You have unlimited access to all premium wallpapers. Enjoy your lifetime PRO membership!',
+                        Text(AppLocalizations.of(context)!.youHaveUnlimitedAccessToAllPremiumWallpapersEnjoyYourLifetimeProMembership,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withAlpha(150),
@@ -334,8 +332,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'YOUR BALANCE',
+                Text(AppLocalizations.of(context)!.yourBalance,
                   style: TextStyle(
                     color: Color(0xFF8899BB),
                     fontSize: 10,
@@ -390,8 +387,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                             child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 10),
                           ),
                           const SizedBox(width: 4),
-                          const Text(
-                            'Diamonds',
+                          Text(AppLocalizations.of(context)!.diamonds,
                             style: TextStyle(
                               color: Color(0xFF8899CC),
                               fontSize: 11,
@@ -482,8 +478,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
               ),
               const Spacer(),
               if (!canClaim)
-                Text(
-                  'Come back tomorrow!',
+                Text(AppLocalizations.of(context)!.comeBackTomorrow,
                   style: TextStyle(
                     color: Colors.white.withAlpha(100),
                     fontSize: 11,
@@ -491,8 +486,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                   ),
                 )
               else
-                const Text(
-                  '🎁 Day 7 Bonus!',
+                Text(AppLocalizations.of(context)!.day7Bonus1,
                   style: TextStyle(
                     color: AppColors.goldLight,
                     fontSize: 11,
@@ -625,9 +619,8 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                     ),
                   ],
                 ),
-                child: const Center(
-                  child: Text(
-                    'CLAIM DAILY REWARD',
+                child: Center(
+                  child: Text(AppLocalizations.of(context)!.claimDailyReward,
                     style: TextStyle(
                       color: Color(0xFF2D1E00),
                       fontSize: 14,

@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -220,8 +221,7 @@ class _WatchEarnSectionState extends ConsumerState<WatchEarnSection>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'WATCH & EARN',
+              Text(AppLocalizations.of(context)!.watchEarn,
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -370,8 +370,7 @@ class _WatchEarnSectionState extends ConsumerState<WatchEarnSection>
                   },
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  '+20💎',
+                Text(AppLocalizations.of(context)!.n20,
                   style: TextStyle(
                     color: isDone
                         ? AppColors.goldMid
@@ -398,8 +397,7 @@ class _WatchEarnSectionState extends ConsumerState<WatchEarnSection>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Session Progress',
+            Text(AppLocalizations.of(context)!.sessionProgress,
               style: TextStyle(
                 color: Colors.white.withAlpha(120),
                 fontSize: 11,
@@ -464,8 +462,7 @@ class _WatchEarnSectionState extends ConsumerState<WatchEarnSection>
         children: [
           const Text('🏆', style: TextStyle(fontSize: 18)),
           const SizedBox(width: 8),
-          Text(
-            'DAILY LIMIT REACHED • BACK TOMORROW',
+          Text(AppLocalizations.of(context)!.dailyLimitReachedBackTomorrow,
             style: TextStyle(
               color: Colors.white.withAlpha(120),
               fontSize: 12,
@@ -526,8 +523,7 @@ class _WatchEarnSectionState extends ConsumerState<WatchEarnSection>
         children: [
           const Text('▶️', style: TextStyle(fontSize: 16)),
           const SizedBox(width: 8),
-          const Text(
-            'WATCH AD  •  EARN +20 💎',
+          Text(AppLocalizations.of(context)!.watchAdEarn20,
             style: TextStyle(
               color: Colors.white,
               fontSize: 13,
@@ -595,8 +591,7 @@ class _WatchEarnSectionState extends ConsumerState<WatchEarnSection>
               color: Color(0xFF5544AA), size: 14),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              '5 ads/day • Resets at midnight • 15s cooldown • 20 💎 per ad',
+            child: Text(AppLocalizations.of(context)!.n5AdsdayResetsAtMidnight15sCooldown20PerAd,
               style: TextStyle(
                 color: Colors.white.withAlpha(80),
                 fontSize: 10,

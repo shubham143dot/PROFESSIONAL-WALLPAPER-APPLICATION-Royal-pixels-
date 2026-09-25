@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -263,37 +264,37 @@ class _WallpaperLongPressOverlayState
             mainAxisSize: MainAxisSize.min,
             children: [
               if (isPremium)
-                const _OverlayBadge(
+                _OverlayBadge(
                   gradient: AppColors.goldGradient,
                   glowColor: AppColors.goldMid,
                   icon: Icons.diamond,
                   iconColor: Colors.black,
-                  label: 'ELITE',
+                  label: AppLocalizations.of(context)!.elite,
                   labelColor: Colors.black,
                 ),
               if (isUltraHD) ...[
                 if (isPremium) const SizedBox(height: 4),
-                const _OverlayBadge(
+                _OverlayBadge(
                   gradient: LinearGradient(
                     colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
                   ),
                   glowColor: Color(0xFF22D3EE),
                   icon: Icons.hd_rounded,
                   iconColor: Colors.white,
-                  label: '4K',
+                  label: AppLocalizations.of(context)!.n4k,
                   labelColor: Colors.white,
                 ),
               ],
               if (isEditorsChoice) ...[
                 if (isPremium || isUltraHD) const SizedBox(height: 4),
-                const _OverlayBadge(
+                _OverlayBadge(
                   gradient: LinearGradient(
                     colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
                   ),
                   glowColor: Color(0xFFFBBF24),
                   icon: Icons.star_rounded,
                   iconColor: Colors.black,
-                  label: 'PICK',
+                  label: AppLocalizations.of(context)!.pick,
                   labelColor: Colors.black,
                 ),
               ],
@@ -312,14 +313,13 @@ class _WallpaperLongPressOverlayState
               color: Colors.black.withValues(alpha: 0.45),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.touch_app_rounded,
                     color: Colors.white70, size: 11),
                 SizedBox(width: 4),
-                Text(
-                  'Tap to open',
+                Text(AppLocalizations.of(context)!.tapToOpen,
                   style: TextStyle(
                       color: Colors.white70,
                       fontSize: 9,
@@ -552,7 +552,7 @@ class _ActionPanel extends ConsumerWidget {
               children: [
                 if (wallpaper.isUltraHD)
                   _TagChip(
-                    label: '4K Ultra HD',
+                    label: AppLocalizations.of(context)!.n4kUltraHd,
                     icon: Icons.hd_rounded,
                     gradient: const LinearGradient(
                       colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
@@ -580,7 +580,7 @@ class _ActionPanel extends ConsumerWidget {
             children: [
               _QuickAction(
                 icon: Icons.movie_filter_rounded,
-                label: 'Feed',
+                label: AppLocalizations.of(context)!.feed,
                 gradient: const LinearGradient(
                     colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)]),
                 onTap: () {
@@ -590,7 +590,7 @@ class _ActionPanel extends ConsumerWidget {
               const SizedBox(width: 8),
               _QuickAction(
                 icon: Icons.download_rounded,
-                label: 'Save',
+                label: AppLocalizations.of(context)!.save,
                 gradient: const LinearGradient(
                     colors: [Color(0xFF34D399), Color(0xFF059669)]),
                 onTap: () {
@@ -600,7 +600,7 @@ class _ActionPanel extends ConsumerWidget {
               const SizedBox(width: 8),
               _QuickAction(
                 icon: Icons.wallpaper_rounded,
-                label: 'Set',
+                label: AppLocalizations.of(context)!.set,
                 gradient: const LinearGradient(
                     colors: [Color(0xFF60A5FA), Color(0xFF2563EB)]),
                 onTap: () {
@@ -640,8 +640,7 @@ class _ActionPanel extends ConsumerWidget {
             onTap: onDismiss,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                'Tap anywhere to close',
+              child: Text(AppLocalizations.of(context)!.tapAnywhereToClose,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.3),
                   fontSize: 11,

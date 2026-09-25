@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -107,8 +108,7 @@ class _CategoriesListPageState extends ConsumerState<CategoriesListPage>
         title: Stack(
           alignment: Alignment.center,
           children: [
-            Text(
-              'CATEGORIES',
+            Text(AppLocalizations.of(context)!.categories,
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2.5,
@@ -121,8 +121,7 @@ class _CategoriesListPageState extends ConsumerState<CategoriesListPage>
             ),
             ShaderMask(
               shaderCallback: (bounds) => AppColors.goldGradient.createShader(bounds),
-              child: const Text(
-                'CATEGORIES',
+              child: Text(AppLocalizations.of(context)!.categories,
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   letterSpacing: 2.5,
@@ -190,7 +189,7 @@ class _CategoriesListPageState extends ConsumerState<CategoriesListPage>
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(AppLocalizations.of(context)!.tryAgain, style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ],
@@ -206,8 +205,7 @@ class _CategoriesListPageState extends ConsumerState<CategoriesListPage>
         children: [
           const Icon(Icons.category_outlined, size: 72, color: Colors.white10),
           const SizedBox(height: 16),
-          const Text(
-            'No categories yet',
+          Text(AppLocalizations.of(context)!.noCategoriesYet,
             style: TextStyle(
               color: AppColors.textMuted,
               fontSize: 18,

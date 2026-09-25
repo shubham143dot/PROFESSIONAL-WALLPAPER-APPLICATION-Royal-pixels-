@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -73,7 +74,7 @@ class _SocialFeedPageState extends ConsumerState<SocialFeedPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildFeedTab(
-                label: 'EXPLORE',
+                label: AppLocalizations.of(context)!.explore,
                 isSelected: _selectedFeed == FeedType.explore,
                 onTap: () {
                   if (_selectedFeed != FeedType.explore) {
@@ -91,7 +92,7 @@ class _SocialFeedPageState extends ConsumerState<SocialFeedPage> {
               ),
               const SizedBox(width: 4),
               _buildFeedTab(
-                label: 'LIVE',
+                label: AppLocalizations.of(context)!.live,
                 isSelected: _selectedFeed == FeedType.live,
                 isLive: true,
                 onTap: () {
@@ -238,8 +239,8 @@ class _SocialFeedPageState extends ConsumerState<SocialFeedPage> {
               child: CircularProgressIndicator(color: AppColors.goldMid),
             );
           }
-          return const Center(
-            child: Text('No wallpapers found', style: TextStyle(color: Colors.white)),
+          return Center(
+            child: Text(AppLocalizations.of(context)!.noWallpapersFound1, style: TextStyle(color: Colors.white)),
           );
         }
 

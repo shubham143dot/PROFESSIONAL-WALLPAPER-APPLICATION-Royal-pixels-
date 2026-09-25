@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -98,8 +99,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Remove from Favorites',
+            Text(AppLocalizations.of(context)!.removeFromFavorites,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -125,7 +125,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Cancel'),
+                    child: Text(AppLocalizations.of(context)!.cancel),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -140,8 +140,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
                           borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Remove',
+                    child: Text(AppLocalizations.of(context)!.remove,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -219,8 +218,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Remove Wallpaper',
+            Text(AppLocalizations.of(context)!.removeWallpaper,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -246,7 +244,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Cancel'),
+                    child: Text(AppLocalizations.of(context)!.cancel),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -261,8 +259,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
                           borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Remove',
+                    child: Text(AppLocalizations.of(context)!.remove,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -674,8 +671,7 @@ class _MyWallpapersPageState extends ConsumerState<MyWallpapersPage>
                   ),
                 ],
               ),
-              child: const Text(
-                'Explore Now',
+              child: Text(AppLocalizations.of(context)!.exploreNow,
                 style: TextStyle(
                   color: Colors.black87,
                   fontSize: 16,

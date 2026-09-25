@@ -12,7 +12,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:screen_protector/screen_protector.dart';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:royal_pixels/core/constants/app_constants.dart';
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:royal_pixels/core/di/service_locator.dart';
 import 'package:royal_pixels/core/scroll/scroll.dart';
 import 'package:royal_pixels/core/services/adaptive_performance.dart';
@@ -206,6 +208,15 @@ class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp>
       theme: AppTheme.darkTheme,
       darkTheme: AppTheme.darkTheme,
       routerConfig: appRouter,
+      // ── Localization ──────────────────────────────────────────────────
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,  // RTL support (Arabic, Urdu, etc.)
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      // ─────────────────────────────────────────────────────────────────
     );
   }
 }

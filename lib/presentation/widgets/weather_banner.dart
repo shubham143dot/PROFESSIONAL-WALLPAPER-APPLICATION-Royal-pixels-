@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -61,8 +62,7 @@ class WeatherBanner extends ConsumerWidget {
                     fontSize: 18,
                   ),
                 ),
-                Text(
-                  'Perfect vibes for your home screen',
+                Text(AppLocalizations.of(context)!.perfectVibesForYourHomeScreen,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 12,
@@ -78,8 +78,7 @@ class WeatherBanner extends ConsumerWidget {
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Text(
-              'REEL',
+            child: Text(AppLocalizations.of(context)!.reel,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 10,

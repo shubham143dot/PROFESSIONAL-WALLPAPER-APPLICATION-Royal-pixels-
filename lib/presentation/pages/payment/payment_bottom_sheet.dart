@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -136,8 +137,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
 
                               const SizedBox(height: 32),
 
-                              const Text(
-                                'Payments Closed',
+                              Text(AppLocalizations.of(context)!.paymentsClosed,
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 24,
@@ -149,8 +149,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
 
                               const SizedBox(height: 12),
 
-                              const Text(
-                                'Manual UPI payments are temporarily closed for system maintenance. Please check back later.',
+                              Text(AppLocalizations.of(context)!.manualUpiPaymentsAreTemporarilyClosedForSystemMaintenancePleaseCheckBackLater,
                                 style: TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 15,
@@ -177,8 +176,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet>
                                       borderRadius: BorderRadius.circular(18),
                                       border: Border.all(color: Colors.white10),
                                     ),
-                                    child: const Text(
-                                      'Dismiss',
+                                    child: Text(AppLocalizations.of(context)!.dismiss,
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,

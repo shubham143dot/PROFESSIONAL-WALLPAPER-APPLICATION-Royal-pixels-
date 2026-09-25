@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
@@ -255,10 +256,10 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Delete Wallpaper',
+                  Text(AppLocalizations.of(context)!.deleteWallpaper,
                       style: TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  const Text('Are you sure you want to delete this wallpaper?',
+                  Text(AppLocalizations.of(context)!.areYouSureYouWantToDeleteThisWallpaper,
                       style: TextStyle(color: AppColors.textSecondary)),
                   const SizedBox(height: 24),
                   Row(
@@ -266,7 +267,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                     children: [
                       TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel',
+                          child: Text(AppLocalizations.of(context)!.cancel,
                               style: TextStyle(color: AppColors.textMuted))),
                       const SizedBox(width: 8),
                       ElevatedButton(
@@ -274,7 +275,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                               backgroundColor: Colors.redAccent.withAlpha(200)),
                           onPressed: () => Navigator.pop(ctx, true),
                           child:
-                              const Text('Delete', style: TextStyle(color: Colors.white))),
+                              Text(AppLocalizations.of(context)!.delete, style: TextStyle(color: Colors.white))),
                     ],
                   ),
                 ],
@@ -292,10 +293,10 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Delete Wallpaper',
+                  Text(AppLocalizations.of(context)!.deleteWallpaper,
                       style: TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  const Text('Are you sure you want to delete this wallpaper?',
+                  Text(AppLocalizations.of(context)!.areYouSureYouWantToDeleteThisWallpaper,
                       style: TextStyle(color: AppColors.textSecondary)),
                   const SizedBox(height: 24),
                   Row(
@@ -303,7 +304,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                     children: [
                       TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel',
+                          child: Text(AppLocalizations.of(context)!.cancel,
                               style: TextStyle(color: AppColors.textMuted))),
                       const SizedBox(width: 8),
                       ElevatedButton(
@@ -311,7 +312,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                               backgroundColor: Colors.redAccent.withAlpha(200)),
                           onPressed: () => Navigator.pop(ctx, true),
                           child:
-                              const Text('Delete', style: TextStyle(color: Colors.white))),
+                              Text(AppLocalizations.of(context)!.delete, style: TextStyle(color: Colors.white))),
                     ],
                   ),
                 ],
@@ -375,7 +376,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                     const Icon(Icons.admin_panel_settings_rounded,
                         color: AppColors.goldMid, size: 22),
                     const SizedBox(width: 10),
-                    const Text('Edit Wallpaper',
+                    Text(AppLocalizations.of(context)!.editWallpaper,
                         style: TextStyle(
                             color: AppColors.textPrimary,
                             fontSize: 18,
@@ -387,7 +388,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                 // Title
                 _EditField(
                   controller: titleController,
-                  label: 'Title',
+                  label: AppLocalizations.of(context)!.title,
                   icon: Icons.title_rounded,
                 ),
                 const SizedBox(height: 12),
@@ -395,7 +396,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                 // Category
                 _EditField(
                   controller: categoryController,
-                  label: 'Category',
+                  label: AppLocalizations.of(context)!.category,
                   icon: Icons.category_rounded,
                 ),
                 const SizedBox(height: 20),
@@ -408,8 +409,8 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                 _DialogSwitch(
                   icon: Icons.workspace_premium,
                   iconColor: AppColors.goldMid,
-                  label: 'Premium',
-                  subtitle: 'Premium badge for exclusive wallpapers',
+                  label: AppLocalizations.of(context)!.premium,
+                  subtitle: AppLocalizations.of(context)!.premiumBadgeForExclusiveWallpapers,
                   value: dialogIsPremium,
                   activeColor: AppColors.goldMid,
                   onChanged: (v) => setDialogState(() {
@@ -439,16 +440,16 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                       children: [
                         const Text('💎', style: TextStyle(fontSize: 20)),
                         const SizedBox(width: 10),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Diamond Cost',
+                              Text(AppLocalizations.of(context)!.diamondCost,
                                   style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600)),
-                              Text('How many 💎 required to unlock',
+                              Text(AppLocalizations.of(context)!.howManyRequiredToUnlock,
                                   style: TextStyle(
                                       color: Colors.white38, fontSize: 11)),
                             ],
@@ -498,8 +499,8 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                 _DialogSwitch(
                   icon: Icons.hd_rounded,
                   iconColor: const Color(0xFF22D3EE),
-                  label: 'Ultra HD / 4K',
-                  subtitle: 'Shows cyan 4K badge on card',
+                  label: AppLocalizations.of(context)!.ultraHd4k,
+                  subtitle: AppLocalizations.of(context)!.showsCyan4kBadgeOnCard,
                   value: dialogIsUltraHD,
                   activeColor: const Color(0xFF22D3EE),
                   onChanged: (v) => setDialogState(() => dialogIsUltraHD = v),
@@ -511,7 +512,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                   icon: Icons.star_rounded,
                   iconColor: const Color(0xFFFBBF24),
                   label: "Editor's Choice",
-                  subtitle: 'Shows amber ★ PICK badge on card',
+                  subtitle: AppLocalizations.of(context)!.showsAmberPickBadgeOnCard,
                   value: dialogIsEditorsChoice,
                   activeColor: const Color(0xFFFBBF24),
                   onChanged: (v) => setDialogState(() => dialogIsEditorsChoice = v),
@@ -524,7 +525,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancel',
+                        child: Text(AppLocalizations.of(context)!.cancel,
                             style: TextStyle(color: AppColors.textMuted)),
                       ),
                     ),
@@ -538,7 +539,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                               borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Save Changes',
+                        child: Text(AppLocalizations.of(context)!.saveChanges,
                             style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
@@ -679,7 +680,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       if (mounted) {
         if (!isSilent) RoyalSnackBar.show(context, 'Saved to Gallery! ✨');
         ref.read(notificationProvider.notifier).addNotification(
-              title: 'Download Successful',
+              title: AppLocalizations.of(context)!.downloadSuccessful,
               message:
                   '"${widget.wallpaper.title}" has been saved to your gallery.',
               type: NotificationType.download,
@@ -761,7 +762,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
       if (mounted) {
         if (!isSilent) RoyalSnackBar.show(context, 'Wallpaper set successfully!');
         ref.read(notificationProvider.notifier).addNotification(
-              title: 'Wallpaper Applied',
+              title: AppLocalizations.of(context)!.wallpaperApplied,
               message:
                   '"${widget.wallpaper.title}" is now your active wallpaper.',
               type: NotificationType.update, // Categorized as update
@@ -821,7 +822,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Remix Wallpaper',
+                        Text(AppLocalizations.of(context)!.remixWallpaper,
                             style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
@@ -855,7 +856,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Remix Wallpaper',
+                      Text(AppLocalizations.of(context)!.remixWallpaper,
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -903,7 +904,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Set Wallpaper',
+                        Text(AppLocalizations.of(context)!.setWallpaper,
                             style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
@@ -929,7 +930,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Set Wallpaper',
+                      Text(AppLocalizations.of(context)!.setWallpaper,
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -1275,15 +1276,14 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white.withAlpha(20)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.info_outline_rounded,
                               color: AppColors.goldLight, size: 14),
                           SizedBox(width: 8),
                           Flexible(
-                            child: Text(
-                              'This is a preview. High-quality original image is provided when you download or set as wallpaper.',
+                            child: Text(AppLocalizations.of(context)!.thisIsAPreviewHighqualityOriginalImageIsProvidedWhenYouDownloadOrSetAsWallpaper,
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 10,
@@ -1417,7 +1417,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                           children: [
                             DiamondLoader(size: 20, color: AppColors.goldMid),
                             const SizedBox(width: 8),
-                            const Text('Unlocking…',
+                            Text(AppLocalizations.of(context)!.unlocking,
                                 style: TextStyle(
                                     color: AppColors.textSecondary,
                                     fontWeight: FontWeight.w600)),
@@ -1467,9 +1467,8 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.glassBorder),
                   ),
-                  child: const Center(
-                    child: Text(
-                      'Get PRO',
+                  child: Center(
+                    child: Text(AppLocalizations.of(context)!.getPro,
                       style: TextStyle(
                         color: AppColors.goldLight,
                         fontWeight: FontWeight.bold,
@@ -1513,7 +1512,7 @@ class _WallpaperDetailPageState extends ConsumerState<WallpaperDetailPage> {
                         children: [
                           DiamondLoader(size: 20, color: _primaryColor),
                           const SizedBox(width: 8),
-                          const Text('Setting…',
+                          Text(AppLocalizations.of(context)!.setting,
                               style: TextStyle(
                                   color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w600)),

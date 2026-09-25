@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -185,36 +186,36 @@ class _HomePageState extends ConsumerState<HomePage>
   // Filter logic now moved to homeFilteredWallpapersProvider for high-performance memoization
 
   // â”€â”€ Premium nav items definition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  static const List<NavBarItem> _navItems = [
+  List<NavBarItem> _getNavItems(BuildContext context) => [
     NavBarItem(
       activeIcon: Icons.home_rounded,
       inactiveIcon: Icons.home_outlined,
-      label: 'HOME',
+      label: AppLocalizations.of(context)!.home,
     ),
     NavBarItem(
       activeIcon: Icons.local_fire_department_rounded,
       inactiveIcon: Icons.local_fire_department_outlined,
-      label: 'FEEDS',
+      label: AppLocalizations.of(context)!.feeds,
     ),
     NavBarItem(
       activeIcon: Icons.grid_view_rounded,
       inactiveIcon: Icons.grid_view_outlined,
-      label: 'EXPLORE',
+      label: AppLocalizations.of(context)!.explore,
     ),
     NavBarItem(
       activeIcon: Icons.favorite_rounded,
       inactiveIcon: Icons.favorite_outline_rounded,
-      label: 'FAVORITES',
+      label: AppLocalizations.of(context)!.favorites,
     ),
     NavBarItem(
       activeIcon: Icons.download_done_rounded,
       inactiveIcon: Icons.download_outlined,
-      label: 'SAVED',
+      label: AppLocalizations.of(context)!.saved,
     ),
     NavBarItem(
       activeIcon: Icons.person_rounded,
       inactiveIcon: Icons.person_outline_rounded,
-      label: 'PROFILE',
+      label: AppLocalizations.of(context)!.profile,
     ),
   ];
 
@@ -360,7 +361,7 @@ class _HomePageState extends ConsumerState<HomePage>
             child: PremiumFloatingNavBar(
               currentIndex: navIndex,
               pageNotifier: _pageNotifier,
-              items: _navItems,
+              items: _getNavItems(context),
               bottomSafeArea: bottomPadding,
               onTap: (index) {
                 ref.read(hapticProvider.notifier).selectionClick();
@@ -405,7 +406,7 @@ class _HomePageState extends ConsumerState<HomePage>
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 32, 16, 20),
             child: Center(
-              child: _AppBarTitleText('ROYAL COLLECTION', fontSize: 15),
+              child: _AppBarTitleText(AppLocalizations.of(context)!.royalCollection, fontSize: 15),
             ),
           ),
         ),
@@ -488,8 +489,7 @@ class _HomePageState extends ConsumerState<HomePage>
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        'LOADING MORE...',
+                      Text(AppLocalizations.of(context)!.loadingMore,
                         style: TextStyle(
                           color: AppColors.goldMid,
                           fontSize: 10,
@@ -796,8 +796,7 @@ class _HomePageState extends ConsumerState<HomePage>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Guest User',
+                                  Text(AppLocalizations.of(context)!.guestUser,
                                     style: TextStyle(
                                       color: AppColors.textPrimary,
                                       fontSize: 20,
@@ -819,8 +818,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                       children: [
                                         const Icon(Icons.info_outline_rounded, size: 12, color: AppColors.goldMid),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          'Sign in to sync your data',
+                                        Text(AppLocalizations.of(context)!.signInToSyncYourData,
                                           style: TextStyle(
                                             color: AppColors.textMuted.withAlpha(200),
                                             fontSize: 11,
@@ -853,7 +851,7 @@ class _HomePageState extends ConsumerState<HomePage>
                   const SizedBox(height: 28),
 
                   // ——— Daily streak card (Interactive) —————————————————
-                  const _ProfileGroupLabel(label: 'DAILY REWARDS'),
+                  _ProfileGroupLabel(label: AppLocalizations.of(context)!.dailyRewards),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -927,8 +925,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                       ),
                                     ],
                                   ),
-                                  child: const Text(
-                                    'CLAIM',
+                                  child: Text(AppLocalizations.of(context)!.claim,
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontSize: 10,
@@ -983,14 +980,14 @@ class _HomePageState extends ConsumerState<HomePage>
                   const SizedBox(height: 28),
 
                   // ——— Grouped Actions ————————————————————————————————
-                  const _ProfileGroupLabel(label: 'ACCOUNT & APP'),
+                  _ProfileGroupLabel(label: AppLocalizations.of(context)!.accountApp),
                   const SizedBox(height: 12),
                   _ProfileGroupWrapper(
                     children: [
                       _ProfileMenuTile(
                         icon: Icons.login_rounded,
-                        label: 'Sign In with Google',
-                        subtitle: 'Sync your favorites and progress',
+                        label: AppLocalizations.of(context)!.signInWithGoogle,
+                        subtitle: AppLocalizations.of(context)!.syncYourFavoritesAndProgress,
                         isGold: true,
                         useCardStyle: false,
                         onTap: () {
@@ -1000,7 +997,7 @@ class _HomePageState extends ConsumerState<HomePage>
                       ),
                       _ProfileMenuTile(
                         icon: Icons.info_outline_rounded,
-                        label: 'About Royal Pixels',
+                        label: AppLocalizations.of(context)!.aboutRoyalPixels,
                         subtitle: 'Version ${AppConstants.appVersion}',
                         useCardStyle: false,
                         onTap: () => context.push('/about'),
@@ -1009,7 +1006,7 @@ class _HomePageState extends ConsumerState<HomePage>
                   ),
 
                   const SizedBox(height: 28),
-                  const _ProfileGroupLabel(label: 'APP FEEL'),
+                  _ProfileGroupLabel(label: AppLocalizations.of(context)!.appFeel),
                   const SizedBox(height: 12),
                   const _HapticControlCenter(),
 
@@ -1198,8 +1195,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                         ),
                                       ],
                                     ),
-                                    child: const Text(
-                                      'PRO',
+                                    child: Text(AppLocalizations.of(context)!.pro,
                                       style: TextStyle(
                                         color: Colors.black,
                                         fontSize: 10,
@@ -1292,7 +1288,7 @@ class _HomePageState extends ConsumerState<HomePage>
                 const SizedBox(height: 28),
 
                 // ——— Membership Group ————————————————————————————————
-                const _ProfileGroupLabel(label: 'MEMBERSHIP & WALLET'),
+                _ProfileGroupLabel(label: AppLocalizations.of(context)!.membershipWallet),
                 const SizedBox(height: 12),
                 _ProfileGroupWrapper(
                   children: [
@@ -1335,7 +1331,7 @@ class _HomePageState extends ConsumerState<HomePage>
                           final diamonds = ref.watch(diamondProvider).diamonds;
                           return _ProfileMenuTile(
                             icon: Icons.account_balance_wallet_rounded,
-                            label: 'Diamond Store',
+                            label: AppLocalizations.of(context)!.diamondStore,
                             subtitle: 'Current balance: 💎 $diamonds',
                             isGold: false,
                             useCardStyle: false,
@@ -1347,8 +1343,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: AppColors.glassBorder),
                               ),
-                              child: const Text(
-                                'TOP UP',
+                              child: Text(AppLocalizations.of(context)!.topUp,
                                 style: TextStyle(
                                   color: AppColors.goldMid,
                                   fontSize: 10,
@@ -1365,7 +1360,7 @@ class _HomePageState extends ConsumerState<HomePage>
                 const SizedBox(height: 32),
 
                 // ——— App Settings Group —————————————————————————————
-                const _ProfileGroupLabel(label: 'PREFERENCES'),
+                _ProfileGroupLabel(label: AppLocalizations.of(context)!.preferences),
                 const SizedBox(height: 12),
                 
                 Consumer(
@@ -1383,7 +1378,7 @@ class _HomePageState extends ConsumerState<HomePage>
                           children: [
                             _ProfileMenuTile(
                               icon: Icons.brightness_medium_rounded,
-                              label: 'AMOLED Mode',
+                              label: AppLocalizations.of(context)!.amoledMode,
                               subtitle: settings.isAmoledMode ? 'Prioritize deep blacks' : 'Standard dark',
                               useCardStyle: false,
                               trailingWidget: Switch(
@@ -1398,7 +1393,7 @@ class _HomePageState extends ConsumerState<HomePage>
                             ),
                             _ProfileMenuTile(
                               icon: Icons.auto_mode_rounded,
-                              label: 'Auto Daily Wallpaper',
+                              label: AppLocalizations.of(context)!.autoDailyWallpaper,
                               subtitle: settings.isAutoDailyWallpaper ? 'Schedule active' : 'Off',
                               useCardStyle: false,
                               trailingWidget: Switch(
@@ -1418,7 +1413,7 @@ class _HomePageState extends ConsumerState<HomePage>
                             ),
                             _ProfileMenuTile(
                               icon: Icons.info_outline_rounded,
-                              label: 'About Royal Pixels',
+                              label: AppLocalizations.of(context)!.aboutRoyalPixels,
                               subtitle: 'Version ${AppConstants.appVersion}',
                               useCardStyle: false,
                               onTap: () => context.push('/about'),
@@ -1433,7 +1428,7 @@ class _HomePageState extends ConsumerState<HomePage>
                 // ——— Admin section —————————————————————————————————
                 if (user?.email == 'subhamsoudeep@gmail.com') ...[
                   const SizedBox(height: 28),
-                  const _ProfileGroupLabel(label: 'ADMIN CONTROL', color: AppColors.goldMid),
+                  _ProfileGroupLabel(label: AppLocalizations.of(context)!.adminControl, color: AppColors.goldMid),
                   const SizedBox(height: 12),
                   _ProfileGroupWrapper(
                     children: [
@@ -1442,7 +1437,7 @@ class _HomePageState extends ConsumerState<HomePage>
                         builder: (context, ref, _) {
                           return _ProfileMenuTile(
                             icon: Icons.workspace_premium_rounded,
-                            label: 'Premium Membership',
+                            label: AppLocalizations.of(context)!.premiumMembership,
                             subtitle: isSubscribed ? 'PRO Active (Testing)' : 'FREE Version (Testing)',
                             isGold: true,
                             useCardStyle: false,
@@ -1492,7 +1487,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
                       _ProfileMenuTile(
                         icon: Icons.admin_panel_settings_rounded,
-                        label: 'Admin Upload',
+                        label: AppLocalizations.of(context)!.adminUpload,
                         isGold: true,
                         useCardStyle: false,
                         onTap: () => context.push('/upload'),
@@ -1500,14 +1495,14 @@ class _HomePageState extends ConsumerState<HomePage>
 
                       _ProfileMenuTile(
                         icon: Icons.edit_note_rounded,
-                        label: 'Rename Category',
+                        label: AppLocalizations.of(context)!.renameCategory,
                         isGold: true,
                         useCardStyle: false,
                         onTap: () => context.push('/rename-category'),
                       ),
                       _ProfileMenuTile(
                         icon: Icons.category_rounded,
-                        label: 'Category Covers',
+                        label: AppLocalizations.of(context)!.categoryCovers,
                         isGold: true,
                         useCardStyle: false,
                         onTap: () => context.push('/upload-category-cover'),
@@ -1520,7 +1515,7 @@ class _HomePageState extends ConsumerState<HomePage>
                 ],
 
                 const SizedBox(height: 28),
-                const _ProfileGroupLabel(label: 'ACCOUNT'),
+                _ProfileGroupLabel(label: AppLocalizations.of(context)!.account),
                 const SizedBox(height: 12),
 
                 // ——— Logout ————————————————————————————————————————
@@ -1528,7 +1523,7 @@ class _HomePageState extends ConsumerState<HomePage>
                   children: [
                     _ProfileMenuTile(
                       icon: Icons.logout_rounded,
-                      label: 'Logout',
+                      label: AppLocalizations.of(context)!.logout,
                       isDanger: true,
                       useCardStyle: false,
                       onTap: () async {
@@ -1616,12 +1611,12 @@ class _HomePageState extends ConsumerState<HomePage>
                     border: Border.all(
                         color: Colors.white.withAlpha(30), width: 1),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('💎', style: TextStyle(fontSize: 16)),
                       SizedBox(width: 5),
-                      Text('Sign In',
+                      Text(AppLocalizations.of(context)!.signIn,
                           style: TextStyle(
                               color: AppColors.textMuted,
                               fontSize: 12,
@@ -1653,7 +1648,7 @@ class _HomePageState extends ConsumerState<HomePage>
             return Stack(
               children: [
                 IconButton(
-                  tooltip: 'Notifications',
+                  tooltip: AppLocalizations.of(context)!.notifications,
                   icon: const Icon(Icons.notifications_none_rounded,
                       color: AppColors.textSecondary),
                   onPressed: () => context.push('/notifications'),
@@ -1857,14 +1852,14 @@ class _HapticControlCenter extends ConsumerWidget {
         child: AdaptivePerformance.enableBackdropBlur
             ? BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: _buildHapticContent(
+                child: _buildHapticContent(context,
                   currentLevel: currentLevel,
                   notifier: notifier,
                   levels: levels,
                   selectedIndex: selectedIndex,
                 ),
               )
-            : _buildHapticContent(
+            : _buildHapticContent(context,
                 currentLevel: currentLevel,
                 notifier: notifier,
                 levels: levels,
@@ -1875,7 +1870,7 @@ class _HapticControlCenter extends ConsumerWidget {
     ).animate(target: AdaptivePerformance.enableAnimations ? null : 1.0).fadeIn(duration: 800.ms).slideY(begin: 0.1, curve: Curves.easeOutCubic);
   }
 
-  Widget _buildHapticContent({
+  Widget _buildHapticContent(BuildContext context, {
     required HapticLevel currentLevel,
     required HapticNotifier notifier,
     required List<HapticLevel> levels,
@@ -1899,8 +1894,7 @@ class _HapticControlCenter extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'HAPTIC ENGINE',
+                      Text(AppLocalizations.of(context)!.hapticEngine,
                         style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 13,
@@ -1908,8 +1902,7 @@ class _HapticControlCenter extends ConsumerWidget {
                           letterSpacing: 1.4,
                         ),
                       ),
-                      Text(
-                        'Precision-tuned vibration response',
+                      Text(AppLocalizations.of(context)!.precisiontunedVibrationResponse,
                         style: TextStyle(
                           color: AppColors.textMuted.withValues(alpha: 0.8),
                           fontSize: 10,
@@ -1919,7 +1912,7 @@ class _HapticControlCenter extends ConsumerWidget {
                     ],
                   ),
                 ),
-                _buildStatusBadge(currentLevel),
+                _buildStatusBadge(currentLevel, context),
               ],
             ),
           ),
@@ -2049,7 +2042,7 @@ class _HapticControlCenter extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatusBadge(HapticLevel level) {
+  Widget _buildStatusBadge(HapticLevel level, BuildContext context) {
     final bool isOff = level == HapticLevel.off;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -2061,7 +2054,7 @@ class _HapticControlCenter extends ConsumerWidget {
         ),
       ),
       child: Text(
-        isOff ? 'DISABLED' : 'ACTIVE',
+        isOff ? AppLocalizations.of(context)!.disabled : AppLocalizations.of(context)!.active,
         style: TextStyle(
           color: isOff ? Colors.redAccent : AppColors.goldLight,
           fontSize: 8,
@@ -2270,28 +2263,28 @@ class _CrossFadingAppBarTitle extends StatelessWidget {
           opacity: (1.0 - fraction).clamp(0.0, 1.0),
           child: index1 == 0 
               ? _PremiumSearchBar(onTap: onSearchTap) 
-              : _AppBarTitleText(_getTitleForIndex(index1)),
+              : _AppBarTitleText(_getTitleForIndex(index1, context)),
         ),
         if (index1 != index2)
           Opacity(
             opacity: fraction.clamp(0.0, 1.0),
             child: index2 == 0 
                 ? _PremiumSearchBar(onTap: onSearchTap) 
-                : _AppBarTitleText(_getTitleForIndex(index2)),
+                : _AppBarTitleText(_getTitleForIndex(index2, context)),
           ),
       ],
     );
   }
 
-  String _getTitleForIndex(int index) {
+  String _getTitleForIndex(int index, BuildContext context) {
     switch (index) {
-      case 0: return 'ROYAL PIXELS';
-      case 1: return 'LIVE FEED';
-      case 2: return 'EXPLORE';
-      case 3: return 'FAVORITES';
-      case 4: return 'MY SAVED';
-      case 5: return 'PROFILE';
-      default: return 'ROYAL PIXELS';
+      case 0: return AppLocalizations.of(context)!.royalPixels;
+      case 1: return AppLocalizations.of(context)!.liveFeed;
+      case 2: return AppLocalizations.of(context)!.explore;
+      case 3: return AppLocalizations.of(context)!.favorites;
+      case 4: return AppLocalizations.of(context)!.mySaved;
+      case 5: return AppLocalizations.of(context)!.profile.toUpperCase();
+      default: return AppLocalizations.of(context)!.royalPixels;
     }
   }
 }
@@ -2374,8 +2367,7 @@ class _PremiumSearchBar extends StatelessWidget {
                  size: 18, 
                  color: AppColors.goldMid.withValues(alpha: 0.8)),
             const SizedBox(width: 10),
-            Text(
-              'Search Wallpapers...',
+            Text(AppLocalizations.of(context)!.searchWallpapers,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.4),
                 fontSize: 13,
@@ -2426,8 +2418,7 @@ class _DauStatsCard extends ConsumerWidget {
           loading: () => const _DauLoadingState(),
           error: (e, _) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'DAU data unavailable',
+            child: Text(AppLocalizations.of(context)!.dauDataUnavailable,
               style: TextStyle(color: AppColors.textMuted, fontSize: 13),
             ),
           ),
@@ -2458,7 +2449,7 @@ class _DauNumberContentState extends State<_DauNumberContent> {
   Future<void> _downloadPdf() async {
     setState(() => _isGeneratingPdf = true);
     try {
-      final pdfBytes = await _generateDauPdf(widget.records);
+      final pdfBytes = await _generateDauPdf(context, widget.records);
       await Printing.sharePdf(
         bytes: pdfBytes,
         filename: 'royal_pixels_dau_report_${DateTime.now().millisecondsSinceEpoch}.pdf',
@@ -2467,7 +2458,7 @@ class _DauNumberContentState extends State<_DauNumberContent> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to generate PDF: $e'),
+            content: Text(AppLocalizations.of(context)!.failedToGeneratePdf(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -2492,8 +2483,7 @@ class _DauNumberContentState extends State<_DauNumberContent> {
           children: [
             const Icon(Icons.people_alt_rounded, color: AppColors.goldLight, size: 20),
             const SizedBox(width: 8),
-            Text(
-              'Daily Active Users',
+            Text(AppLocalizations.of(context)!.dailyActiveUsers,
               style: const TextStyle(
                 color: AppColors.goldLight,
                 fontSize: 14,
@@ -2512,7 +2502,7 @@ class _DauNumberContentState extends State<_DauNumberContent> {
                   border: Border.all(color: AppColors.goldMid.withValues(alpha: 0.5)),
                 ),
                 child: Text(
-                  'Today: ${today.count}',
+                  AppLocalizations.of(context)!.todayCount(today.count),
                   style: const TextStyle(
                     color: AppColors.goldLight,
                     fontSize: 12,
@@ -2525,7 +2515,7 @@ class _DauNumberContentState extends State<_DauNumberContent> {
 
         const SizedBox(height: 4),
         Text(
-          '7-day total: $_weekTotal users',
+          AppLocalizations.of(context)!.sevenDayTotalUsers(_weekTotal),
           style: TextStyle(
             color: AppColors.textMuted,
             fontSize: 10,
@@ -2608,8 +2598,7 @@ class _DauNumberContentState extends State<_DauNumberContent> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  'users',
+                Text(AppLocalizations.of(context)!.users,
                   style: TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 9,
@@ -2669,7 +2658,7 @@ class _DauNumberContentState extends State<_DauNumberContent> {
                     const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Colors.black),
                   const SizedBox(width: 8),
                   Text(
-                    _isGeneratingPdf ? 'Generating PDF...' : 'Download PDF Report',
+                    _isGeneratingPdf ? AppLocalizations.of(context)!.generatingPdf : AppLocalizations.of(context)!.downloadPdfReport,
                     style: TextStyle(
                       color: _isGeneratingPdf ? AppColors.textMuted : Colors.black,
                       fontSize: 13,
@@ -2688,7 +2677,7 @@ class _DauNumberContentState extends State<_DauNumberContent> {
 }
 
 // ─── PDF generation helper ───────────────────────────────────────────────────
-Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
+Future<Uint8List> _generateDauPdf(BuildContext context, List<DauDayRecord> records) async {
   final doc = pw.Document();
   final now = DateTime.now();
   final dateStr =
@@ -2716,8 +2705,7 @@ Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text(
-                        'ROYAL PIXELS',
+                      pw.Text(AppLocalizations.of(context)!.royalPixels,
                         style: pw.TextStyle(
                           fontSize: 20,
                           fontWeight: pw.FontWeight.bold,
@@ -2725,8 +2713,7 @@ Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
                         ),
                       ),
                       pw.SizedBox(height: 4),
-                      pw.Text(
-                        'Admin — Daily Active Users Report',
+                      pw.Text(AppLocalizations.of(context)!.adminDailyActiveUsersReport,
                         style: pw.TextStyle(
                           fontSize: 11,
                           color: const PdfColor.fromInt(0xFFCCCCCC),
@@ -2735,7 +2722,7 @@ Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
                     ],
                   ),
                   pw.Text(
-                    'Generated: $dateStr',
+                    AppLocalizations.of(context)!.generated(dateStr),
                     style: pw.TextStyle(
                       fontSize: 9,
                       color: const PdfColor.fromInt(0xFFAAAAAA),
@@ -2750,16 +2737,16 @@ Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
             // ── Summary stats ───────────────────────────────────────────────
             pw.Row(
               children: [
-                _pdfStatBox('7-Day Total', '$weekTotal users'),
+                _pdfStatBox(AppLocalizations.of(context)!.sevenDayTotal, AppLocalizations.of(context)!.userCount(weekTotal)),
                 pw.SizedBox(width: 12),
-                _pdfStatBox('Today', '${records.isNotEmpty ? records.last.count : 0} users'),
+                _pdfStatBox(AppLocalizations.of(context)!.today, AppLocalizations.of(context)!.userCount(records.isNotEmpty ? records.last.count : 0)),
                 pw.SizedBox(width: 12),
                 _pdfStatBox(
-                  'Peak Day',
+                  AppLocalizations.of(context)!.peakDay,
                   records.isEmpty
                       ? '—'
                       : '${records.reduce((a, b) => a.count > b.count ? a : b).label}: '
-                          '${records.map((r) => r.count).fold(0, (a, b) => a > b ? a : b)} users',
+                          '${AppLocalizations.of(context)!.userCount(records.map((r) => r.count).fold(0, (a, b) => a > b ? a : b))}',
                 ),
               ],
             ),
@@ -2767,8 +2754,7 @@ Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
             pw.SizedBox(height: 24),
 
             // ── Table header ────────────────────────────────────────────────
-            pw.Text(
-              'PER-DAY BREAKDOWN (LAST 7 DAYS)',
+            pw.Text(AppLocalizations.of(context)!.perdayBreakdownLast7Days,
               style: pw.TextStyle(
                 fontSize: 10,
                 fontWeight: pw.FontWeight.bold,
@@ -2796,9 +2782,9 @@ Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
                     color: PdfColor.fromInt(0xFF1a1a2e),
                   ),
                   children: [
-                    _pdfTableHeader('Day'),
-                    _pdfTableHeader('Date'),
-                    _pdfTableHeader('Users'),
+                    _pdfTableHeader(AppLocalizations.of(context)!.day),
+                    _pdfTableHeader(AppLocalizations.of(context)!.date),
+                    _pdfTableHeader(AppLocalizations.of(context)!.users),
                   ],
                 ),
                 // Data rows (newest first)
@@ -2812,7 +2798,7 @@ Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
                     ),
                     children: [
                       _pdfTableCell(
-                        isToday ? 'Today' : r.label,
+                        isToday ? AppLocalizations.of(context)!.today : r.label,
                         bold: isToday,
                       ),
                       _pdfTableCell(r.dateKey),
@@ -2829,7 +2815,7 @@ Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
                     color: PdfColor.fromInt(0xFFF5F5F5),
                   ),
                   children: [
-                    _pdfTableCell('TOTAL', bold: true),
+                    _pdfTableCell(AppLocalizations.of(context)!.total, bold: true),
                     _pdfTableCell(''),
                     _pdfTableCell('$weekTotal', bold: true),
                   ],
@@ -2842,8 +2828,7 @@ Future<Uint8List> _generateDauPdf(List<DauDayRecord> records) async {
             // ── Footer ──────────────────────────────────────────────────────
             pw.Divider(color: const PdfColor.fromInt(0xFFDDDDDD)),
             pw.SizedBox(height: 8),
-            pw.Text(
-              'Royal Pixels — Admin Report  •  Confidential  •  Do not distribute',
+            pw.Text(AppLocalizations.of(context)!.royalPixelsAdminReportConfidentialDoNotDistribute,
               style: pw.TextStyle(
                 fontSize: 8,
                 color: const PdfColor.fromInt(0xFFAAAAAA),

@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -61,8 +62,7 @@ class FestivalBanner extends ConsumerWidget {
                       fontSize: 18,
                     ),
                   ),
-                  Text(
-                    'Special curated wallpapers for you',
+                  Text(AppLocalizations.of(context)!.specialCuratedWallpapersForYou,
                     style: TextStyle(
                       color: Colors.black.withValues(alpha: 0.7),
                       fontSize: 12,
@@ -78,8 +78,7 @@ class FestivalBanner extends ConsumerWidget {
                 color: Colors.black,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'VIEW',
+              child: Text(AppLocalizations.of(context)!.view,
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 10,

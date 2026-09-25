@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -62,7 +63,7 @@ class _UploadCategoryCoverPageState
       if (_selectedImage == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select an image first!')),
+            SnackBar(content: Text(AppLocalizations.of(context)!.pleaseSelectAnImageFirst)),
           );
         }
         return;
@@ -152,18 +153,18 @@ class _UploadCategoryCoverPageState
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Manage Category Cover',
+        title: Text(AppLocalizations.of(context)!.manageCategoryCover,
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: _isUploading
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CircularProgressIndicator(color: Colors.amber),
                   SizedBox(height: 16),
-                  Text('Uploading to ImageKit & Firebase...',
+                  Text(AppLocalizations.of(context)!.uploadingToImagekitFirebase,
                       style: TextStyle(color: Colors.white70)),
                 ],
               ),
@@ -190,13 +191,13 @@ class _UploadCategoryCoverPageState
                             : null,
                       ),
                       child: _selectedImage == null
-                          ? const Column(
+                          ? Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.add_photo_alternate,
                                     size: 50, color: Colors.amber),
                                 SizedBox(height: 12),
-                                Text('Tap to choose cover image',
+                                Text(AppLocalizations.of(context)!.tapToChooseCoverImage,
                                     style: TextStyle(color: Colors.white54)),
                               ],
                             )
@@ -246,7 +247,7 @@ class _UploadCategoryCoverPageState
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Set Category Cover',
+                    child: Text(AppLocalizations.of(context)!.setCategoryCover,
                         style: TextStyle(
                             color: Colors.black,
                             fontSize: 18,

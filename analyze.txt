@@ -1,5 +1,0 @@
-Analyzing royal_pixels...
-
-   info - lib\presentation\pages\upload\upload_wallpaper_page.dart:150:28 - Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check. - use_build_context_synchronously
-
-1 issue found.

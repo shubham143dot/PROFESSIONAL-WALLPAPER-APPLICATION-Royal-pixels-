@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
@@ -350,8 +351,7 @@ class _MicSheetState extends State<_MicSheet>
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Listening…',
+          Text(AppLocalizations.of(context)!.listening,
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 16,
@@ -415,14 +415,13 @@ class _MicSheetState extends State<_MicSheet>
                 gradient: AppColors.goldGradient,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.check_circle_outline,
                       color: Colors.black, size: 20),
                   SizedBox(width: 8),
-                  Text(
-                    'Search',
+                  Text(AppLocalizations.of(context)!.search,
                     style: TextStyle(
                       color: Colors.black,
                       fontSize: 16,

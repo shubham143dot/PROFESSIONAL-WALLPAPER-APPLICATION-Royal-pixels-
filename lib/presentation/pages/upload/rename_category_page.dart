@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -35,9 +36,9 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
       if (_selectedCategory == null || newName.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
                 content:
-                    Text('Please select a category and enter a new name!')),
+                    Text(AppLocalizations.of(context)!.pleaseSelectACategoryAndEnterANewName)),
           );
         }
         return;
@@ -128,18 +129,18 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Rename Category',
+        title: Text(AppLocalizations.of(context)!.renameCategory,
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: _isRenaming
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CircularProgressIndicator(color: Colors.amber),
                   SizedBox(height: 16),
-                  Text('Updating categories and properties...',
+                  Text(AppLocalizations.of(context)!.updatingCategoriesAndProperties,
                       style: TextStyle(color: Colors.white70)),
                 ],
               ),
@@ -149,8 +150,7 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Select an existing category to rename. This will update the category property of all associated wallpapers and migrate its cover image if one exists.',
+                  Text(AppLocalizations.of(context)!.selectAnExistingCategoryToRenameThisWillUpdateTheCategoryPropertyOfAllAssociatedWallpapersAndMigrateItsCoverImageIfOneExists,
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                   const SizedBox(height: 24),
@@ -217,7 +217,7 @@ class _RenameCategoryPageState extends ConsumerState<RenameCategoryPage> {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Rename Category',
+                    child: Text(AppLocalizations.of(context)!.renameCategory,
                         style: TextStyle(
                             color: Colors.black,
                             fontSize: 18,

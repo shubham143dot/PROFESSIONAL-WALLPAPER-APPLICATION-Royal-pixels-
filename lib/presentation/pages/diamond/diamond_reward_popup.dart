@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:ui';
 import '../../../core/services/adaptive_performance.dart';
 import 'package:flutter/material.dart';
@@ -158,8 +159,7 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
 
         // Title
         if (!_claimed) ...[
-          const Text(
-            '🎁 Daily Reward!',
+          Text(AppLocalizations.of(context)!.dailyReward,
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 22,
@@ -168,16 +168,14 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
             ),
           ).animate().fade(duration: 400.ms).slideY(begin: -0.2),
           const SizedBox(height: 6),
-          Text(
-            'Come back every day to build your streak',
+          Text(AppLocalizations.of(context)!.comeBackEveryDayToBuildYourStreak,
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13,
             ),
           ).animate().fade(duration: 400.ms, delay: 100.ms),
         ] else ...[
-          const Text(
-            '✅ Claimed!',
+          Text(AppLocalizations.of(context)!.claimed,
             style: TextStyle(
               color: AppColors.goldLight,
               fontSize: 22,
@@ -450,8 +448,7 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
         ),
         const Text('🎉', style: TextStyle(fontSize: 48)),
         const SizedBox(height: 8),
-        const Text(
-          'Day 7 Bonus!',
+        Text(AppLocalizations.of(context)!.day7Bonus,
           style: TextStyle(
             color: AppColors.goldLight,
             fontSize: 26,
@@ -459,8 +456,7 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'You completed a full streak! Choose your bonus:',
+        Text(AppLocalizations.of(context)!.youCompletedAFullStreakChooseYourBonus,
           textAlign: TextAlign.center,
           style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
@@ -482,13 +478,12 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
                 ),
               ],
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text('💎', style: TextStyle(fontSize: 22)),
                 SizedBox(width: 10),
-                Text(
-                  '+80 Diamonds  (50 + bonus 30)',
+                Text(AppLocalizations.of(context)!.n80Diamonds50Bonus30,
                   style: TextStyle(
                     color: Colors.black,
                     fontSize: 15,
@@ -511,7 +506,7 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColors.accentPurple.withAlpha(120)),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text('🔓', style: TextStyle(fontSize: 22)),
@@ -519,16 +514,14 @@ class _DailyRewardSheetState extends ConsumerState<_DailyRewardSheet>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Claim 50 Diamonds',
+                    Text(AppLocalizations.of(context)!.claim50Diamonds,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    Text(
-                      'Then use them to unlock a wallpaper',
+                    Text(AppLocalizations.of(context)!.thenUseThemToUnlockAWallpaper,
                       style:
                           TextStyle(color: AppColors.textMuted, fontSize: 11),
                     ),

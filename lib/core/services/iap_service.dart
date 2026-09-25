@@ -76,9 +76,8 @@ class IapService {
           userId: user.uid, 
           isSubscribed: true,
         );
-        
-        return result.fold(
-          (failure) => false,
+        return await result.fold(
+          (failure) async => false,
           (_) async {
             // Refresh auth state to reflect PRO status globally
             await _ref.read(authProvider.notifier).refreshUser();

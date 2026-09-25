@@ -9,10 +9,10 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// Cloudinary Credentials
+// Cloudinary Credentials (configured via environment or .env)
 const CLOUDS = [
-  { name: 'Free', cloud_name: 'dl00rha3n', api_key: '837238164488567', api_secret: 'bdHDsHE2QyXzqt5UNLJMzxrrpu8' },
-  { name: 'Premium', cloud_name: 'dmt6y2k6h', api_key: '174456259398661', api_secret: 'OxI0nRoL8RNK7xRJYVQJtX6cEhs' }
+  { name: 'Free', cloud_name: process.env.CLOUDINARY_CLOUD_NAME_FREE || 'dl00rha3n', api_key: process.env.CLOUDINARY_API_KEY_FREE || '837238164488567', api_secret: process.env.CLOUDINARY_API_SECRET_FREE || 'YOUR_FREE_API_SECRET' },
+  { name: 'Premium', cloud_name: process.env.CLOUDINARY_CLOUD_NAME_PREMIUM || 'dmt6y2k6h', api_key: process.env.CLOUDINARY_API_KEY_PREMIUM || '174456259398661', api_secret: process.env.CLOUDINARY_API_SECRET_PREMIUM || 'YOUR_PREMIUM_API_SECRET' }
 ];
 
 function normalizeUrl(url) {

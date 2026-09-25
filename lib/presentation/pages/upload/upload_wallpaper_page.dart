@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -79,7 +80,7 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
     if (_selectedImage == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select an image first!')),
+          SnackBar(content: Text(AppLocalizations.of(context)!.pleaseSelectAnImageFirst)),
         );
       }
       return;
@@ -264,7 +265,7 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
         backgroundColor: const Color(0xFF1E1E1E),
         title: Row(
           children: [
-            const Text('Admin Upload',
+            Text(AppLocalizations.of(context)!.adminUpload,
                 style: TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
             if (_uploadCount > 0) ...[
@@ -294,7 +295,7 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
           if (_uploadCount > 0)
             TextButton(
               onPressed: () => context.pop(),
-              child: const Text('Done',
+              child: Text(AppLocalizations.of(context)!.done,
                   style: TextStyle(
                       color: Colors.amber,
                       fontWeight: FontWeight.bold,
@@ -326,13 +327,13 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                           : null,
                     ),
                     child: _selectedImage == null
-                        ? const Column(
+                        ? Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.add_photo_alternate,
                                   size: 50, color: Colors.amber),
                               SizedBox(height: 12),
-                              Text('Tap to choose wallpaper',
+                              Text(AppLocalizations.of(context)!.tapToChooseWallpaper,
                                   style: TextStyle(color: Colors.white54)),
                             ],
                           )
@@ -423,10 +424,9 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                 const SizedBox(height: 24),
 
                 // ── Section: Content Type ────────────────────────────
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(bottom: 10),
-                  child: Text(
-                    'Content Type',
+                  child: Text(AppLocalizations.of(context)!.contentType,
                     style: TextStyle(
                       color: Colors.white54,
                       fontSize: 12,
@@ -440,8 +440,8 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                 _AdminToggle(
                   icon: Icons.workspace_premium,
                   iconColor: Colors.amber,
-                  label: 'Mark as Premium',
-                  subtitle: 'Requires custom 💎 to unlock',
+                  label: AppLocalizations.of(context)!.markAsPremium,
+                  subtitle: AppLocalizations.of(context)!.requiresCustomToUnlock,
                   value: _isPremium,
                   enabled: !_isUploading,
                   onChanged: (val) => setState(() => _isPremium = val),
@@ -475,13 +475,12 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Diamond Cost',
+                              Text(AppLocalizations.of(context)!.diamondCost,
                                   style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600)),
-                              const Text(
-                                  'Diamonds required to unlock this wallpaper',
+                              Text(AppLocalizations.of(context)!.diamondsRequiredToUnlockThisWallpaper,
                                   style: TextStyle(
                                       color: Colors.white38, fontSize: 11)),
                             ],
@@ -527,10 +526,9 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                 const SizedBox(height: 12),
 
                 // ── Section: Tags ────────────────────────────────────
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 4, bottom: 10),
-                  child: Text(
-                    'Tags',
+                  child: Text(AppLocalizations.of(context)!.tags,
                     style: TextStyle(
                       color: Colors.white54,
                       fontSize: 12,
@@ -544,8 +542,8 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                 _AdminToggle(
                   icon: Icons.hd_rounded,
                   iconColor: const Color(0xFF22D3EE),
-                  label: 'Ultra HD / 4K',
-                  subtitle: 'Shows a cyan "4K" badge on the wallpaper card',
+                  label: AppLocalizations.of(context)!.ultraHd4k,
+                  subtitle: AppLocalizations.of(context)!.showsACyan4kBadgeOnTheWallpaperCard,
                   value: _isUltraHD,
                   activeColor: const Color(0xFF22D3EE),
                   enabled: !_isUploading,
@@ -559,8 +557,7 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                   icon: Icons.star_rounded,
                   iconColor: const Color(0xFFFBBF24),
                   label: "Editor's Choice",
-                  subtitle:
-                      'Shows an amber "★ PICK" badge on the wallpaper card',
+                  subtitle: AppLocalizations.of(context)!.showsAnAmberPickBadgeOnTheWallpaperCard,
                   value: _isEditorsChoice,
                   activeColor: const Color(0xFFFBBF24),
                   enabled: !_isUploading,
@@ -579,7 +576,7 @@ class _UploadWallpaperPageState extends ConsumerState<UploadWallpaperPage> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Publish Wallpaper',
+                  child: Text(AppLocalizations.of(context)!.publishWallpaper,
                       style: TextStyle(
                           color: Colors.black,
                           fontSize: 18,

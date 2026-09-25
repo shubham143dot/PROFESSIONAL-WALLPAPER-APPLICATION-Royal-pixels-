@@ -1,3 +1,4 @@
+import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -18,8 +19,7 @@ class NotificationsPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text(
-          'NOTIFICATIONS',
+        title: Text(AppLocalizations.of(context)!.notifications,
           style: TextStyle(
             letterSpacing: 2,
             fontWeight: FontWeight.bold,
@@ -36,7 +36,7 @@ class NotificationsPage extends ConsumerWidget {
                     icon: const Icon(Icons.delete_sweep_outlined,
                         color: Colors.amber),
                     onPressed: () => _showClearAllConfirm(context, ref),
-                    tooltip: 'Clear All',
+                    tooltip: AppLocalizations.of(context)!.clearAll1,
                   )
                 : const SizedBox.shrink(),
             orElse: () => const SizedBox.shrink(),
@@ -46,7 +46,7 @@ class NotificationsPage extends ConsumerWidget {
       body: notificationsAsync.when(
         data: (notifications) {
           if (notifications.isEmpty) {
-            return _buildEmptyState();
+            return _buildEmptyState(context);
           }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(notificationProvider),
@@ -79,7 +79,7 @@ class NotificationsPage extends ConsumerWidget {
         ),
         error: (err, stack) => Center(
           child: Text(
-            'Error loading notifications: $err',
+            AppLocalizations.of(context)!.errorLoadingNotifications(err.toString()),
             style: const TextStyle(color: Colors.red),
           ),
         ),
@@ -87,7 +87,7 @@ class NotificationsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -95,8 +95,7 @@ class NotificationsPage extends ConsumerWidget {
           Icon(Icons.notifications_none_outlined,
               size: 80, color: Colors.grey[800]),
           const SizedBox(height: 16),
-          const Text(
-            'Nothing to see here',
+          Text(AppLocalizations.of(context)!.nothingToSeeHere,
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -105,7 +104,7 @@ class NotificationsPage extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'We\'ll notify you when something important happens.',
+            AppLocalizations.of(context)!.weWillNotifyYou,
             style: TextStyle(color: Colors.grey[600], fontSize: 14),
           ),
         ],
@@ -118,16 +117,15 @@ class NotificationsPage extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        title: const Text('Clear All Notifications?',
+        title: Text(AppLocalizations.of(context)!.clearAllNotifications,
             style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'This action cannot be undone.',
+        content: Text(AppLocalizations.of(context)!.thisActionCannotBeUndone,
           style: TextStyle(color: Colors.grey),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
+            child: Text(AppLocalizations.of(context)!.cancel, style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () {
@@ -137,7 +135,7 @@ class NotificationsPage extends ConsumerWidget {
               });
             },
             child:
-                const Text('CLEAR ALL', style: TextStyle(color: Colors.amber)),
+                Text(AppLocalizations.of(context)!.clearAll, style: TextStyle(color: Colors.amber)),
           ),
         ],
       ),
@@ -205,7 +203,7 @@ class _NotificationItemCard extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          _formatDate(notification.timestamp),
+                          _formatDate(context, notification.timestamp),
                           style:
                               TextStyle(color: Colors.grey[600], fontSize: 11),
                         ),
@@ -351,14 +349,14 @@ class _NotificationItemCard extends ConsumerWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(BuildContext context, DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
 
     if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
+      return AppLocalizations.of(context)!.minutesAgo(difference.inMinutes);
     } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
+      return AppLocalizations.of(context)!.hoursAgo(difference.inHours);
     } else {
       return DateFormat('MMM d').format(date);
     }

@@ -55,24 +55,28 @@ scripts/node_modules/
 scripts/*.json
 !scripts/package.json
 !scripts/package-lock.json
-!scripts/service_account.json
+!scripts/*.example
 !scripts/*.js
 
-# Local environment
+# Security & Private Credentials
 .env*
+!.env.example
 key.properties
+!key.properties.example
 *.jks
+*.keystore
+scripts/service_account.json
 
-# Temporary files and logs
+# Scratch scripts, mappings, and logs
+scratch/
+scratch_fix_new.py
+update_en.py
+edit_logo.py
+final_mapping.json
+string_mapping.json
 *.txt
 *.log
-build_out.txt
-flutter_analyze.txt
-*output.txt
-temp*.txt
-analyze*.txt
-
-# Scratch directory
-scratch/
+hs_err_pid*
+replay_pid*
 
 
