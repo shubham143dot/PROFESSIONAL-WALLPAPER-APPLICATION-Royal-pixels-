@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibration/vibration.dart';
 import '../../core/di/service_locator.dart';
+import '../../core/utils/haptic_helper.dart';
 import '../../domain/entities/haptic_level.dart';
 
 /// Provider to check if the device supports haptic feedback/vibration.
@@ -47,7 +47,9 @@ class HapticNotifier extends Notifier<HapticLevel> {
     // Warm up the hardware cache immediately
     _initHardwareCache();
 
-    return HapticLevel.fromString(saved);
+    final level = HapticLevel.fromString(saved);
+    HapticHelper.setLevel(level);
+    return level;
   }
 
   Future<void> _initHardwareCache() async {
@@ -67,6 +69,11 @@ class HapticNotifier extends Notifier<HapticLevel> {
     } catch (_) {
       _hasVibrator = true; // Optimistic fallback for standard haptics
     } finally {
+      HapticHelper.updateHardwareCapabilities(
+        hasVibrator: _hasVibrator,
+        hasCustomVibrations: _hasCustomVibrations,
+        hasAmplitudeControl: _hasAmplitudeControl,
+      );
       _initCompleter!.complete();
     }
   }
@@ -74,6 +81,7 @@ class HapticNotifier extends Notifier<HapticLevel> {
   Future<void> setLevel(HapticLevel level) async {
     if (state == level) return;
     state = level;
+    HapticHelper.setLevel(level);
     
     // Give immediate feedback when setting (Preview)
     trigger(previewLevel: level);
@@ -83,57 +91,9 @@ class HapticNotifier extends Notifier<HapticLevel> {
     prefs.setString(_key, level.name);
   }
 
-  // Throttle physical vibration to once per 35ms to prevent hardware queue lag
-  // 35ms is optimized for fast taps (up to 28 taps per second)
-  DateTime _lastVibrateTime = DateTime.fromMillisecondsSinceEpoch(0);
-
   /// Internal method to perform physical haptic feedback with high compatibility
   Future<void> _perform(HapticLevel physicalLevel) async {
-    if (physicalLevel == HapticLevel.off) return;
-
-    final now = DateTime.now();
-    if (now.difference(_lastVibrateTime).inMilliseconds < 35) return;
-    _lastVibrateTime = now;
-
-    try {
-      // Ensure cache is ready
-      if (_hasVibrator == null) await _initHardwareCache();
-      if (_hasVibrator == false) return;
-
-      // Platform-agnostic approach using Flutter's native HapticFeedback
-      // supplemented by Vibration package where native falls short.
-      
-      switch (physicalLevel) {
-        case HapticLevel.light:
-          // Selection click is the lightest OS-level feedback
-          await HapticFeedback.selectionClick();
-          break;
-          
-        case HapticLevel.medium:
-          // Medium impact is crisp and noticeable
-          await HapticFeedback.mediumImpact();
-          break;
-          
-        case HapticLevel.strong:
-          if (Platform.isAndroid && _hasCustomVibrations == true) {
-            // On Android, "heavyImpact" can sometimes be subtle. 
-            // We use a custom pulse for a "Strong" premium feel.
-            Vibration.vibrate(
-              duration: 40,
-              amplitude: _hasAmplitudeControl == true ? 255 : -1,
-            );
-          } else {
-            await HapticFeedback.heavyImpact();
-          }
-          break;
-          
-        case HapticLevel.off:
-          break;
-      }
-    } catch (e) {
-      // Final fallback to core Flutter haptics which never fails
-      HapticFeedback.selectionClick();
-    }
+    await HapticHelper.perform(physicalLevel);
   }
 
   /// Triggers haptic feedback based on current settings or a specific override.

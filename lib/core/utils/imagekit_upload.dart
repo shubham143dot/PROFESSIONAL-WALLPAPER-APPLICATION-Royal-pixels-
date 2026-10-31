@@ -12,26 +12,58 @@ import 'package:path/path.dart' as path;
 ///  - PREMIUM wallpapers: Upload directly to the Cloudinary premium account (unchanged).
 class ImageKitUpload {
   // ── ImageKit Credentials ────────────────────────────────────────────────
-  static const String _ikPrivateKey =
-      String.fromEnvironment('IMAGEKIT_PRIVATE_KEY', defaultValue: '');
+  static const String _ikPrivateKey = String.fromEnvironment(
+    'IMAGEKIT_PRIVATE_KEY',
+    defaultValue: '',
+  );
   static const String _ikUploadUrl =
       'https://upload.imagekit.io/api/v1/files/upload';
 
   // ── Cloudinary Credentials (Free account — fallback) ───────────────────
-  static const String _clFreeCloudName =
-      String.fromEnvironment('CLOUDINARY_FREE_CLOUD_NAME', defaultValue: '');
-  static const String _clFreeApiKey =
-      String.fromEnvironment('CLOUDINARY_FREE_API_KEY', defaultValue: '');
-  static const String _clFreeApiSecret =
-      String.fromEnvironment('CLOUDINARY_FREE_API_SECRET', defaultValue: '');
+  static const String _clFreeCloudName = String.fromEnvironment(
+    'CLOUDINARY_FREE_CLOUD_NAME',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_CLOUD_NAME_FREE',
+      defaultValue: '',
+    ),
+  );
+  static const String _clFreeApiKey = String.fromEnvironment(
+    'CLOUDINARY_FREE_API_KEY',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_API_KEY_FREE',
+      defaultValue: '',
+    ),
+  );
+  static const String _clFreeApiSecret = String.fromEnvironment(
+    'CLOUDINARY_FREE_API_SECRET',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_API_SECRET_FREE',
+      defaultValue: '',
+    ),
+  );
 
   // ── Cloudinary Credentials (Premium account) ────────────────────────────
-  static const String _clPremiumCloudName =
-      String.fromEnvironment('CLOUDINARY_PREMIUM_CLOUD_NAME', defaultValue: '');
-  static const String _clPremiumApiKey =
-      String.fromEnvironment('CLOUDINARY_PREMIUM_API_KEY', defaultValue: '');
-  static const String _clPremiumApiSecret =
-      String.fromEnvironment('CLOUDINARY_PREMIUM_API_SECRET', defaultValue: '');
+  static const String _clPremiumCloudName = String.fromEnvironment(
+    'CLOUDINARY_PREMIUM_CLOUD_NAME',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_CLOUD_NAME_PREMIUM',
+      defaultValue: '',
+    ),
+  );
+  static const String _clPremiumApiKey = String.fromEnvironment(
+    'CLOUDINARY_PREMIUM_API_KEY',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_API_KEY_PREMIUM',
+      defaultValue: '',
+    ),
+  );
+  static const String _clPremiumApiSecret = String.fromEnvironment(
+    'CLOUDINARY_PREMIUM_API_SECRET',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_API_SECRET_PREMIUM',
+      defaultValue: '',
+    ),
+  );
 
   // ────────────────────────────────────────────────────────────────────────
   /// Public entry point.

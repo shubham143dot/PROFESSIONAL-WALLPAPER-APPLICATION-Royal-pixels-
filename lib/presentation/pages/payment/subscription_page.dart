@@ -2,12 +2,12 @@ import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/safe_tap.dart';
 import '../../../core/utils/royal_snack_bar.dart';
+import '../../../core/utils/haptic_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/services/adaptive_performance.dart';
 import '../../../core/widgets/login_required_sheet.dart';
@@ -98,7 +98,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
       }
 
       setState(() => _isPurchasing = true);
-      HapticFeedback.heavyImpact();
+      HapticHelper.heavyImpact();
 
       try {
         final iapService = ref.read(iapServiceProvider);
@@ -663,7 +663,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
           onTapDown: (_) {
             if (!_isPurchasing) {
               setState(() => _isPressed = true);
-              HapticFeedback.mediumImpact();
+              HapticHelper.mediumImpact();
             }
           },
           onTapUp: (_) => setState(() => _isPressed = false),
@@ -826,7 +826,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage>
   Widget _buildRestoreButton() {
     return TextButton(
       onPressed: () async {
-        HapticFeedback.lightImpact();
+        HapticHelper.lightImpact();
         if (!mounted) return;
         try {
           RoyalSnackBar.show(context, 'Checking for past purchases...', type: SnackBarType.info);

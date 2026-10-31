@@ -3,10 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTheme {
+  // ── Existing Luxury Royal Pixels Dark Theme ───────────────────────────────
   static ThemeData get darkTheme {
     final base = ThemeData.dark();
 
-    // ── Outfit type scale ──────────────────────────────────────────────────
     final textTheme = GoogleFonts.outfitTextTheme(base.textTheme).copyWith(
       displayLarge: GoogleFonts.outfit(
           fontSize: 48,
@@ -119,4 +119,32 @@ class AppTheme {
       ),
     );
   }
+
+  // ── Pure AMOLED Dark Theme (True OLED Black from Royal Spend) ─────────────
+  static ThemeData get amoledDarkTheme {
+    final base = darkTheme;
+    return base.copyWith(
+      scaffoldBackgroundColor: AppColors.darkBackground,
+      colorScheme: base.colorScheme.copyWith(
+        surface: AppColors.darkCard,
+        onSurface: Colors.white,
+      ),
+      cardTheme: base.cardTheme.copyWith(
+        color: AppColors.darkCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: const BorderSide(color: AppColors.darkGlassHighlight, width: 0.6),
+        ),
+      ),
+      drawerTheme: const DrawerThemeData(
+        backgroundColor: AppColors.darkBackground,
+      ),
+      dialogTheme: base.dialogTheme.copyWith(
+        backgroundColor: AppColors.darkCard,
+      ),
+    );
+  }
+
+  // Light mode completely removed - defaults directly to 120 FPS high performance dark theme
+  static ThemeData get lightTheme => darkTheme;
 }

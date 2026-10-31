@@ -8,7 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/diamond_provider.dart';
 import '../../../core/utils/royal_snack_bar.dart';
-import 'package:flutter/services.dart';
+import '../../../core/utils/haptic_helper.dart';
 
 import '../../../core/widgets/login_required_sheet.dart';
 import '../../../core/scroll/elite_scroll_physics.dart';
@@ -595,7 +595,7 @@ class _DiamondStorePageState extends ConsumerState<DiamondStorePage>
                   return;
                 }
                 
-                HapticFeedback.heavyImpact();
+                HapticHelper.heavyImpact();
                 final result = await ref.read(diamondProvider.notifier).claimDailyReward(authState.user!.uid);
                 if (result != null && mounted) {
                   RoyalSnackBar.show(

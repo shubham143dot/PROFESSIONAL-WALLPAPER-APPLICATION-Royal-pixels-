@@ -1,12 +1,12 @@
 import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/reward_ad_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/royal_snack_bar.dart';
+import '../../../core/utils/haptic_helper.dart';
 import '../../../core/widgets/login_required_sheet.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/diamond_provider.dart';
@@ -74,7 +74,7 @@ class _WatchEarnSectionState extends ConsumerState<WatchEarnSection>
     }
     if (_isWatching) return;
 
-    HapticFeedback.mediumImpact();
+    HapticHelper.mediumImpact();
     setState(() => _isWatching = true);
 
     _adService.showRewardedAd(
@@ -89,7 +89,7 @@ class _WatchEarnSectionState extends ConsumerState<WatchEarnSection>
             _showCelebration = true;
             _isWatching = false;
           });
-          HapticFeedback.heavyImpact();
+          HapticHelper.heavyImpact();
           _celebController.forward(from: 0).then((_) {
             if (mounted) setState(() => _showCelebration = false);
           });

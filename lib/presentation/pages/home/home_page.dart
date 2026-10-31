@@ -1,8 +1,10 @@
+import 'package:flutter/cupertino.dart';
 import 'package:royal_pixels/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../widgets/ambient_background.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/animation_constants.dart';
 import '../../../core/utils/safe_tap.dart';
@@ -163,6 +165,16 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   void _navigateToPage(int index) {
+    if (ref.read(navigationProvider) == index) {
+      if (index == 0 && _homeScrollController.hasClients) {
+        _homeScrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      }
+      return;
+    }
     // Immediately update state - the listener below will handle the UI jump
     ref.read(navigationProvider.notifier).setIndex(index);
     
@@ -188,33 +200,33 @@ class _HomePageState extends ConsumerState<HomePage>
   // â”€â”€ Premium nav items definition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   List<NavBarItem> _getNavItems(BuildContext context) => [
     NavBarItem(
-      activeIcon: Icons.home_rounded,
-      inactiveIcon: Icons.home_outlined,
+      activeIcon: CupertinoIcons.house_fill,
+      inactiveIcon: CupertinoIcons.house,
       label: AppLocalizations.of(context)!.home,
     ),
     NavBarItem(
-      activeIcon: Icons.local_fire_department_rounded,
-      inactiveIcon: Icons.local_fire_department_outlined,
+      activeIcon: CupertinoIcons.flame_fill,
+      inactiveIcon: CupertinoIcons.flame,
       label: AppLocalizations.of(context)!.feeds,
     ),
     NavBarItem(
-      activeIcon: Icons.grid_view_rounded,
-      inactiveIcon: Icons.grid_view_outlined,
+      activeIcon: CupertinoIcons.square_grid_2x2_fill,
+      inactiveIcon: CupertinoIcons.square_grid_2x2,
       label: AppLocalizations.of(context)!.explore,
     ),
     NavBarItem(
-      activeIcon: Icons.favorite_rounded,
-      inactiveIcon: Icons.favorite_outline_rounded,
+      activeIcon: CupertinoIcons.heart_fill,
+      inactiveIcon: CupertinoIcons.heart,
       label: AppLocalizations.of(context)!.favorites,
     ),
     NavBarItem(
-      activeIcon: Icons.download_done_rounded,
-      inactiveIcon: Icons.download_outlined,
+      activeIcon: CupertinoIcons.arrow_down_circle_fill,
+      inactiveIcon: CupertinoIcons.arrow_down_circle,
       label: AppLocalizations.of(context)!.saved,
     ),
     NavBarItem(
-      activeIcon: Icons.person_rounded,
-      inactiveIcon: Icons.person_outline_rounded,
+      activeIcon: CupertinoIcons.person_crop_circle_fill,
+      inactiveIcon: CupertinoIcons.person_crop_circle,
       label: AppLocalizations.of(context)!.profile,
     ),
   ];
@@ -224,25 +236,37 @@ class _HomePageState extends ConsumerState<HomePage>
     final wallpaperState = ref.watch(wallpaperProvider);
     final userState = ref.watch(authProvider);
     final navIndex = ref.watch(navigationProvider);
+    final settings = ref.watch(settingsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    // Keep PageController aligned with navIndex across external rebuilds or theme/AMOLED changes
+    if (_pageController.hasClients) {
+      final currentPage = _pageController.page?.round();
+      if (currentPage != null && currentPage != navIndex) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_pageController.hasClients && _pageController.page?.round() != navIndex) {
+            _pageController.jumpToPage(navIndex);
+          }
+        });
+      }
+    }
 
     // Listen to navigation changes to sync PageController when updated externally or via tab tap
     ref.listen<int>(navigationProvider, (previous, next) {
       if (_pageController.hasClients) {
         final currentPage = _pageController.page?.round();
         if (currentPage != next) {
-          // Use jumpToPage for "direct" transition as requested
           _pageController.jumpToPage(next);
         }
       }
+      _pageNotifier.value = next.toDouble();
 
       // Trigger specific data logic per tab (centralized here for all navigation sources)
       if (next == 1) { // FEEDS
         ref.read(feedWallpapersProvider.notifier).refresh();
       } else if (next == 2) { // EXPLORE
         ref.read(discoverSeedProvider.notifier).state = DateTime.now().millisecondsSinceEpoch;
-        ref.read(wallpaperProvider.notifier).shuffleSessionSeed();
-      } else if (next == 0) { // HOME
         ref.read(wallpaperProvider.notifier).shuffleSessionSeed();
       }
     });
@@ -285,93 +309,66 @@ class _HomePageState extends ConsumerState<HomePage>
         ),
       ),
       // â”€â”€ Body + Floating Nav overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      body: Stack(
+      body: AmbientBackground(
+        isDark: isDark,
+        isAmoled: settings.isAmoledMode,
+        child: Stack(
         children: [
-          // â”€â”€ PageView â€” gesture-driven, iOS-physics swipe navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          // keepAlive: each page is wrapped in AutomaticKeepAlive inside.
+          // ── PageView ──────────────────────────────────────────────────────────
+          // Swipe gestures between pages removed: users navigate exclusively via navigation bar
           PageView(
+            key: const PageStorageKey('home_main_page_view'),
             controller: _pageController,
-            physics: const EliteScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            // Update _navIndex ONLY when page fully settles (not during swipe)
-            // so AppBar title and haptic only fire once per completed nav.
-            onPageChanged: (index) {
-              ref.read(hapticProvider.notifier).selectionClick();
-              ref.read(navigationProvider.notifier).setIndex(index);
-            },
+            physics: const NeverScrollableScrollPhysics(),
             children: [
               // Tab 0: Home wallpaper grid
-              _PremiumParallaxWrapper(
-                index: 0,
-                pageNotifier: _pageNotifier,
+              _KeepAlivePage(
                 child: _buildHomeTab(wallpaperState),
               ),
               // Tab 1: Social Feed (Reels)
-              _PremiumParallaxWrapper(
-                index: 1,
-                pageNotifier: _pageNotifier,
-                child: const _KeepAlivePage(child: SocialFeedPage()),
-              ),
+              const _KeepAlivePage(child: SocialFeedPage()),
               // Tab 2: Categories
-              _PremiumParallaxWrapper(
-                index: 2,
-                pageNotifier: _pageNotifier,
-                child: const _KeepAlivePage(
-                  child: CategoriesListPage(embeddedMode: true),
-                ),
+              const _KeepAlivePage(
+                child: CategoriesListPage(embeddedMode: true),
               ),
               // Tab 3: Favorites (only favorites)
-              _PremiumParallaxWrapper(
-                index: 3,
-                pageNotifier: _pageNotifier,
-                child: const _KeepAlivePage(
-                  child: MyWallpapersPage(
-                    embeddedMode: true,
-                    showFavoritesOnly: true,
-                  ),
+              const _KeepAlivePage(
+                child: MyWallpapersPage(
+                  embeddedMode: true,
+                  showFavoritesOnly: true,
                 ),
               ),
               // Tab 4: My Wallpapers (downloaded)
-              _PremiumParallaxWrapper(
-                index: 4,
-                pageNotifier: _pageNotifier,
-                child: const _KeepAlivePage(
-                  child: MyWallpapersPage(embeddedMode: true),
-                ),
+              const _KeepAlivePage(
+                child: MyWallpapersPage(embeddedMode: true),
               ),
               // Tab 5: Profile
-              _PremiumParallaxWrapper(
-                index: 5,
-                pageNotifier: _pageNotifier,
-                child: _KeepAlivePage(
-                  child: userState.isGuest
-                      ? _buildGuestProfileTab()
-                      : _buildProfileTab(userState),
-                ),
+              _KeepAlivePage(
+                child: userState.isGuest
+                    ? _buildGuestProfileTab()
+                    : _buildProfileTab(userState),
               ),
             ],
           ),
 
-          // â”€â”€ Floating nav bar â€” pinned at bottom of Stack â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ── Floating nav bar ──────────────────────────────────────────────
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
             child: PremiumFloatingNavBar(
               currentIndex: navIndex,
-              pageNotifier: _pageNotifier,
               items: _getNavItems(context),
               bottomSafeArea: bottomPadding,
               onTap: (index) {
-                ref.read(hapticProvider.notifier).selectionClick();
                 _navigateToPage(index);
               },
             ),
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
 
@@ -381,12 +378,21 @@ class _HomePageState extends ConsumerState<HomePage>
 
     final isHigh = AdaptivePerformance.isHigh;
 
-    return CustomScrollView(
-      controller: _homeScrollController,
-      physics: const EliteAlwaysScrollPhysics(),
-      // Reduced cacheExtent for non-high devices to save memory/build time
-      // Phase 8: aggressively reduced on LOW tier to prevent scroll lag
-      cacheExtent: isHigh ? 1200 : (AdaptivePerformance.isLow ? 250 : 500),
+    return RefreshIndicator(
+      color: AppColors.goldMid,
+      backgroundColor: AppColors.bg1,
+      edgeOffset: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+      onRefresh: () async {
+        ref.read(hapticProvider.notifier).lightImpact();
+        ref.read(wallpaperProvider.notifier).shuffleSessionSeed();
+        await ref.read(wallpaperProvider.notifier).loadWallpapers(forceRefresh: true);
+      },
+      child: CustomScrollView(
+        controller: _homeScrollController,
+        physics: const EliteAlwaysScrollPhysics(),
+        // Reduced cacheExtent for non-high devices to save memory/build time
+        // Phase 8: aggressively reduced on LOW tier to prevent scroll lag
+        cacheExtent: isHigh ? 1200 : (AdaptivePerformance.isLow ? 250 : 500),
       slivers: [
         // â”€â”€ Filter chips strip (pinned-like via padding top) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         SliverToBoxAdapter(child: _buildFilterStrip(wallpaperState)),
@@ -509,7 +515,8 @@ class _HomePageState extends ConsumerState<HomePage>
           child: SizedBox(height: 110 + MediaQuery.of(context).padding.bottom),
         ),
       ],
-    );
+    ),
+  );
   }
 
   // â”€â”€ Filter chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1006,6 +1013,40 @@ class _HomePageState extends ConsumerState<HomePage>
                   ),
 
                   const SizedBox(height: 28),
+                  _ProfileGroupLabel(label: AppLocalizations.of(context)!.preferences),
+                  const SizedBox(height: 12),
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final settings = ref.watch(settingsProvider);
+                      return _ProfileGroupWrapper(
+                        children: [
+                          _ProfileMenuTile(
+                            icon: Icons.brightness_medium_rounded,
+                            label: AppLocalizations.of(context)!.amoledMode,
+                            subtitle: settings.isAmoledMode ? 'Prioritize deep blacks' : 'Standard dark',
+                            useCardStyle: false,
+                            trailingWidget: Switch(
+                              value: settings.isAmoledMode,
+                              activeThumbColor: AppColors.goldMid,
+                              activeTrackColor: AppColors.goldMid.withValues(alpha: 0.35),
+                              trackColor: WidgetStateProperty.resolveWith((states) {
+                                if (states.contains(WidgetState.selected)) {
+                                  return AppColors.goldMid.withValues(alpha: 0.35);
+                                }
+                                return AppColors.bg3;
+                              }),
+                              onChanged: (_) {
+                                ref.read(hapticProvider.notifier).lightImpact();
+                                ref.read(settingsProvider.notifier).toggleAmoledMode();
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 28),
                   _ProfileGroupLabel(label: AppLocalizations.of(context)!.appFeel),
                   const SizedBox(height: 12),
                   const _HapticControlCenter(),
@@ -1384,7 +1425,13 @@ class _HomePageState extends ConsumerState<HomePage>
                               trailingWidget: Switch(
                                 value: settings.isAmoledMode,
                                 activeThumbColor: AppColors.goldMid,
-                                trackColor: WidgetStateProperty.all(AppColors.bg3),
+                                activeTrackColor: AppColors.goldMid.withValues(alpha: 0.35),
+                                trackColor: WidgetStateProperty.resolveWith((states) {
+                                  if (states.contains(WidgetState.selected)) {
+                                    return AppColors.goldMid.withValues(alpha: 0.35);
+                                  }
+                                  return AppColors.bg3;
+                                }),
                                 onChanged: (_) {
                                   ref.read(hapticProvider.notifier).lightImpact();
                                   ref.read(settingsProvider.notifier).toggleAmoledMode();
@@ -1713,11 +1760,12 @@ class _ProfileMenuTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color iconColor = isDanger
         ? Colors.redAccent
         : isGold
             ? AppColors.goldMid
-            : AppColors.textSecondary;
+            : (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary);
 
     final tileContent = Row(
       children: [
@@ -1729,7 +1777,7 @@ class _ProfileMenuTile extends ConsumerWidget {
                 ? Colors.red.withAlpha(25)
                 : isGold
                     ? AppColors.goldMid.withAlpha(25)
-                    : AppColors.bg2.withAlpha(150),
+                    : (isDark ? AppColors.bg2.withAlpha(150) : const Color(0xFFF1F5F9)),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Icon(icon, color: iconColor, size: 20),
@@ -1745,7 +1793,7 @@ class _ProfileMenuTile extends ConsumerWidget {
                 style: TextStyle(
                   color: isDanger
                       ? Colors.redAccent
-                      : AppColors.textPrimary,
+                      : (isDark ? AppColors.textPrimary : AppColors.lightTextPrimary),
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
                   letterSpacing: -0.2,
@@ -1755,8 +1803,8 @@ class _ProfileMenuTile extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle!,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: isDark ? AppColors.textMuted : AppColors.lightTextMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
                   ),
@@ -1767,7 +1815,7 @@ class _ProfileMenuTile extends ConsumerWidget {
         ),
         trailingWidget ??
             Icon(Icons.chevron_right_rounded,
-                color: AppColors.textMuted.withAlpha(150), size: 22),
+                color: (isDark ? AppColors.textMuted.withAlpha(150) : AppColors.lightTextMuted), size: 22),
       ],
     );
 
@@ -2138,14 +2186,18 @@ class _ProfileGroupWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.bg1.withAlpha(180),
+        color: isDark ? AppColors.bg1.withAlpha(180) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.glassBorder.withAlpha(100), width: 1),
+        border: Border.all(
+          color: isDark ? AppColors.glassBorder.withAlpha(100) : const Color(0x18000000),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(50),
+            color: isDark ? Colors.black.withAlpha(50) : const Color(0xFF64748B).withValues(alpha: 0.08),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -2160,7 +2212,10 @@ class _ProfileGroupWrapper extends StatelessWidget {
               if (!isLast)
                 Padding(
                   padding: const EdgeInsets.only(left: 60, right: 16),
-                  child: Divider(color: AppColors.divider.withAlpha(50), height: 1),
+                  child: Divider(
+                    color: isDark ? AppColors.divider.withAlpha(50) : AppColors.lightSeparator,
+                    height: 1,
+                  ),
                 ),
             ],
           );
@@ -2174,56 +2229,6 @@ class _ProfileGroupWrapper extends StatelessWidget {
 // -- KeepAlivePage -------------------------------------------------------------
 // Wraps each PageView child so it stays alive (state + scroll position preserved)
 // even when swiped off screen — replicates IndexedStack's keep-alive guarantee.
-
-/// A premium wrapper that provides parallax, scale, and opacity transitions
-/// to PageView tabs based on their scroll position.
-class _PremiumParallaxWrapper extends StatelessWidget {
-  final int index;
-  final ValueNotifier<double> pageNotifier;
-  final Widget child;
-
-  const _PremiumParallaxWrapper({
-    required this.index,
-    required this.pageNotifier,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<double>(
-      valueListenable: pageNotifier,
-      builder: (context, page, child) {
-        final double offset = index - page;
-        final double absOffset = offset.abs();
-        
-        if (absOffset > 1.0) return child!;
-
-        if (AdaptivePerformance.isLow) {
-          return Opacity(
-            opacity: (1.0 - absOffset).clamp(0.0, 1.0),
-            child: child,
-          );
-        }
-
-        final double scale = (1.0 - absOffset * 0.06).clamp(0.94, 1.0);
-        final double opacity = (1.0 - absOffset * 0.7).clamp(0.0, 1.0);
-        final double parallaxX = offset * MediaQuery.of(context).size.width * 0.4;
-
-        return Opacity(
-          opacity: opacity,
-          child: Transform.translate(
-            offset: Offset(parallaxX, 0),
-            child: Transform.scale(
-              scale: scale,
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: child,
-    );
-  }
-}
 
 class _KeepAlivePage extends StatefulWidget {
   final Widget child;

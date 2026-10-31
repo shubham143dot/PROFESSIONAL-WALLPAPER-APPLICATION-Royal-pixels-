@@ -24,6 +24,7 @@ import '../../domain/usecases/update_wallpaper_usecase.dart';
 import '../../domain/usecases/rename_category_usecase.dart';
 import '../../domain/repositories/notification_repository.dart';
 import '../../data/repositories/notification_repository_impl.dart';
+import '../utils/haptic_helper.dart';
 
 final sl = GetIt.instance;
 
@@ -31,6 +32,7 @@ Future<void> setupLocator() async {
   // --- External ---
   final sharedPreferences = await SharedPreferences.getInstance();
   sl.registerLazySingleton(() => sharedPreferences);
+  HapticHelper.init(sharedPreferences);
 
   sl.registerLazySingleton(() => FirebaseAuth.instance);
   sl.registerLazySingleton(() => FirebaseFirestore.instance);

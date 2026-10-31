@@ -26,6 +26,7 @@ import 'package:royal_pixels/core/theme/app_theme.dart';
 import 'package:royal_pixels/core/utils/royal_snack_bar.dart';
 import 'package:royal_pixels/presentation/navigation/app_router.dart';
 import 'package:royal_pixels/presentation/providers/auth_provider.dart';
+import 'package:royal_pixels/presentation/providers/settings_provider.dart';
 import 'package:royal_pixels/core/services/iap_service.dart';
 
 void main() async {
@@ -199,14 +200,16 @@ class _RoyalPixelsAppState extends ConsumerState<RoyalPixelsApp>
        _updateAdServices(ref.read(authProvider));
     });
 
+    final settings = ref.watch(settingsProvider);
+
     return MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: RoyalSnackBar.messengerKey,
       scrollBehavior: const PremiumScrollBehavior(),
       themeMode: ThemeMode.dark,
-      theme: AppTheme.darkTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme: settings.isAmoledMode ? AppTheme.amoledDarkTheme : AppTheme.darkTheme,
+      darkTheme: settings.isAmoledMode ? AppTheme.amoledDarkTheme : AppTheme.darkTheme,
       routerConfig: appRouter,
       // ── Localization ──────────────────────────────────────────────────
       supportedLocales: AppLocalizations.supportedLocales,

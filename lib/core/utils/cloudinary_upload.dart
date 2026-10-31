@@ -6,20 +6,50 @@ import 'package:http/http.dart' as http;
 
 class CloudinaryUpload {
   // Free Wallpapers Credentials
-  static const String _freeCloudName =
-      String.fromEnvironment('CLOUDINARY_FREE_CLOUD_NAME', defaultValue: '');
-  static const String _freeApiKey =
-      String.fromEnvironment('CLOUDINARY_FREE_API_KEY', defaultValue: '');
-  static const String _freeApiSecret =
-      String.fromEnvironment('CLOUDINARY_FREE_API_SECRET', defaultValue: '');
+  static const String _freeCloudName = String.fromEnvironment(
+    'CLOUDINARY_FREE_CLOUD_NAME',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_CLOUD_NAME_FREE',
+      defaultValue: '',
+    ),
+  );
+  static const String _freeApiKey = String.fromEnvironment(
+    'CLOUDINARY_FREE_API_KEY',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_API_KEY_FREE',
+      defaultValue: '',
+    ),
+  );
+  static const String _freeApiSecret = String.fromEnvironment(
+    'CLOUDINARY_FREE_API_SECRET',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_API_SECRET_FREE',
+      defaultValue: '',
+    ),
+  );
 
   // Premium & Special Wallpapers Credentials
-  static const String _premiumCloudName =
-      String.fromEnvironment('CLOUDINARY_PREMIUM_CLOUD_NAME', defaultValue: '');
-  static const String _premiumApiKey =
-      String.fromEnvironment('CLOUDINARY_PREMIUM_API_KEY', defaultValue: '');
-  static const String _premiumApiSecret =
-      String.fromEnvironment('CLOUDINARY_PREMIUM_API_SECRET', defaultValue: '');
+  static const String _premiumCloudName = String.fromEnvironment(
+    'CLOUDINARY_PREMIUM_CLOUD_NAME',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_CLOUD_NAME_PREMIUM',
+      defaultValue: '',
+    ),
+  );
+  static const String _premiumApiKey = String.fromEnvironment(
+    'CLOUDINARY_PREMIUM_API_KEY',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_API_KEY_PREMIUM',
+      defaultValue: '',
+    ),
+  );
+  static const String _premiumApiSecret = String.fromEnvironment(
+    'CLOUDINARY_PREMIUM_API_SECRET',
+    defaultValue: String.fromEnvironment(
+      'CLOUDINARY_API_SECRET_PREMIUM',
+      defaultValue: '',
+    ),
+  );
 
   /// Uploads an image file to Cloudinary using Signed API.
   /// If [isPremiumOrSpecial] is true, uses the premium Cloudinary account.

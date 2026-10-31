@@ -19,7 +19,7 @@
   </p>
 
   <p align="center">
-    <img src="https://img.shields.io/badge/Version-2.3.4%2B36-blue?style=flat-square" alt="Version 2.3.4+36" />
+    <img src="https://img.shields.io/badge/Version-2.4.0%2B37-blue?style=flat-square" alt="Version 2.4.0+37" />
     <img src="https://img.shields.io/badge/Flutter-%3E%3D3.5.0-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter SDK" />
     <img src="https://img.shields.io/badge/Dart-%3E%3D3.5.0-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart SDK" />
     <img src="https://img.shields.io/badge/Android-Min%20SDK%2024%20|%20Target%20SDK%2036-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android SDK" />

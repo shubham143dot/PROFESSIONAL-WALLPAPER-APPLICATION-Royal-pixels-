@@ -23,9 +23,9 @@ async function pushUpdate(buildNumber, versionName, force = true) {
   process.exit(0);
 }
 
-// Defaulting to 18 for the latest stable build with fixes
-const targetBuild = 19; 
-const targetVersion = "1.2.9";
+// Defaulting to 37 for version 2.4.0
+const targetBuild = 37; 
+const targetVersion = "2.4.0";
 
 pushUpdate(targetBuild, targetVersion, true).catch(err => {
   console.error('❌ Error pushing update:', err);
